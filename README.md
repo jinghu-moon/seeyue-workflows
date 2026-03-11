@@ -39,3 +39,8 @@
 - `npm run test:skills:smoke:auto`
 - `npm run test:skills:smoke:runner`
 - `npm run test:all`
+
+## 许可证
+
+- 本项目采用 AGPL-3.0-or-later 许可证，详见 LICENSE。
+- 额外说明见 NOTICE。
