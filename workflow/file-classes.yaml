@@ -1,0 +1,84 @@
+schema_kind: file_class_registry
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define file classes consumed by hooks, policy, and approval routing.
+  authority: machine_source_of_truth
+  source_documents:
+    - docs/architecture-v4.md
+    - workflow/policy.spec.yaml
+  rules:
+    - File classes MUST remain stable identifiers for policy and hook evaluation.
+    - Match precedence MUST be deterministic.
+classes:
+  workspace_file:
+    default_risk_class: low
+    patterns:
+      - src/**/*
+      - app/**/*
+      - lib/**/*
+      - packages/**/*
+      - scripts/**/*
+  docs_file:
+    default_risk_class: low
+    patterns:
+      - docs/**/*.md
+      - '**/README.md'
+      - '**/*.md'
+  test_file:
+    default_risk_class: low
+    patterns:
+      - tests/**/*
+      - '**/*.test.*'
+      - '**/*.spec.*'
+  generated_file:
+    default_risk_class: medium
+    patterns:
+      - dist/**/*
+      - coverage/**/*
+      - '**/*.generated.*'
+  system_file:
+    default_risk_class: critical
+    patterns:
+      - .git/**/*
+      - .github/workflows/**/*
+      - .claude/settings.json
+  security_boundary:
+    default_risk_class: critical
+    patterns:
+      - scripts/hooks/**/*
+      - .claude/sy-hooks.policy.json
+      - workflow/runtime.schema.yaml
+      - workflow/router.spec.yaml
+      - workflow/policy.spec.yaml
+      - workflow/approval-matrix.yaml
+      - workflow/file-classes.yaml
+      - workflow/persona-bindings.yaml
+      - workflow/capabilities.yaml
+  secret_material:
+    default_risk_class: critical
+    patterns:
+      - .env
+      - .env.*
+      - '**/*.pem'
+      - '**/*.key'
+      - '**/*.p12'
+      - '**/secrets/**/*'
+  critical_policy_file:
+    default_risk_class: high
+    patterns:
+      - workflow/**/*.yaml
+      - docs/architecture-v4.md
+      - docs/test-gate-spec-v2.md
+      - .agents/skills/sy-constraints/**/*
+match_precedence:
+  - secret_material
+  - security_boundary
+  - system_file
+  - critical_policy_file
+  - generated_file
+  - test_file
+  - docs_file
+  - workspace_file

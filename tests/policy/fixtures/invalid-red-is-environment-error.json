@@ -1,0 +1,20 @@
+{
+  "actionContext": {
+    "redEvidence": {
+      "executed": true,
+      "testFailed": true,
+      "failureKind": "environment_error",
+      "exitCode": 1,
+      "recorded": true
+    }
+  },
+  "expected": {
+    "route_effect": "block",
+    "primary_reason": "invalid_red",
+    "test_gates": {
+      "required": true,
+      "red_valid": false,
+      "pre_write_block": true
+    }
+  }
+}

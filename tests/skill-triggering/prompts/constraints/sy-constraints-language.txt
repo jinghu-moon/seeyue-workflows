@@ -1,0 +1,1 @@
+请检查这份规则文档是否满足 RULES/PERSONA/RFC2119、USER_OUTPUT 与 zh-CN only 的语言分区约束。

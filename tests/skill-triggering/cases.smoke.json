@@ -1,0 +1,47 @@
+[
+  {
+    "skill": "sy-workflow",
+    "prompt": "tests/skill-triggering/prompts/sy-workflow.txt",
+    "offline_keywords": [
+      "模糊想法",
+      "可执行任务",
+      "按工作流开始"
+    ]
+  },
+  {
+    "skill": "sy-executing-plans",
+    "prompt": "tests/skill-triggering/prompts/sy-executing-plans.txt",
+    "offline_keywords": [
+      "执行节点",
+      "运行测试",
+      "验证节点"
+    ]
+  },
+  {
+    "skill": "sy-requesting-code-review",
+    "prompt": "tests/skill-triggering/prompts/sy-requesting-code-review.txt",
+    "offline_keywords": [
+      "结构化代码评审",
+      "高风险问题",
+      "按严重级别"
+    ]
+  },
+  {
+    "skill": "sy-design",
+    "prompt": "tests/skill-triggering/prompts/sy-design.txt",
+    "offline_keywords": [
+      "技术设计",
+      "非目标",
+      "风险"
+    ]
+  },
+  {
+    "skill": "sy-debug",
+    "prompt": "tests/skill-triggering/prompts/sy-debug.txt",
+    "offline_keywords": [
+      "根因调试",
+      "先收集证据",
+      "假设"
+    ]
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "actionContext": {
+    "targetPath": "docs/guide.md",
+    "commandClass": "safe",
+    "changeClass": "docs",
+    "verificationPassed": true,
+    "changeIsAuditable": true,
+    "touchesAuthOrSecurity": false,
+    "touchesSchemaOrPublicApi": false,
+    "touchesDataMigration": false,
+    "tddExceptionActive": false
+  },
+  "expected": {
+    "route_effect": "allow",
+    "primary_reason": "notify_only",
+    "approval": {
+      "required": false,
+      "notify_only": true,
+      "file_class": "docs_file"
+    }
+  }
+}

@@ -1,0 +1,121 @@
+schema_kind: approval_matrix
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define approval requirements by command class and file class.
+  authority: machine_source_of_truth
+  source_documents:
+    - docs/architecture-v4.md
+    - workflow/policy.spec.yaml
+    - workflow/file-classes.yaml
+  rules:
+    - Approval mode MUST remain separate from grant scope.
+    - Notify-only eligibility MUST NOT be treated as approval.
+risk_classes:
+  - low
+  - medium
+  - high
+  - critical
+approval_modes:
+  - manual_required
+  - never_auto
+grant_scopes:
+  - once
+  - session
+command_classes:
+  safe:
+    risk_class: low
+    approval_required: false
+    notify_only_allowed: true
+  verify:
+    risk_class: low
+    approval_required: false
+    notify_only_allowed: true
+  destructive:
+    risk_class: critical
+    approval_required: true
+    approval_mode: never_auto
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  git_mutating:
+    risk_class: high
+    approval_required: true
+    approval_mode: manual_required
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  networked:
+    risk_class: high
+    approval_required: true
+    approval_mode: manual_required
+    allowed_grant_scopes:
+      - once
+      - session
+    notify_only_allowed: false
+  privileged:
+    risk_class: critical
+    approval_required: true
+    approval_mode: never_auto
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  schema_mutation:
+    risk_class: high
+    approval_required: true
+    approval_mode: manual_required
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  data_mutation:
+    risk_class: high
+    approval_required: true
+    approval_mode: manual_required
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+file_classes:
+  system_file:
+    risk_class: critical
+    approval_required: true
+    approval_mode: never_auto
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  security_boundary:
+    risk_class: critical
+    approval_required: true
+    approval_mode: never_auto
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  secret_material:
+    risk_class: critical
+    approval_required: true
+    approval_mode: never_auto
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+  critical_policy_file:
+    risk_class: high
+    approval_required: true
+    approval_mode: manual_required
+    allowed_grant_scopes:
+      - once
+    notify_only_allowed: false
+notify_only:
+  allowed_change_classes:
+    - docs
+    - scaffold
+    - utility
+  forbidden_command_classes:
+    - destructive
+    - git_mutating
+    - networked
+    - privileged
+  forbidden_file_classes:
+    - system_file
+    - security_boundary
+    - secret_material

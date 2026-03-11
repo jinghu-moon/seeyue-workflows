@@ -1,0 +1,15 @@
+{
+  "phases": {
+    "P1": { "status": "pending" },
+    "P2": { "status": "in_progress" }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "phase_dependency_unmet",
+    "next_persona": "human",
+    "next_capability": "human_approval",
+    "recommended_next": [
+      { "type": "human_intervention", "target": "P2" }
+    ]
+  }
+}

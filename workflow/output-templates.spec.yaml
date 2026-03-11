@@ -1,0 +1,102 @@
+schema_kind: output_template_registry
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: frozen
+owner: seeyue-workflows
+meta:
+  purpose: Define canonical output templates and variable contracts for V5 skills.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - skills
+  - adapters
+  - validators
+  source_documents:
+  - refer/output-templates-reference.md
+templates:
+  checkpoint:
+    title: Checkpoint Summary
+    output_level: detail
+    i18n_key: checkpoint
+    required_variables:
+    - node_id
+    - file_path
+    - line_start
+    - line_end
+    - lines_added
+    - lines_removed
+    - verify_command
+    - tests_passed
+    - tests_failed
+    - duration
+    - scope_status
+    - scope_detail
+    - constraints_status
+    - constraints_detail
+    - tdd_status
+    - tdd_detail
+    - current_node
+    - total_nodes
+    - progress_pct
+    - next_action
+    optional_variables:
+    - commit_sha
+  review-report:
+    title: Review Report
+    output_level: detail
+    i18n_key: review_report
+    required_variables:
+    - files_changed
+    - lines_added
+    - lines_removed
+    - commits_count
+    - critical_section
+    - high_section
+    - medium_section
+    - low_section
+    - verdict
+  error-report:
+    title: Error Report
+    output_level: detail
+    i18n_key: error_report
+    required_variables:
+    - error_type
+    - command
+    - exit_code
+    - output
+    - failure_details
+    - root_cause
+    - next_steps
+  user-decision:
+    title: User Decision
+    output_level: detail
+    i18n_key: user_decision
+    required_variables:
+    - question
+    - options
+    - input_prompt
+  progress-bar:
+    title: Progress Bar
+    output_level: summary
+    i18n_key: progress_bar
+    required_variables:
+    - progress_pct
+    - current_node
+    - total_nodes
+  completion-summary:
+    title: Completion Summary
+    output_level: summary
+    i18n_key: completion_summary
+    required_variables:
+    - summary
+    - files_changed
+    - lines_added
+    - lines_removed
+    - verification_status
+    - next_action
+  status-indicator:
+    title: Status Indicator
+    output_level: summary
+    i18n_key: status_indicator
+    required_variables:
+    - status
+    - message

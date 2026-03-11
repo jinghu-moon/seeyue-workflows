@@ -1,0 +1,21 @@
+{
+  "nodes": {
+    "P2-N2": {
+      "parallel_group": "adapter_mvp"
+    }
+  },
+  "expected": {
+    "result": {
+      "route_verdict": "block",
+      "block_reason": "invalid_state"
+    },
+    "sprint_status": {
+      "recommended_next": [
+        {
+          "type": "human_intervention",
+          "target": "P2"
+        }
+      ]
+    }
+  }
+}

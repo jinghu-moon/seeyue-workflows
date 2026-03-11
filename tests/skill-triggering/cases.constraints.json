@@ -1,0 +1,67 @@
+[
+  {
+    "skill": "sy-constraints",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints.txt",
+    "offline_keywords": ["启动 sy-* 工作流", "最小加载约束", "hook 强约束"]
+  },
+  {
+    "skill": "sy-constraints/language",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-language.txt",
+    "offline_keywords": ["rules/persona/rfc2119", "user_output", "zh-cn only"]
+  },
+  {
+    "skill": "sy-constraints/truth",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-truth.txt",
+    "offline_keywords": ["事实性声明", "提供来源", "新鲜验证"]
+  },
+  {
+    "skill": "sy-constraints/execution",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-execution.txt",
+    "offline_keywords": ["plan execute review", "source-of-truth", "rollback boundary"]
+  },
+  {
+    "skill": "sy-constraints/research",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-research.txt",
+    "offline_keywords": ["adopt extend build", "先搜后建", "新增依赖"]
+  },
+  {
+    "skill": "sy-constraints/debug",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-debug.txt",
+    "offline_keywords": ["bug", "根因定位", "禁止盲修"]
+  },
+  {
+    "skill": "sy-constraints/review",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-review.txt",
+    "offline_keywords": ["处理评审反馈", "accept reject unverified defer", "逐条验证"]
+  },
+  {
+    "skill": "sy-constraints/verify",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-verify.txt",
+    "offline_keywords": ["完成声明", "verification report", "fresh evidence"]
+  },
+  {
+    "skill": "sy-constraints/workspace",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-workspace.txt",
+    "offline_keywords": ["worktree", "baseline health check", "隔离环境"]
+  },
+  {
+    "skill": "sy-constraints/appsec",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-appsec.txt",
+    "offline_keywords": ["auth", "input", "secret"]
+  },
+  {
+    "skill": "sy-constraints/safety",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-safety.txt",
+    "offline_keywords": ["高风险操作确认", "git reset --hard", "force push"]
+  },
+  {
+    "skill": "sy-constraints/testing",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-testing.txt",
+    "offline_keywords": ["tdd", "red green refactor", "coverage_min"]
+  },
+  {
+    "skill": "sy-constraints/phase",
+    "prompt": "tests/skill-triggering/prompts/constraints/sy-constraints-phase.txt",
+    "offline_keywords": ["多节点", "parallel preflight", "entry_condition exit_gate rollback_boundary"]
+  }
+]

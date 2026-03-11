@@ -1,0 +1,83 @@
+{
+  "version": "2.0.0",
+  "sessionStart": {
+    "enabled": true,
+    "workflowSkill": "sy-workflow",
+    "constraintsSkill": "sy-constraints",
+    "maxChildSkillsPerTurn": 2
+  },
+  "promptRefresh": {
+    "triggerKeywords": [
+      "implement",
+      "fix",
+      "add",
+      "write",
+      "create",
+      "build",
+      "debug",
+      "test",
+      "\u5b9e\u73b0",
+      "\u4fee\u590d",
+      "\u6dfb\u52a0",
+      "\u7f16\u5199",
+      "\u521b\u5efa",
+      "\u6784\u5efa",
+      "\u6d4b\u8bd5"
+    ],
+    "activePhases": [
+      "plan",
+      "execute",
+      "review"
+    ]
+  },
+  "beforeToolSelection": {
+    "enabled": true,
+    "bypassEnv": "SY_BYPASS_TOOL_SELECTION",
+    "allowMode": "AUTO",
+    "denyMode": "NONE",
+    "restrictOnNonExecute": true,
+    "restrictOnParseError": true,
+    "blockOnApprovalPending": true,
+    "blockOnRestorePending": true,
+    "allowedFunctionNames": [
+      "glob",
+      "grep_search",
+      "list_directory",
+      "read_file",
+      "read_many_files",
+      "google_web_search",
+      "web_fetch",
+      "get_internal_docs",
+      "activate_skill",
+      "save_memory"
+    ]
+  },
+  "afterModel": {
+    "enabled": true,
+    "bypassEnv": "SY_BYPASS_AFTER_MODEL",
+    "maxRedactions": 5
+  },
+  "stop": {
+    "maxReportAgeHours": 6,
+    "reportRelativePath": ".ai/analysis/ai.report.json"
+  },
+  "workflow": {
+    "sessionRelativePath": ".ai/workflow/session.yaml",
+    "donePhases": [
+      "done"
+    ],
+    "doneNextActions": [
+      "none",
+      "n/a",
+      "na",
+      "done",
+      "completed",
+      "idle",
+      "wait new task",
+      "wait_new_task",
+      "\u65e0",
+      "\u5b8c\u6210"
+    ],
+    "maxActiveHours": 72
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "session": {
+    "recovery": { "restore_pending": true, "restore_reason": "missing_terminal_event" }
+  },
+  "expected": {
+    "route_verdict": "resume",
+    "block_reason": "restore_pending",
+    "next_persona": "author",
+    "recommended_next": [
+      { "type": "resume_node", "target": "P2-N1" }
+    ]
+  }
+}

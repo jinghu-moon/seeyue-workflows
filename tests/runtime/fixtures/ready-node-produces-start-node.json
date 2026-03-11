@@ -1,0 +1,21 @@
+{
+  "session": {
+    "node": { "active_id": "none", "state": "idle", "owner_persona": "planner" }
+  },
+  "expected": {
+    "result": {
+      "route_verdict": "advance",
+      "active_node": "P2-N2",
+      "next_persona": "author",
+      "recommended_next": [
+        { "type": "start_node", "target": "P2-N2" }
+      ]
+    },
+    "sprint_status": {
+      "active_phase": "P2",
+      "recommended_next": [
+        { "type": "start_node", "target": "P2-N2" }
+      ]
+    }
+  }
+}

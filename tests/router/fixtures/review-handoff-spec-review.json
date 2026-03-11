@@ -1,0 +1,24 @@
+{
+  "session": {
+    "node": { "active_id": "P2-N1", "state": "green_verified", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "review",
+      "tdd_state": "green_verified",
+      "review_state": { "spec_review": "pending", "quality_review": "pending" }
+    }
+  },
+  "expected": {
+    "route_verdict": "handoff",
+    "next_persona": "spec_reviewer",
+    "next_capability": "spec_review",
+    "recommended_next": [
+      {
+        "type": "resume_node",
+        "target": "P2-N1",
+        "params": { "persona": "spec_reviewer" }
+      }
+    ]
+  }
+}

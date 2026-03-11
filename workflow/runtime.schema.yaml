@@ -1,0 +1,1162 @@
+schema_kind: runtime_schema
+schema_version: 4
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define the durable runtime state contract for V4 workflows.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - router
+  - policy_engine
+  - validators
+  - engine_adapters
+  source_documents:
+  - docs/architecture-v4.md
+  compatibility_targets:
+  - claude_code
+  - codex
+  - gemini_cli
+conventions:
+  structural_keywords:
+  - type
+  - required
+  - properties
+  - items
+  - enum
+  - const
+  - minimum
+  - maximum
+  - min_items
+  - max_items
+  - pattern
+  - format
+  - nullable
+  - additional_properties
+  rules:
+  - Array item contracts MUST be expressed through `items`.
+  - Object item requirements MUST be expressed through `required`.
+  - Unrecognized fields MUST be rejected when `additional_properties` is `false`.
+file_layout:
+  root: .ai/workflow
+  managed_assets:
+  - session.yaml
+  - task-graph.yaml
+  - sprint-status.yaml
+  - journal.jsonl
+  - ledger.md
+  - capsules/
+  - checkpoints/
+session:
+  file: .ai/workflow/session.yaml
+  type: object
+  additional_properties: false
+  required:
+  - schema
+  - run_id
+  - engine
+  - task
+  - phase
+  - node
+  - loop_budget
+  - context_budget
+  - workspace
+  - approvals
+  - recovery
+  - timestamps
+  properties:
+    schema:
+      type: integer
+      const: 4
+    run_id:
+      type: string
+      pattern: ^wf-[0-9]{8}-[0-9]{3,}$
+    engine:
+      type: object
+      additional_properties: false
+      required:
+      - kind
+      - adapter_version
+      properties:
+        kind:
+          type: string
+          enum:
+          - claude_code
+          - codex
+          - gemini_cli
+        adapter_version:
+          type: integer
+          minimum: 1
+    task:
+      type: object
+      additional_properties: false
+      required:
+      - id
+      - title
+      - mode
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        mode:
+          type: string
+          enum:
+          - feature
+          - bugfix
+          - refactor
+          - docs
+          - research
+    phase:
+      type: object
+      additional_properties: false
+      required:
+      - current
+      - status
+      properties:
+        current:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - in_progress
+          - blocked
+          - review
+          - completed
+    node:
+      type: object
+      additional_properties: false
+      required:
+      - active_id
+      - state
+      - owner_persona
+      properties:
+        active_id:
+          type: string
+        state:
+          type: string
+          enum:
+          - idle
+          - red_pending
+          - red_verified
+          - green_pending
+          - green_verified
+          - refactor_pending
+          - verified
+          - failed
+        owner_persona:
+          type: string
+          enum:
+          - planner
+          - author
+          - spec_reviewer
+          - quality_reviewer
+          - reader
+          - auditor
+          - human
+    loop_budget:
+      type: object
+      additional_properties: false
+      required:
+      - max_nodes
+      - max_failures
+      - max_pending_approvals
+      - consumed_nodes
+      - consumed_failures
+      properties:
+        max_nodes:
+          type: integer
+          minimum: 1
+        max_failures:
+          type: integer
+          minimum: 0
+        max_pending_approvals:
+          type: integer
+          minimum: 1
+        consumed_nodes:
+          type: integer
+          minimum: 0
+        consumed_failures:
+          type: integer
+          minimum: 0
+    context_budget:
+      type: object
+      additional_properties: false
+      required:
+      - strategy
+      - capsule_refresh_threshold
+      - summary_required_after_turns
+      properties:
+        strategy:
+          type: string
+          enum:
+          - capsule_first
+          - summary_first
+          - hybrid
+        capsule_refresh_threshold:
+          type: integer
+          minimum: 1
+        summary_required_after_turns:
+          type: integer
+          minimum: 1
+    workspace:
+      type: object
+      additional_properties: false
+      required:
+      - root
+      - sandbox_mode
+      properties:
+        root:
+          type: string
+        sandbox_mode:
+          type: string
+          enum:
+          - read_only
+          - workspace_write
+          - full_access
+    approvals:
+      type: object
+      additional_properties: false
+      required:
+      - pending
+      - pending_count
+      - last_grant_scope
+      - last_approval_mode
+      - active_request
+      - grants
+      properties:
+        pending:
+          type: boolean
+        pending_count:
+          type: integer
+          minimum: 0
+        last_grant_scope:
+          type: string
+          enum:
+          - none
+          - once
+          - session
+        last_approval_mode:
+          type: string
+          enum:
+          - none
+          - manual_required
+          - never_auto
+        active_request:
+          type: object
+          nullable: true
+          additional_properties: false
+          required:
+          - approval_id
+          - action
+          - target_ref
+          - risk_class
+          - approval_mode
+          - grant_scope
+          - status
+          - requested_at
+          properties:
+            approval_id:
+              type: string
+            action:
+              type: string
+            target_ref:
+              type: string
+            risk_class:
+              type: string
+              enum:
+              - low
+              - medium
+              - high
+              - critical
+            approval_mode:
+              type: string
+              enum:
+              - manual_required
+              - never_auto
+            grant_scope:
+              type: string
+              enum:
+              - once
+              - session
+            status:
+              type: string
+              enum:
+              - pending
+              - approved
+              - rejected
+              - expired
+            requested_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+              nullable: true
+            decision:
+              type: string
+              nullable: true
+        grants:
+          type: array
+          items:
+            type: object
+            additional_properties: false
+            required:
+            - approval_id
+            - grant_scope
+            - approval_mode
+            - action
+            - target_ref
+            - risk_class
+            - decision
+            - granted_at
+            properties:
+              approval_id:
+                type: string
+              grant_scope:
+                type: string
+                enum:
+                - once
+                - session
+              approval_mode:
+                type: string
+                enum:
+                - manual_required
+                - never_auto
+              action:
+                type: string
+              target_ref:
+                type: string
+              risk_class:
+                type: string
+                enum:
+                - low
+                - medium
+                - high
+                - critical
+              decision:
+                type: string
+                enum:
+                - approved
+                - rejected
+              granted_at:
+                type: string
+                format: date-time
+              expires_at:
+                type: string
+                format: date-time
+                nullable: true
+    recovery:
+      type: object
+      additional_properties: false
+      required:
+      - last_checkpoint_id
+      - restore_pending
+      properties:
+        last_checkpoint_id:
+          type: string
+          nullable: true
+        restore_pending:
+          type: boolean
+        restore_reason:
+          type: string
+          nullable: true
+    timestamps:
+      type: object
+      additional_properties: false
+      required:
+      - created_at
+      - updated_at
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+task_graph:
+  file: .ai/workflow/task-graph.yaml
+  type: object
+  additional_properties: false
+  required:
+  - schema
+  - graph_id
+  - phases
+  - nodes
+  properties:
+    schema:
+      type: integer
+      const: 4
+    graph_id:
+      type: string
+    phases:
+      type: array
+      items:
+        type: object
+        additional_properties: false
+        required:
+        - id
+        - title
+        - status
+        - entry_condition
+        - exit_gate
+        - rollback_boundary
+        properties:
+          id:
+            type: string
+          title:
+            type: string
+          status:
+            type: string
+            enum:
+            - pending
+            - in_progress
+            - blocked
+            - review
+            - completed
+          depends_on:
+            type: array
+            items:
+              type: string
+          entry_condition:
+            type: array
+            items:
+              type: string
+          exit_gate:
+            type: object
+            additional_properties: false
+            required:
+            - cmd
+            - pass_signal
+            properties:
+              cmd:
+                type: string
+              pass_signal:
+                type: string
+              coverage_min:
+                type: string
+          rollback_boundary:
+            type: object
+            additional_properties: false
+            required:
+            - revert_nodes
+            - restore_point
+            properties:
+              revert_nodes:
+                type: array
+                items:
+                  type: string
+              restore_point:
+                type: string
+    nodes:
+      type: array
+      items:
+        type: object
+        additional_properties: false
+        required:
+        - id
+        - phase_id
+        - title
+        - target
+        - action
+        - why
+        - depends_on
+        - verify
+        - risk_level
+        - tdd_required
+        - status
+        - tdd_state
+        - owner_persona
+        - review_state
+        - evidence_refs
+        - output_refs
+        - capability
+        - priority
+        properties:
+          id:
+            type: string
+          phase_id:
+            type: string
+          title:
+            type: string
+          target:
+            type: string
+          action:
+            type: string
+          why:
+            type: string
+          depends_on:
+            type: array
+            items:
+              type: string
+          verify:
+            type: object
+            additional_properties: false
+            required:
+            - cmd
+            - pass_signal
+            properties:
+              cmd:
+                type: string
+              pass_signal:
+                type: string
+          risk_level:
+            type: string
+            enum:
+            - low
+            - medium
+            - high
+            - critical
+          tdd_required:
+            type: boolean
+          status:
+            type: string
+            enum:
+            - pending
+            - ready
+            - in_progress
+            - blocked
+            - review
+            - completed
+            - failed
+          tdd_state:
+            type: string
+            enum:
+            - not_applicable
+            - idle
+            - red_pending
+            - red_verified
+            - green_pending
+            - green_verified
+            - refactor_pending
+            - verified
+            - failed
+          owner_persona:
+            type: string
+            enum:
+            - planner
+            - author
+            - spec_reviewer
+            - quality_reviewer
+            - reader
+            - auditor
+            - human
+          parallel_group:
+            type: string
+            nullable: true
+            reserved_in_v1: true
+            v1_rule: MUST remain null while workflow/router.spec.yaml declares parallel_nodes_supported false.
+          review_state:
+            type: object
+            additional_properties: false
+            required:
+            - spec_review
+            - quality_review
+            properties:
+              spec_review:
+                type: string
+                enum:
+                - pending
+                - pass
+                - concerns
+                - rework
+                - fail
+              quality_review:
+                type: string
+                enum:
+                - pending
+                - pass
+                - concerns
+                - rework
+                - fail
+          evidence_refs:
+            type: array
+            items:
+              type: string
+          output_refs:
+            type: array
+            items:
+              type: string
+          approval_ref:
+            type: string
+            nullable: true
+          capability:
+            type: string
+          priority:
+            type: string
+            enum:
+            - critical
+            - high
+            - medium
+            - low
+          condition:
+            type: object
+            nullable: true
+            additional_properties: false
+            required:
+            - mode
+            - expression
+            properties:
+              mode:
+                type: string
+                enum:
+                - state_expression
+              expression:
+                type: string
+          retry_policy:
+            type: object
+            nullable: true
+            additional_properties: false
+            required:
+            - max_attempts
+            - backoff_mode
+            properties:
+              max_attempts:
+                type: integer
+                minimum: 1
+              backoff_mode:
+                type: string
+                enum:
+                - fixed
+                - exponential
+              initial_delay_seconds:
+                type: integer
+                minimum: 0
+                nullable: true
+              max_delay_seconds:
+                type: integer
+                minimum: 0
+                nullable: true
+              retry_on:
+                type: array
+                items:
+                  type: string
+          timeout_policy:
+            type: object
+            nullable: true
+            additional_properties: false
+            required:
+            - timeout_seconds
+            - on_timeout
+            properties:
+              timeout_seconds:
+                type: integer
+                minimum: 1
+              grace_seconds:
+                type: integer
+                minimum: 0
+                nullable: true
+              on_timeout:
+                type: string
+                enum:
+                - fail_node
+                - block_node
+                - require_human
+          test_contract:
+            type: object
+            nullable: true
+            additional_properties: false
+            required:
+            - layer
+            - coverage_mode
+            - coverage_profile
+            - mock_policy
+            - acceptance_criteria_refs
+            - red_cmd
+            - green_cmd
+            - red_expectation
+            - behavior_gate
+            properties:
+              layer:
+                type: string
+                enum:
+                - unit
+                - integration
+                - contract
+                - e2e
+                - smoke
+              coverage_mode:
+                type: string
+                enum:
+                - full
+                - patch
+              coverage_profile:
+                type: string
+                enum:
+                - critical
+                - core
+                - standard
+                - utility
+                - scaffold
+              mock_policy:
+                type: string
+                enum:
+                - none
+                - boundary_only
+                - allowed_with_justification
+              acceptance_criteria_refs:
+                type: array
+                items:
+                  type: string
+              red_cmd:
+                type: string
+              green_cmd:
+                type: string
+              red_expectation:
+                type: object
+                additional_properties: false
+                required:
+                - allowed_failure_kinds
+                - rejected_failure_kinds
+                properties:
+                  allowed_failure_kinds:
+                    type: array
+                    items:
+                      type: string
+                  rejected_failure_kinds:
+                    type: array
+                    items:
+                      type: string
+                  allowed_exit_codes:
+                    type: array
+                    items:
+                      type: integer
+                  stderr_pattern:
+                    type: string
+                    nullable: true
+                  error_type:
+                    type: string
+                    nullable: true
+              behavior_gate:
+                type: object
+                additional_properties: false
+                required:
+                - ac_traceability_required
+                properties:
+                  ac_traceability_required:
+                    type: boolean
+                  boundary_conditions_required:
+                    type: boolean
+                    nullable: true
+sprint_status:
+  file: .ai/workflow/sprint-status.yaml
+  type: object
+  additional_properties: false
+  required:
+  - schema
+  - active_phase
+  - node_summary
+  - recommended_next
+  properties:
+    schema:
+      type: integer
+      const: 4
+    active_phase:
+      type: string
+    node_summary:
+      type: array
+      items:
+        type: object
+        additional_properties: false
+        required:
+        - id
+        - status
+        - tdd_state
+        properties:
+          id:
+            type: string
+          status:
+            type: string
+          tdd_state:
+            type: string
+    recommended_next:
+      type: array
+      min_items: 1
+      max_items: 3
+      items:
+        type: object
+        additional_properties: false
+        required:
+        - type
+        - target
+        - params
+        - reason
+        - blocking_on
+        - priority
+        properties:
+          type:
+            type: string
+            enum:
+            - resume_node
+            - start_node
+            - request_approval
+            - enter_phase
+            - human_intervention
+            - retry_node
+          target:
+            type: string
+          params:
+            type: object
+          reason:
+            type: string
+          blocking_on:
+            type: array
+            items:
+              type: string
+          priority:
+            type: string
+            enum:
+            - now
+            - next
+            - later
+journal:
+  file: .ai/workflow/journal.jsonl
+  type: append_only_log
+  storage:
+    format: jsonl
+    mode: append_only
+  event_shape:
+    type: object
+    additional_properties: false
+    required:
+    - ts
+    - run_id
+    - event
+    - phase
+    - node_id
+    - actor
+    - payload
+    properties:
+      ts:
+        type: string
+        format: date-time
+      run_id:
+        type: string
+      event:
+        type: string
+        enum:
+        - session_started
+        - phase_entered
+        - phase_completed
+        - node_started
+        - red_recorded
+        - green_recorded
+        - verification_recorded
+        - node_completed
+        - node_failed
+        - node_timed_out
+        - node_bypassed
+        - approval_requested
+        - approval_resolved
+        - approval_expired
+        - review_verdict_recorded
+        - checkpoint_created
+        - checkpoint_restored
+        - budget_exhausted
+        - session_stopped
+        - session_resumed
+        - validation_failed
+      phase:
+        type: string
+      node_id:
+        type: string
+      actor:
+        type: string
+        enum:
+        - runtime
+        - hook
+        - planner
+        - author
+        - spec_reviewer
+        - quality_reviewer
+        - reader
+        - auditor
+        - human
+        - adapter
+      payload:
+        type: object
+        additional_properties: true
+        properties:
+          route_decision:
+            type: object
+            additional_properties: false
+            required:
+            - recommended_next
+            properties:
+              next_phase:
+                type: string
+                nullable: true
+              next_node:
+                type: string
+                nullable: true
+              next_persona:
+                type: string
+                nullable: true
+              next_capability:
+                type: string
+                nullable: true
+              block_reason:
+                type: string
+                nullable: true
+              recommended_next:
+                type: array
+                max_items: 3
+                items:
+                  type: object
+                  additional_properties: false
+                  required:
+                  - type
+                  - target
+                  - params
+                  - reason
+                  - blocking_on
+                  - priority
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                      - resume_node
+                      - start_node
+                      - request_approval
+                      - enter_phase
+                      - human_intervention
+                      - retry_node
+                    target:
+                      type: string
+                    params:
+                      type: object
+                    reason:
+                      type: string
+                    blocking_on:
+                      type: array
+                      items:
+                        type: string
+                    priority:
+                      type: string
+                      enum:
+                      - now
+                      - next
+                      - later
+          route_basis:
+            type: object
+            additional_properties: false
+            required:
+            - session_fields
+            - phase_checks
+            - node_checks
+            - policy_verdicts
+            - blockers
+            - sorting_decision
+            properties:
+              session_fields:
+                type: array
+                items:
+                  type: string
+              phase_checks:
+                type: array
+                items:
+                  type: string
+              node_checks:
+                type: array
+                items:
+                  type: string
+              policy_verdicts:
+                type: array
+                items:
+                  type: string
+              blockers:
+                type: array
+                items:
+                  type: string
+              sorting_decision:
+                type: array
+                items:
+                  type: string
+      trace_id:
+        type: string
+        nullable: true
+ledger:
+  file: .ai/workflow/ledger.md
+  type: human_summary
+  required_sections:
+  - Current Run
+  - Active Phase
+  - Active Node
+  - Latest Evidence
+  - Pending Approval
+  - Recommended Next
+capsules:
+  directory: .ai/workflow/capsules
+  type: persona_handoff_store
+  capsule_shape:
+    type: object
+    additional_properties: false
+    required:
+    - capsule_id
+    - persona
+    - task_id
+    - input_summary
+    - constraints
+    - evidence_refs
+    - output_summary
+    - verdict
+    - context_budget_used
+    - created_at
+    properties:
+      capsule_id:
+        type: string
+      persona:
+        type: string
+        enum:
+        - planner
+        - author
+        - spec_reviewer
+        - quality_reviewer
+        - reader
+        - auditor
+      task_id:
+        type: string
+      input_summary:
+        type: string
+      constraints:
+        type: array
+        items:
+          type: string
+      evidence_refs:
+        type: array
+        items:
+          type: string
+      output_summary:
+        type: string
+      verdict:
+        type: string
+        enum:
+        - pending
+        - pass
+        - concerns
+        - rework
+        - fail
+      context_budget_used:
+        type: integer
+        minimum: 0
+      created_at:
+        type: string
+        format: date-time
+checkpoints:
+  directory: .ai/workflow/checkpoints
+  type: recovery_store
+  checkpoint_shape:
+    type: object
+    additional_properties: false
+    required:
+    - checkpoint_id
+    - checkpoint_class
+    - run_id
+    - phase
+    - node_id
+    - session_snapshot_ref
+    - task_graph_snapshot_ref
+    - journal_offset
+    - integrity_hash
+    - restore_status
+    - created_at
+    properties:
+      checkpoint_id:
+        type: string
+      checkpoint_class:
+        type: string
+        enum:
+        - node
+        - review
+        - pre_destructive
+      run_id:
+        type: string
+      phase:
+        type: string
+      node_id:
+        type: string
+      session_snapshot_ref:
+        type: string
+      task_graph_snapshot_ref:
+        type: string
+      sprint_status_snapshot_ref:
+        type: string
+        nullable: true
+      journal_offset:
+        type: integer
+        minimum: 0
+      integrity_hash:
+        type: string
+      restore_status:
+        type: string
+        enum:
+        - not_restored
+        - restored
+        - restore_failed
+      restore_verified_at:
+        type: string
+        format: date-time
+        nullable: true
+      restore_source_event:
+        type: string
+        nullable: true
+      target_ref:
+        type: string
+        nullable: true
+      operation_kind:
+        type: string
+        nullable: true
+      command_class:
+        type: string
+        nullable: true
+      file_class:
+        type: string
+        nullable: true
+      metadata:
+        type: object
+        nullable: true
+      target_snapshot_ref:
+        type: string
+        nullable: true
+      target_snapshot_content_ref:
+        type: string
+        nullable: true
+      capsule_snapshot_ref:
+        type: string
+        nullable: true
+      capsule_id:
+        type: string
+        nullable: true
+      git_head_ref:
+        type: string
+        nullable: true
+      created_at:
+        type: string
+        format: date-time
+validation_rules:
+- Session state MUST describe only the active run.
+- Array item contracts MUST use `items` and MUST NOT use ad-hoc array keys.
+- Journal MUST be append-only.
+- Ledger MUST remain human-readable and MUST NOT be treated as audit truth.
+- TDD node state transitions MUST follow the declared order.
+- A pending approval MUST block autonomous completion.
+- Active approval objects MUST contain action, approval_mode, grant_scope, target, and risk metadata.
+- Approval records MUST keep grant_scope separate from approval_mode.
+- session.approvals.pending_count MUST NOT exceed session.loop_budget.max_pending_approvals.
+- Checkpoint restore MUST preserve run_id continuity and record restore status.
+- Recommended next actions MUST be deterministic, structured, bounded to at most three items,
+  and stored with the router recommended_next item schema.
+- Router-consumable nodes MUST declare non-null capability and explicit priority.
+- Runtime V1 MUST keep at most one phase in [in_progress, blocked, review].
+- Runtime V1 MUST keep at most one node in [in_progress, review].
+- "`parallel_group` MUST remain null while workflow/router.spec.yaml declares parallel_nodes_supported false."
+- Conditional nodes MUST use declarative state-based conditions only.
+- Retry policy MAY be omitted in V1, but if declared it MUST define max_attempts and backoff_mode.
+- Timeout policy MAY be omitted in V1, but if declared it MUST define timeout_seconds and on_timeout.
+- Timed out nodes MUST emit node_timed_out before router selects retry, block, or human escalation.
+- Events that capture routing decisions MUST record payload.route_decision and payload.route_basis.
+- Journal SHOULD record phase_completed and node_bypassed when those route decisions occur.
+- Behavior-changing nodes SHOULD declare test_contract when testing gates apply.
+- Notify-only eligibility MUST NOT redefine approval grant scopes or approval modes.
+- Patch coverage MAY be used for legacy code, but MUST NOT regress global or touched-region coverage.

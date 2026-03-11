@@ -1,0 +1,1 @@
+这次按 TDD 执行 red green refactor，检查 coverage_min 并防止反模式测试。

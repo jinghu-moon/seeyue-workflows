@@ -1,0 +1,421 @@
+schema_kind: skills_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define the V5 skill registry, triggers, and policy metadata.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - adapters
+  - validators
+  - runtime
+  source_documents:
+  - docs/architecture-v5-proposal.md
+  - docs/implementation-plan-v5.md
+  rules:
+  - Skills MUST reference instruction files and must not inline bodies.
+  - output_templates MUST reference ids from workflow/output-templates.spec.yaml.
+registry:
+  revision: "2026-03-11"
+  spec_hash: pending
+  change_detection:
+    strategy: registry_hash
+    manifest_file: .ai/workflow/skills-manifest.json
+defaults:
+  phases:
+  - plan
+  - execute
+  - review
+  triggers:
+    mode: explicit
+    keywords: []
+  arguments:
+    schema:
+      type: object
+      additional_properties: true
+    argument_hints: []
+  policy:
+    disable_model_invocation: false
+    allowed_tools: []
+  output_templates:
+  - status-indicator
+skills:
+  sy-changelog:
+    title: Change Log Management
+    summary: Record, merge, and review structured changelog entries.
+    category: workflow
+    entry: .agents/skills/sy-changelog/SKILL.md
+    capabilities:
+    - code_edit
+    phases:
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-changelog
+      - changelog
+    output_templates:
+    - completion-summary
+  sy-code-insight:
+    title: Code Insight
+    summary: Build codebase understanding artifacts before planning or execution.
+    category: analysis
+    entry: .agents/skills/sy-code-insight/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-code-insight
+  sy-constraints:
+    title: Constraint Baseline
+    summary: Apply baseline workflow constraints before any phase work.
+    category: constraint
+    entry: .agents/skills/sy-constraints/SKILL.md
+    capabilities:
+    - analysis
+    policy:
+      disable_model_invocation: true
+  sy-constraints/appsec:
+    title: AppSec Constraints
+    summary: Enforce application security constraints for sensitive work.
+    category: constraint
+    entry: .agents/skills/sy-constraints/appsec/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - execute
+    - review
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/debug:
+    title: Debug Constraints
+    summary: Enforce debugging discipline and verification order.
+    category: constraint
+    entry: .agents/skills/sy-constraints/debug/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/execution:
+    title: Execution Constraints
+    summary: Enforce execution-phase contracts and gate ordering.
+    category: constraint
+    entry: .agents/skills/sy-constraints/execution/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/language:
+    title: Language Constraints
+    summary: Enforce English machine rules and Chinese user-facing output.
+    category: constraint
+    entry: .agents/skills/sy-constraints/language/SKILL.md
+    capabilities:
+    - analysis
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/phase:
+    title: Phase Constraints
+    summary: Enforce workflow phase boundaries and checkpoint rules.
+    category: constraint
+    entry: .agents/skills/sy-constraints/phase/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/research:
+    title: Research Constraints
+    summary: Gate external research and evidence collection.
+    category: constraint
+    entry: .agents/skills/sy-constraints/research/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/review:
+    title: Review Constraints
+    summary: Enforce review-stage ordering and evidence rules.
+    category: constraint
+    entry: .agents/skills/sy-constraints/review/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - review
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/safety:
+    title: Safety Constraints
+    summary: Gate destructive operations and risky commands.
+    category: constraint
+    entry: .agents/skills/sy-constraints/safety/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/testing:
+    title: Testing Constraints
+    summary: Enforce test discipline and TDD sequencing.
+    category: constraint
+    entry: .agents/skills/sy-constraints/testing/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/truth:
+    title: Truth Constraints
+    summary: Enforce evidence-first claims and citation rules.
+    category: constraint
+    entry: .agents/skills/sy-constraints/truth/SKILL.md
+    capabilities:
+    - analysis
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/verify:
+    title: Verification Constraints
+    summary: Enforce verification gates before completion claims.
+    category: constraint
+    entry: .agents/skills/sy-constraints/verify/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - review
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-constraints/workspace:
+    title: Workspace Constraints
+    summary: Validate workspace setup, sandbox, and isolation.
+    category: constraint
+    entry: .agents/skills/sy-constraints/workspace/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    parent_skill: sy-constraints
+    policy:
+      disable_model_invocation: true
+  sy-debug:
+    title: Debug Workflow
+    summary: Run structured debugging to identify root causes.
+    category: debug
+    entry: .agents/skills/sy-debug/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-debug
+  sy-design:
+    title: Design Workflow
+    summary: Produce technical design artifacts from discovery outputs.
+    category: planning
+    entry: .agents/skills/sy-design/SKILL.md
+    capabilities:
+    - planning
+    phases:
+    - plan
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-design
+  sy-development-workflow:
+    title: Legacy Workflow Bridge
+    summary: Route legacy development workflow requests to modern phases.
+    category: workflow
+    entry: .agents/skills/sy-development-workflow/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-development-workflow
+  sy-doc-sync:
+    title: Doc Synchronization
+    summary: Synchronize module-level README and AI docs.
+    category: documentation
+    entry: .agents/skills/sy-doc-sync/SKILL.md
+    capabilities:
+    - code_edit
+    phases:
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-doc-sync
+    output_templates:
+    - completion-summary
+  sy-executing-plans:
+    title: Execute Plans
+    summary: Execute approved plans node-by-node with checkpointing.
+    category: execution
+    entry: .agents/skills/sy-executing-plans/SKILL.md
+    capabilities:
+    - code_edit
+    phases:
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-executing-plans
+  sy-git-commit:
+    title: Commit Assistance
+    summary: Generate commit or release messages on request.
+    category: release
+    entry: .agents/skills/sy-git-commit/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - review
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-git-commit
+  sy-ideation:
+    title: Ideation Workflow
+    summary: Explore ambiguous requirements before design.
+    category: planning
+    entry: .agents/skills/sy-ideation/SKILL.md
+    capabilities:
+    - planning
+    phases:
+    - plan
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-ideation
+  sy-receiving-code-review:
+    title: Review Feedback Processing
+    summary: Process reviewer feedback item-by-item with evidence checks.
+    category: review
+    entry: .agents/skills/sy-receiving-code-review/SKILL.md
+    capabilities:
+    - quality_review
+    phases:
+    - review
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-receiving-code-review
+    output_templates:
+    - review-report
+  sy-requesting-code-review:
+    title: Code Review Request
+    summary: Produce structured review verdicts with evidence.
+    category: review
+    entry: .agents/skills/sy-requesting-code-review/SKILL.md
+    capabilities:
+    - quality_review
+    phases:
+    - review
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-requesting-code-review
+    output_templates:
+    - review-report
+  sy-verification-before-completion:
+    title: Verification Gate
+    summary: Enforce verification before completion claims.
+    category: review
+    entry: .agents/skills/sy-verification-before-completion/SKILL.md
+    capabilities:
+    - quality_review
+    phases:
+    - review
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-verification-before-completion
+    output_templates:
+    - review-report
+  sy-workflow:
+    title: Workflow Router
+    summary: Route requests into the V5 phased workflow.
+    category: workflow
+    entry: .agents/skills/sy-workflow/SKILL.md
+    capabilities:
+    - planning
+    phases:
+    - plan
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-workflow
+  sy-workflow-constraints:
+    title: Workflow Constraint Loader
+    summary: Load minimal constraints for workflow execution.
+    category: constraint
+    entry: .agents/skills/sy-workflow-constraints/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    - review
+    policy:
+      disable_model_invocation: true
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-workflow-constraints
+  sy-worktree:
+    title: Worktree Preparation
+    summary: Prepare isolated worktrees and baseline checks.
+    category: workflow
+    entry: .agents/skills/sy-worktree/SKILL.md
+    capabilities:
+    - analysis
+    phases:
+    - plan
+    - execute
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-worktree
+  sy-writing-plans:
+    title: Plan Authoring
+    summary: Convert approved design into executable steps.
+    category: planning
+    entry: .agents/skills/sy-writing-plans/SKILL.md
+    capabilities:
+    - planning
+    phases:
+    - plan
+    triggers:
+      mode: explicit
+      keywords:
+      - sy-writing-plans

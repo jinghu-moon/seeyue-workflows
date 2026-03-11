@@ -1,0 +1,562 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sy.skills/ai-report.schema.v3.json",
+  "title": "AI Report v3",
+  "type": "object",
+  "required": [
+    "schema_name",
+    "schema_version",
+    "report_name",
+    "report_version",
+    "generated_at",
+    "updated_at",
+    "task",
+    "project",
+    "scm",
+    "run",
+    "update_mode",
+    "delta_basis",
+    "verification",
+    "risks",
+    "notes",
+    "files",
+    "tree"
+  ],
+  "properties": {
+    "schema_name": {
+      "type": "string",
+      "const": "ai.report"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 3
+    },
+    "report_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "name",
+        "root",
+        "platform",
+        "language_stack"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language_stack": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scm": {
+      "type": "object",
+      "required": [
+        "branch",
+        "head_commit",
+        "base_ref",
+        "dirty"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "head_commit": {
+          "type": "string"
+        },
+        "base_ref": {
+          "type": "string"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "phase_id",
+        "node_id",
+        "started_at",
+        "finished_at",
+        "duration_ms"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "update_mode": {
+      "type": "string",
+      "enum": [
+        "SKIP",
+        "INCREMENTAL",
+        "FULL",
+        "REINDEX"
+      ]
+    },
+    "delta_basis": {
+      "type": "object",
+      "required": [
+        "changed_files",
+        "deleted_files",
+        "renamed_files",
+        "cache_used",
+        "manifest_mismatch"
+      ],
+      "properties": {
+        "changed_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deleted_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "renamed_files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_used": {
+          "type": "boolean"
+        },
+        "manifest_mismatch": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "compile",
+        "test",
+        "lint",
+        "build"
+      ],
+      "properties": {
+        "compile": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "skip"
+          ]
+        },
+        "test": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "skip"
+          ]
+        },
+        "lint": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "skip"
+          ]
+        },
+        "build": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "skip"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fileRecord"
+      }
+    },
+    "tree": {
+      "$ref": "#/$defs/treeDirectory"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "understanding": {
+      "type": "object",
+      "required": [
+        "summary",
+        "interfaces",
+        "constraints",
+        "dependencies",
+        "evidence",
+        "confidence",
+        "blind_spots",
+        "evidence_count"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blind_spots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "fileRecord": {
+      "type": "object",
+      "required": [
+        "path",
+        "name",
+        "exists",
+        "size_bytes",
+        "used_bytes",
+        "line_count",
+        "encoding",
+        "last_modified",
+        "last_modified_epoch",
+        "fingerprint",
+        "previous_fingerprint",
+        "status",
+        "change_type",
+        "rename_from",
+        "role",
+        "modify_prob",
+        "understanding"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "used_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_modified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_modified_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous_fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "MATCH",
+            "MODIFIED",
+            "DELETED",
+            "RENAMED",
+            "UNKNOWN"
+          ]
+        },
+        "change_type": {
+          "type": "string",
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed",
+            "unchanged",
+            "unknown"
+          ]
+        },
+        "rename_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modify_prob": {
+          "type": "string",
+          "enum": [
+            "High",
+            "Med",
+            "Low"
+          ]
+        },
+        "understanding": {
+          "$ref": "#/$defs/understanding"
+        }
+      },
+      "additionalProperties": false
+    },
+    "treeFile": {
+      "type": "object",
+      "required": [
+        "type",
+        "name",
+        "path",
+        "exists",
+        "size_bytes",
+        "used_bytes",
+        "line_count",
+        "encoding",
+        "last_modified",
+        "last_modified_epoch",
+        "fingerprint",
+        "previous_fingerprint",
+        "status",
+        "change_type",
+        "rename_from"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "file"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "used_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_modified": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_modified_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous_fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "MATCH",
+            "MODIFIED",
+            "DELETED",
+            "RENAMED",
+            "UNKNOWN"
+          ]
+        },
+        "change_type": {
+          "type": "string",
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed",
+            "unchanged",
+            "unknown"
+          ]
+        },
+        "rename_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "treeDirectory": {
+      "type": "object",
+      "required": [
+        "type",
+        "name",
+        "path",
+        "children"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "directory"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/treeDirectory"
+              },
+              {
+                "$ref": "#/$defs/treeFile"
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

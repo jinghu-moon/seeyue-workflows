@@ -1,0 +1,24 @@
+{
+  "session": {
+    "node": { "active_id": "P2-N1", "state": "failed", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "failed",
+      "tdd_state": "failed",
+      "retry_policy": null
+    }
+  },
+  "policyVerdict": {
+    "retry": { "allowed": false }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "failed_node_without_recovery_path",
+    "next_persona": "human",
+    "next_capability": "human_approval",
+    "recommended_next": [
+      { "type": "human_intervention", "target": "P2-N1" }
+    ]
+  }
+}

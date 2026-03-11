@@ -1,0 +1,5 @@
+node_modules/
+.ai/
+tests/skill-triggering/output/
+*.log
+refer/

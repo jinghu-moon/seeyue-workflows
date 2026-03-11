@@ -1,0 +1,378 @@
+{
+  "schema_kind": "codex_skill_metadata",
+  "schema_version": 1,
+  "schema_dialect": "seeyue_workflow_codex_adapter/v1",
+  "generated_from_root": "D:/100_Projects/110_Daily/VibeCast/seeyue-workflows",
+  "skill_root": ".agents/skills",
+  "progressive_disclosure": true,
+  "source_of_truth": [
+    ".agents/skills",
+    "workflow/runtime.schema.yaml",
+    "workflow/router.spec.yaml",
+    "workflow/policy.spec.yaml",
+    "workflow/capabilities.yaml",
+    "workflow/persona-bindings.yaml",
+    "workflow/file-classes.yaml",
+    "workflow/approval-matrix.yaml",
+    "workflow/hooks.spec.yaml",
+    "docs/architecture-v4.md"
+  ],
+  "skills": [
+    {
+      "name": "sy-changelog",
+      "description": "Use when recording, merging, viewing, or clearing structured feature-level change logs for downstream commit/release message generation.",
+      "relative_path": ".agents/skills/sy-changelog",
+      "skill_file": ".agents/skills/sy-changelog/SKILL.md",
+      "allowed_tools": [],
+      "argument_hint": "[action] [scope]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-code-insight",
+      "description": "Use when project/task/module understanding is required before planning or implementation, and analysis artifacts must be persisted under `.ai/` for session continuity.",
+      "relative_path": ".agents/skills/sy-code-insight",
+      "skill_file": ".agents/skills/sy-code-insight/SKILL.md",
+      "allowed_tools": [],
+      "argument_hint": "[operation] [target] [options]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/appsec",
+      "description": "Use when touching auth, input boundaries, APIs, secrets, or sensitive data so baseline application security controls are enforced.",
+      "relative_path": ".agents/skills/sy-constraints/appsec",
+      "skill_file": ".agents/skills/sy-constraints/appsec/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/debug",
+      "description": "Use when a bug, failing check, or unexpected behavior appears and a fix is being considered.",
+      "relative_path": ".agents/skills/sy-constraints/debug",
+      "skill_file": ".agents/skills/sy-constraints/debug/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/execution",
+      "description": "Use when planning or executing phased work to enforce source-of-truth, phase gates, validation gates, and rollback boundaries.",
+      "relative_path": ".agents/skills/sy-constraints/execution",
+      "skill_file": ".agents/skills/sy-constraints/execution/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/language",
+      "description": "Use when defining, editing, or auditing workflow rules so language partitions and RFC keyword discipline stay consistent.",
+      "relative_path": ".agents/skills/sy-constraints/language",
+      "skill_file": ".agents/skills/sy-constraints/language/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/phase",
+      "description": "Use when planning or executing multi-node work to enforce DAG safety, phase boundary contracts, checkpoints, and resumable flow.",
+      "relative_path": ".agents/skills/sy-constraints/phase",
+      "skill_file": ".agents/skills/sy-constraints/phase/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/research",
+      "description": "Use when deciding whether to adopt, extend, or build a solution before writing net-new code or adding dependencies.",
+      "relative_path": ".agents/skills/sy-constraints/research",
+      "skill_file": ".agents/skills/sy-constraints/research/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "WebSearch"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/review",
+      "description": "Use when handling user or reviewer feedback so each item is clarified, classified, implemented, and verified with evidence.",
+      "relative_path": ".agents/skills/sy-constraints/review",
+      "skill_file": ".agents/skills/sy-constraints/review/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/safety",
+      "description": "Use when any risky command or sensitive operation is considered, so explicit confirmation and safe alternatives are enforced.",
+      "relative_path": ".agents/skills/sy-constraints/safety",
+      "skill_file": ".agents/skills/sy-constraints/safety/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints",
+      "description": "Use when running any sy-* workflow to load minimal constraint skills and enforce hook-backed hard guards.",
+      "relative_path": ".agents/skills/sy-constraints",
+      "skill_file": ".agents/skills/sy-constraints/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/testing",
+      "description": "Use when implementing behavior changes or bug fixes so TDD order, anti-pattern gates, coverage baselines, and behavior validation are enforced.",
+      "relative_path": ".agents/skills/sy-constraints/testing",
+      "skill_file": ".agents/skills/sy-constraints/testing/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/truth",
+      "description": "Use when making factual or technical claims that require citation, freshness checks, and evidence-before-claim discipline.",
+      "relative_path": ".agents/skills/sy-constraints/truth",
+      "skill_file": ".agents/skills/sy-constraints/truth/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "WebSearch"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/verify",
+      "description": "Use when preparing any fixed/completed/ready claim so verification evidence is fresh, complete, and auditable.",
+      "relative_path": ".agents/skills/sy-constraints/verify",
+      "skill_file": ".agents/skills/sy-constraints/verify/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-constraints/workspace",
+      "description": "Use when setting branch/worktree/sandbox context so baseline health and isolation are validated before execution.",
+      "relative_path": ".agents/skills/sy-constraints/workspace",
+      "skill_file": ".agents/skills/sy-constraints/workspace/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-debug",
+      "description": "Use when verify, review, build, test, or runtime failures require structured root-cause debugging before any fix is applied.",
+      "relative_path": ".agents/skills/sy-debug",
+      "skill_file": ".agents/skills/sy-debug/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep"
+      ],
+      "argument_hint": "[issue]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-design",
+      "description": "Use when discovery, benchmark, or ideation outputs must converge into an approved technical design before planning.",
+      "relative_path": ".agents/skills/sy-design",
+      "skill_file": ".agents/skills/sy-design/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "WebSearch"
+      ],
+      "argument_hint": "[task]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-development-workflow",
+      "description": "Use when legacy prompts reference the old unified development workflow skill and routing must be forwarded to the new split sy-* workflow skills.",
+      "relative_path": ".agents/skills/sy-development-workflow",
+      "skill_file": ".agents/skills/sy-development-workflow/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[command] [task]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-doc-sync",
+      "description": "Use when a module-level `README.AI.md` must be created or incrementally synchronized with current code and interfaces.",
+      "relative_path": ".agents/skills/sy-doc-sync",
+      "skill_file": ".agents/skills/sy-doc-sync/SKILL.md",
+      "allowed_tools": [],
+      "argument_hint": "[action] [path]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-executing-plans",
+      "description": "Use when an approved plan exists and implementation should proceed node-by-node with split execution operations (node/test/verify) and checkpointed modes.",
+      "relative_path": ".agents/skills/sy-executing-plans",
+      "skill_file": ".agents/skills/sy-executing-plans/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "WebSearch"
+      ],
+      "argument_hint": "[action] [node]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-git-commit",
+      "description": "Use when user explicitly requests commit or release message generation after code changes are complete and reviewed.",
+      "relative_path": ".agents/skills/sy-git-commit",
+      "skill_file": ".agents/skills/sy-git-commit/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Bash(git:*)"
+      ],
+      "argument_hint": "[context]",
+      "disable_model_invocation": true
+    },
+    {
+      "name": "sy-ideation",
+      "description": "Use when requirements are creative, ambiguous, or not yet decision-ready and you need structured ideation to produce an approvable design before planning.",
+      "relative_path": ".agents/skills/sy-ideation",
+      "skill_file": ".agents/skills/sy-ideation/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebSearch"
+      ],
+      "argument_hint": "[topic]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-receiving-code-review",
+      "description": "Use when review feedback must be processed item-by-item with verify-first discipline, classification, and per-item evidence before proceeding.",
+      "relative_path": ".agents/skills/sy-receiving-code-review",
+      "skill_file": ".agents/skills/sy-receiving-code-review/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep"
+      ],
+      "argument_hint": "[source]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-requesting-code-review",
+      "description": "Use when verification is READY and a structured evidence-first code review must produce a PASS, CONCERNS, REWORK, or FAIL verdict.",
+      "relative_path": ".agents/skills/sy-requesting-code-review",
+      "skill_file": ".agents/skills/sy-requesting-code-review/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Glob",
+        "Grep"
+      ],
+      "argument_hint": "[scope]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-verification-before-completion",
+      "description": "Use when all planned nodes are complete and a full session-level verification gate must run before review or completion claims.",
+      "relative_path": ".agents/skills/sy-verification-before-completion",
+      "skill_file": ".agents/skills/sy-verification-before-completion/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Glob",
+        "Grep"
+      ],
+      "argument_hint": "[scope]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-workflow-constraints",
+      "description": "Use when executing sy-* workflow phases to enforce minimal constraint loading, phase gates, and hook-backed hard controls.",
+      "relative_path": ".agents/skills/sy-workflow-constraints",
+      "skill_file": ".agents/skills/sy-workflow-constraints/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[phase]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-workflow",
+      "description": "Use when users want a single entry to start, route, resume, or inspect the sy-* phased development workflow.",
+      "relative_path": ".agents/skills/sy-workflow",
+      "skill_file": ".agents/skills/sy-workflow/SKILL.md",
+      "allowed_tools": [
+        "Read"
+      ],
+      "argument_hint": "[command] [task]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-worktree",
+      "description": "Use when workflow execution requires isolated workspace preparation, baseline checks, and explicit workspace disclosure before planning or implementation.",
+      "relative_path": ".agents/skills/sy-worktree",
+      "skill_file": ".agents/skills/sy-worktree/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Bash",
+        "Glob",
+        "Grep"
+      ],
+      "argument_hint": "[scope]",
+      "disable_model_invocation": false
+    },
+    {
+      "name": "sy-writing-plans",
+      "description": "Use when an approved design exists and you need an executable implementation plan before writing code.",
+      "relative_path": ".agents/skills/sy-writing-plans",
+      "skill_file": ".agents/skills/sy-writing-plans/SKILL.md",
+      "allowed_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebSearch"
+      ],
+      "argument_hint": "[task]",
+      "disable_model_invocation": false
+    }
+  ],
+  "_sy_generated": {
+    "generator": "seeyue-compile-adapter",
+    "version": 1,
+    "engine": "codex",
+    "pass": "skills",
+    "registry_revision": "2026-03-11",
+    "spec_hash": "616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b"
+  }
+}

@@ -1,0 +1,81 @@
+# SY:GENERATED:BEGIN {"generator":"seeyue-compile-adapter","version":1,"engine":"gemini_cli","pass":"policy","registry_revision":"2026-03-11","spec_hash":"616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b","artifact":"gemini-policy"}
+# seeyue-workflows Gemini CLI policy
+# Generated from workflow specs; do not edit manually.
+
+[[rule]]
+toolName = ["glob", "grep_search", "list_directory", "read_file", "read_many_files", "google_web_search", "web_fetch", "get_internal_docs", "activate_skill", "save_memory"]
+decision = "allow"
+priority = 100
+modes = ["default", "autoEdit", "plan"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:rm\\s+-rf\\b|rm\\s+-r\\b|del\\s+\\/f\\b|rd\\s+\\/s\\s+\\/q\\b|mv\\b|cp\\s+-f\\b|sed\\s+-i\\b|perl\\s+-pi\\b)"
+decision = "ask_user"
+priority = 900
+modes = ["default", "autoEdit", "yolo"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "\\bgit\\s+(add|commit|push|rm|mv|merge|rebase|cherry-pick|restore|clean|reset|stash\\s+(pop|apply))\\b"
+decision = "ask_user"
+priority = 800
+modes = ["default", "autoEdit"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:\\bcurl\\b|\\bwget\\b|\\bInvoke-WebRequest\\b|\\bInvoke-RestMethod\\b|\\bgit\\s+clone\\b|\\bssh\\b|\\bscp\\b|\\brsync\\b|\\bnpm\\s+(install|ci|publish)\\b|\\bpnpm\\s+(install|add|publish)\\b|\\byarn\\s+(add|install|publish)\\b|\\bpython\\s+-m\\s+pip\\s+install\\b|\\bpip\\s+install\\b)"
+decision = "ask_user"
+priority = 800
+modes = ["default", "autoEdit"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:\\bsudo\\b|\\bsu\\b|\\bchmod\\b|\\bchown\\b|\\bicacls\\b|\\bnet\\s+user\\b|\\bnet\\s+localgroup\\b|\\bmount\\b|\\bumount\\b|\\bsystemctl\\b)"
+decision = "ask_user"
+priority = 900
+modes = ["default", "autoEdit", "yolo"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:\\b(prisma|alembic|knex|sequelize|typeorm|rails)\\b[\\s\\S]*\\bmigrate\\b|\\b(db|schema)\\s*migrate\\b|\\bALTER\\s+TABLE\\b|\\bCREATE\\s+TABLE\\b|\\bDROP\\s+TABLE\\b)"
+decision = "ask_user"
+priority = 800
+modes = ["default", "autoEdit"]
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "(?:\\b(psql|mysql|sqlite3)\\b[\\s\\S]*\\b(UPDATE|DELETE|INSERT)\\b|\\b(mongo|mongosh)\\b|\\bredis-cli\\b)"
+decision = "ask_user"
+priority = 800
+modes = ["default", "autoEdit"]
+
+[[rule]]
+toolName = ["write_file", "replace"]
+argsPattern = "\"file_path\":\"(?:\\.git[\\\\/]**[\\\\/]*|\\.github[\\\\/]workflows[\\\\/]**[\\\\/]*|\\.claude[\\\\/]settings\\.json)\""
+decision = "deny"
+priority = 950
+deny_message = "该文件类型禁止直接写入：system_file"
+
+[[rule]]
+toolName = ["write_file", "replace"]
+argsPattern = "\"file_path\":\"(?:scripts[\\\\/]hooks[\\\\/]**[\\\\/]*|\\.claude[\\\\/]sy-hooks\\.policy\\.json|workflow[\\\\/]runtime\\.schema\\.yaml|workflow[\\\\/]router\\.spec\\.yaml|workflow[\\\\/]policy\\.spec\\.yaml|workflow[\\\\/]approval-matrix\\.yaml|workflow[\\\\/]file-classes\\.yaml|workflow[\\\\/]persona-bindings\\.yaml|workflow[\\\\/]capabilities\\.yaml)\""
+decision = "deny"
+priority = 950
+deny_message = "该文件类型禁止直接写入：security_boundary"
+
+[[rule]]
+toolName = ["write_file", "replace"]
+argsPattern = "\"file_path\":\"(?:\\.env|\\.env\\.*|**[\\\\/]*\\.pem|**[\\\\/]*\\.key|**[\\\\/]*\\.p12|**[\\\\/]secrets[\\\\/]**[\\\\/]*)\""
+decision = "deny"
+priority = 950
+deny_message = "该文件类型禁止直接写入：secret_material"
+
+[[rule]]
+toolName = ["write_file", "replace"]
+argsPattern = "\"file_path\":\"(?:workflow[\\\\/]**[\\\\/]*\\.yaml|docs[\\\\/]architecture-v4\\.md|docs[\\\\/]test-gate-spec-v2\\.md|\\.agents[\\\\/]skills[\\\\/]sy-constraints[\\\\/]**[\\\\/]*)\""
+decision = "ask_user"
+priority = 800
+modes = ["default", "autoEdit"]
+# SY:GENERATED:END
+

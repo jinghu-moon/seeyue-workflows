@@ -1,0 +1,261 @@
+schema_kind: hook_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: frozen
+owner: seeyue-workflows
+meta:
+  purpose: Define hook contracts and command classification for V5 workflows.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - hooks
+  - adapters
+  - validators
+  source_documents:
+  - docs/architecture-v4.md
+  - docs/architecture-v5-proposal.md
+contract:
+  schema_ref: workflow/hook-contract.schema.yaml
+  stdout_json_only: true
+  stdin_single_read: true
+  session_start_nonblocking: true
+  stop_force_continue_exit_code: 0
+  verdicts:
+  - allow
+  - block
+  - block_with_approval_request
+  - force_continue
+event_matrix:
+- event: SessionStart
+  purpose: bootstrap routing and constraints
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: UserPromptSubmit
+  purpose: long-session prompt re-anchor
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: PreToolUse:Bash
+  purpose: command class, approval, and destructive guard
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: PreToolUse:Write|Edit
+  purpose: TDD, secret, protected-file, and debug gates
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: PostToolUse:Write|Edit
+  purpose: write evidence and scope drift capture
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: PostToolUse:Bash
+  purpose: verification + TDD evidence capture
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: Stop
+  purpose: checkpoint and resume frontier gate
+  required: true
+  engines:
+    claude_code: supported
+    codex: bridged
+    gemini_cli: supported
+- event: BeforeToolSelection
+  purpose: pre-tool routing interception
+  required: false
+  engines:
+    claude_code: unsupported
+    codex: unsupported
+    gemini_cli: supported
+- event: AfterModel
+  purpose: post-model synthesis inspection
+  required: false
+  engines:
+    claude_code: unsupported
+    codex: unsupported
+    gemini_cli: supported
+capability_gap_report:
+  output_path: .ai/workflow/capability-gap.json
+  derived_from: event_matrix
+hook_matrix:
+- event: SessionStart
+  script: scripts/hooks/sy-session-start.cjs
+  purpose: bootstrap routing and constraints
+  required: true
+- event: UserPromptSubmit
+  script: scripts/hooks/sy-prompt-refresh.cjs
+  purpose: long-session prompt re-anchor
+  required: true
+- event: BeforeToolSelection
+  script: scripts/hooks/sy-before-tool-selection.cjs
+  purpose: pre-tool routing interception
+  required: false
+- event: PreToolUse:Bash
+  script: scripts/hooks/sy-pretool-bash.cjs
+  purpose: command class, approval, and destructive guard
+  required: true
+- event: PreToolUse:Bash
+  script: scripts/hooks/sy-pretool-bash-budget.cjs
+  purpose: loop budget gate
+  required: true
+- event: PreToolUse:Write|Edit
+  script: scripts/hooks/sy-pretool-write.cjs
+  purpose: TDD, secret, protected-file, and debug gates
+  required: true
+- event: PreToolUse:Write|Edit
+  script: scripts/hooks/sy-pretool-write-session.cjs
+  purpose: session integrity gate
+  required: true
+- event: PostToolUse:Write|Edit
+  script: scripts/hooks/sy-posttool-write.cjs
+  purpose: write evidence and scope drift capture
+  required: true
+- event: PostToolUse:Bash
+  script: scripts/hooks/sy-posttool-bash-verify.cjs
+  purpose: verification + TDD evidence capture
+  required: true
+- event: AfterModel
+  script: scripts/hooks/sy-after-model.cjs
+  purpose: post-model synthesis inspection
+  required: false
+- event: Stop
+  script: scripts/hooks/sy-stop.cjs
+  purpose: checkpoint and resume frontier gate
+  required: true
+command_classification:
+  priority:
+  - destructive
+  - privileged
+  - schema_mutation
+  - data_mutation
+  - git_mutating
+  - network_sensitive
+  - verify
+  - safe
+  classes:
+    destructive:
+      patterns:
+      - regex: "(^|[;&|\\n])\\s*rm\\s+-rf\\b"
+        label: rm_rf
+      - regex: "(^|[;&|\\n])\\s*rm\\s+-r\\b"
+        label: rm_recursive
+      - regex: "(^|[;&|\\n])\\s*del\\s+\\/f\\b"
+        label: windows_del_force
+      - regex: "(^|[;&|\\n])\\s*rd\\s+\\/s\\s+\\/q\\b"
+        label: windows_rd_recursive
+      - regex: "(^|[;&|\\n])\\s*mv\\b"
+        label: mv
+      - regex: "(^|[;&|\\n])\\s*cp\\s+-f\\b"
+        label: cp_force
+      - regex: "(^|[;&|\\n])\\s*sed\\s+-i\\b"
+        label: sed_inplace
+      - regex: "(^|[;&|\\n])\\s*perl\\s+-pi\\b"
+        label: perl_inplace
+    git_mutating:
+      patterns:
+      - regex: "\\bgit\\s+(add|commit|push|rm|mv|merge|rebase|cherry-pick|restore|clean|reset|stash\\s+(pop|apply))\\b"
+        label: git_mutating
+    network_sensitive:
+      patterns:
+      - regex: "\\bcurl\\b"
+        label: curl
+      - regex: "\\bwget\\b"
+        label: wget
+      - regex: "\\bInvoke-WebRequest\\b"
+        label: invoke_webrequest
+      - regex: "\\bInvoke-RestMethod\\b"
+        label: invoke_restmethod
+      - regex: "\\bgit\\s+clone\\b"
+        label: git_clone
+      - regex: "\\bssh\\b"
+        label: ssh
+      - regex: "\\bscp\\b"
+        label: scp
+      - regex: "\\brsync\\b"
+        label: rsync
+      - regex: "\\bnpm\\s+(install|ci|publish)\\b"
+        label: npm_network
+      - regex: "\\bpnpm\\s+(install|add|publish)\\b"
+        label: pnpm_network
+      - regex: "\\byarn\\s+(add|install|publish)\\b"
+        label: yarn_network
+      - regex: "\\bpython\\s+-m\\s+pip\\s+install\\b"
+        label: pip_install_module
+      - regex: "\\bpip\\s+install\\b"
+        label: pip_install
+    privileged:
+      patterns:
+      - regex: "\\bsudo\\b"
+        label: sudo
+      - regex: "\\bsu\\b"
+        label: su
+      - regex: "\\bchmod\\b"
+        label: chmod
+      - regex: "\\bchown\\b"
+        label: chown
+      - regex: "\\bicacls\\b"
+        label: icacls
+      - regex: "\\bnet\\s+user\\b"
+        label: net_user
+      - regex: "\\bnet\\s+localgroup\\b"
+        label: net_localgroup
+      - regex: "\\bmount\\b"
+        label: mount
+      - regex: "\\bumount\\b"
+        label: umount
+      - regex: "\\bsystemctl\\b"
+        label: systemctl
+    schema_mutation:
+      patterns:
+      - regex: "\\b(prisma|alembic|knex|sequelize|typeorm|rails)\\b[\\s\\S]*\\bmigrate\\b"
+        label: orm_migrate
+      - regex: "\\b(db|schema)\\s*migrate\\b"
+        label: db_migrate
+      - regex: "\\bALTER\\s+TABLE\\b"
+        label: alter_table
+      - regex: "\\bCREATE\\s+TABLE\\b"
+        label: create_table
+      - regex: "\\bDROP\\s+TABLE\\b"
+        label: drop_table
+    data_mutation:
+      patterns:
+      - regex: "\\b(psql|mysql|sqlite3)\\b[\\s\\S]*\\b(UPDATE|DELETE|INSERT)\\b"
+        label: sql_mutation
+      - regex: "\\b(mongo|mongosh)\\b"
+        label: mongo_shell
+      - regex: "\\bredis-cli\\b"
+        label: redis_cli
+    verify:
+      patterns:
+      - regex: "\\bcargo\\s+(build|check|test|clippy)\\b"
+        label: cargo_verify
+      - regex: "\\bnpm\\s+(test|run\\s+build|run\\s+lint)\\b"
+        label: npm_verify
+      - regex: "\\bpnpm\\s+(test|run\\s+build|run\\s+lint)\\b"
+        label: pnpm_verify
+      - regex: "\\bvitest\\s+run\\b"
+        label: vitest
+      - regex: "\\bpytest\\b"
+        label: pytest
+      - regex: "\\bgo\\s+(test|build|vet)\\b"
+        label: go_verify
+      - regex: "\\beslint\\b"
+        label: eslint
+      - regex: "\\bruff\\s+check\\b"
+        label: ruff
+      - regex: "\\bmypy\\b"
+        label: mypy

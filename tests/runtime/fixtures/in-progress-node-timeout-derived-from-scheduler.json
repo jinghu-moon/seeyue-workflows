@@ -1,0 +1,49 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "in_progress" },
+    "node": { "active_id": "P2-N1", "state": "green_pending", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "in_progress",
+      "tdd_state": "green_pending",
+      "timeout_policy": {
+        "timeout_seconds": 60,
+        "grace_seconds": 30,
+        "on_timeout": "require_human"
+      }
+    }
+  },
+  "journal": [
+    {
+      "ts": "2026-03-09T10:00:00Z",
+      "run_id": "wf-20260308-101",
+      "event": "node_started",
+      "phase": "P2",
+      "node_id": "P2-N1",
+      "actor": "runtime",
+      "payload": {
+        "source": "transition_applier"
+      },
+      "trace_id": "trace-timeout-start-1"
+    }
+  ],
+  "now": "2026-03-09T10:02:00Z",
+  "expected": {
+    "result": {
+      "route_verdict": "block",
+      "block_reason": "node_timed_out",
+      "policy_verdict": {
+        "route_effect": "require_human",
+        "primary_reason": "node_timed_out",
+        "timeout": {
+          "triggered": true,
+          "on_timeout": "require_human"
+        }
+      },
+      "recommended_next": [
+        { "type": "request_approval", "target": "scripts/P2-N1.cjs" }
+      ]
+    }
+  }
+}

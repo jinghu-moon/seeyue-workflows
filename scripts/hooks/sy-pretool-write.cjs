@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+"use strict";
+
+const { runHookAndExit } = require("../runtime/hook-client.cjs");
+
+runHookAndExit("PreToolUse:Write|Edit");

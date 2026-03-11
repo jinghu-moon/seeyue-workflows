@@ -1,0 +1,65 @@
+{
+  "nodes": {
+    "P2-N1": {
+      "status": "review",
+      "tdd_state": "green_verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" },
+      "evidence_refs": ["red", "green", "verify"],
+      "test_contract": {
+        "layer": "integration",
+        "coverage_mode": "patch",
+        "coverage_profile": "standard",
+        "mock_policy": "boundary_only",
+        "acceptance_criteria_refs": ["AC-1"],
+        "red_cmd": "node red P2-N1",
+        "green_cmd": "node green P2-N1",
+        "red_expectation": {
+          "allowed_failure_kinds": ["assertion_failure"],
+          "rejected_failure_kinds": ["syntax_error"],
+          "allowed_exit_codes": [1],
+          "stderr_pattern": null,
+          "error_type": null
+        },
+        "behavior_gate": {
+          "ac_traceability_required": true,
+          "boundary_conditions_required": true
+        }
+      }
+    }
+  },
+  "actionContext": {
+    "redEvidence": {
+      "executed": true,
+      "testFailed": true,
+      "failureKind": "assertion_failure",
+      "exitCode": 1,
+      "recorded": true
+    },
+    "greenEvidence": {
+      "executed": true,
+      "passed": true,
+      "newBlockerIntroduced": false
+    },
+    "behaviorEvidence": {
+      "acReferenced": true,
+      "mapped": true,
+      "allMappedTestsPassed": true
+    },
+    "coverageEvidence": {
+      "actual": 85,
+      "globalRegressed": false
+    },
+    "verifyEvidence": {
+      "passed": true
+    }
+  },
+  "expected": {
+    "route_effect": "allow",
+    "test_gates": {
+      "coverage_pass": false
+    },
+    "completion": {
+      "node_complete_ready": false
+    }
+  }
+}

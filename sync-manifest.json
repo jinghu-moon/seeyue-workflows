@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "release": {
+    "workflow_version": "0.2.0",
+    "release_date": "2026-03-09",
+    "breaking_change": false,
+    "upgrade_notes": [],
+    "adapter_versions": {
+      "claude_code": 1,
+      "codex": 1,
+      "gemini_cli": 1
+    },
+    "compatibility": {
+      "minimum_sync_version": "0.2.0"
+    }
+  },
+  "entries": [
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-changelog",
+      "target": ".agents/skills/sy-changelog"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-code-insight",
+      "target": ".agents/skills/sy-code-insight"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-constraints",
+      "target": ".agents/skills/sy-constraints"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-debug",
+      "target": ".agents/skills/sy-debug"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-design",
+      "target": ".agents/skills/sy-design"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-development-workflow",
+      "target": ".agents/skills/sy-development-workflow"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-doc-sync",
+      "target": ".agents/skills/sy-doc-sync"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-executing-plans",
+      "target": ".agents/skills/sy-executing-plans"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-git-commit",
+      "target": ".agents/skills/sy-git-commit"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-ideation",
+      "target": ".agents/skills/sy-ideation"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-receiving-code-review",
+      "target": ".agents/skills/sy-receiving-code-review"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-requesting-code-review",
+      "target": ".agents/skills/sy-requesting-code-review"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-verification-before-completion",
+      "target": ".agents/skills/sy-verification-before-completion"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-workflow",
+      "target": ".agents/skills/sy-workflow"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-workflow-constraints",
+      "target": ".agents/skills/sy-workflow-constraints"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-worktree",
+      "target": ".agents/skills/sy-worktree"
+    },
+    {
+      "type": "dir",
+      "source": ".agents/skills/sy-writing-plans",
+      "target": ".agents/skills/sy-writing-plans"
+    },
+    {
+      "type": "file",
+      "source": ".claude/settings.json",
+      "target": ".claude/settings.json"
+    },
+    {
+      "type": "file",
+      "source": ".claude/sy-hooks.policy.json",
+      "target": ".claude/sy-hooks.policy.json"
+    },
+    {
+      "type": "dir",
+      "source": "scripts/hooks",
+      "target": "scripts/hooks"
+    },
+    {
+      "type": "file",
+      "source": "scripts/cleanup-skill-trigger-output.cjs",
+      "target": "scripts/cleanup-skill-trigger-output.cjs"
+    },
+    {
+      "type": "dir",
+      "source": "tests/hooks",
+      "target": "tests/hooks"
+    },
+    {
+      "type": "dir",
+      "source": "tests/skill-triggering/prompts",
+      "target": "tests/skill-triggering/prompts"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/cases.json",
+      "target": "tests/skill-triggering/cases.json"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/cases.auto.json",
+      "target": "tests/skill-triggering/cases.auto.json"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/cases.constraints.json",
+      "target": "tests/skill-triggering/cases.constraints.json"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/cases.smoke.json",
+      "target": "tests/skill-triggering/cases.smoke.json"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/README.md",
+      "target": "tests/skill-triggering/README.md"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/run-all.cjs",
+      "target": "tests/skill-triggering/run-all.cjs"
+    },
+    {
+      "type": "file",
+      "source": "tests/skill-triggering/run-test.cjs",
+      "target": "tests/skill-triggering/run-test.cjs"
+    },
+    {
+      "type": "file",
+      "source": "docs/session-schema.md",
+      "target": "docs/workflow/session-schema.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/adoption-guide.md",
+      "target": "docs/workflow/adoption-guide.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/source-of-truth.md",
+      "target": "docs/workflow/source-of-truth.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/release-checklist.md",
+      "target": "docs/workflow/release-checklist.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/operations-runbook.md",
+      "target": "docs/workflow/operations-runbook.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/versioning-policy.md",
+      "target": "docs/workflow/versioning-policy.md"
+    }
+  ]
+}

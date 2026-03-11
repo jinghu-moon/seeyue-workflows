@@ -1,0 +1,162 @@
+{
+  "context": {
+    "fileName": [
+      "GEMINI.md"
+    ]
+  },
+  "general": {
+    "defaultApprovalMode": "default",
+    "checkpointing": {
+      "enabled": true
+    }
+  },
+  "skills": {
+    "enabled": true,
+    "disabled": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "name": "sy-session-start",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode session-start --delegate scripts/hooks/sy-session-start.cjs",
+            "timeout": 8000,
+            "description": "SY bootstrap: inject first-turn workflow + constraint routing context"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "name": "sy-prompt-refresh",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-agent --delegate scripts/hooks/sy-prompt-refresh.cjs",
+            "timeout": 6000,
+            "description": "SY refresh: re-anchor long-session routing context before planning"
+          }
+        ]
+      }
+    ],
+    "BeforeToolSelection": [
+      {
+        "hooks": [
+          {
+            "name": "sy-before-tool-selection",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-tool-selection --delegate scripts/hooks/sy-before-tool-selection.cjs",
+            "timeout": 6000,
+            "description": "SY filter: restrict tool selection scope when required"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "name": "sy-pretool-bash",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-tool --delegate scripts/hooks/sy-pretool-bash.cjs",
+            "timeout": 10000,
+            "description": "SY guard: command class approval, destructive guard, and loop budgets"
+          },
+          {
+            "name": "sy-pretool-bash-budget",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-tool --delegate scripts/hooks/sy-pretool-bash-budget.cjs",
+            "timeout": 8000,
+            "description": "SY guard: command class approval, destructive guard, and loop budgets"
+          }
+        ],
+        "matcher": "run_shell_command",
+        "sequential": true
+      },
+      {
+        "hooks": [
+          {
+            "name": "sy-pretool-write",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-tool --delegate scripts/hooks/sy-pretool-write.cjs",
+            "timeout": 10000,
+            "description": "SY guard: TDD, secret, protected-file, and session-integrity checks"
+          },
+          {
+            "name": "sy-pretool-write-session",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode before-tool --delegate scripts/hooks/sy-pretool-write-session.cjs",
+            "timeout": 8000,
+            "description": "SY guard: TDD, secret, protected-file, and session-integrity checks"
+          }
+        ],
+        "matcher": "write_file|replace",
+        "sequential": true
+      }
+    ],
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "name": "sy-posttool-write",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode after-tool --delegate scripts/hooks/sy-posttool-write.cjs",
+            "timeout": 8000,
+            "description": "SY post-write: audit evidence and scope drift capture"
+          }
+        ],
+        "matcher": "write_file|replace",
+        "sequential": true
+      },
+      {
+        "hooks": [
+          {
+            "name": "sy-posttool-bash-verify",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode after-tool --delegate scripts/hooks/sy-posttool-bash-verify.cjs",
+            "timeout": 8000,
+            "description": "SY post-shell: verification + TDD red/green evidence capture"
+          }
+        ],
+        "matcher": "run_shell_command",
+        "sequential": true
+      }
+    ],
+    "AfterModel": [
+      {
+        "hooks": [
+          {
+            "name": "sy-after-model",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode after-model --delegate scripts/hooks/sy-after-model.cjs",
+            "timeout": 8000,
+            "description": "SY post-model: redaction/logging boundary for Gemini streaming"
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "name": "sy-stop",
+            "type": "command",
+            "command": "node scripts/hooks/gemini-hook-bridge.cjs --mode after-agent --delegate scripts/hooks/sy-stop.cjs",
+            "timeout": 10000,
+            "description": "SY completion gate: checkpoint and resume-frontier enforcement"
+          }
+        ]
+      }
+    ]
+  },
+  "_sy_generated": {
+    "generator": "seeyue-compile-adapter",
+    "version": 1,
+    "engine": "gemini_cli",
+    "pass": "policy",
+    "registry_revision": "2026-03-11",
+    "spec_hash": "616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b"
+  }
+}

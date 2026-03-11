@@ -1,0 +1,58 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "blocked" },
+    "node": { "active_id": "P2-N1", "state": "failed", "owner_persona": "human" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "failed",
+      "tdd_state": "green_pending",
+      "retry_policy": {
+        "max_attempts": 3,
+        "retry_on": ["contract_mismatch", "timeout"],
+        "backoff_mode": "fixed",
+        "initial_delay_seconds": 600
+      }
+    }
+  },
+  "journal": [
+    {
+      "ts": "2026-03-09T10:00:00Z",
+      "run_id": "wf-20260308-101",
+      "event": "node_failed",
+      "phase": "P2",
+      "node_id": "P2-N1",
+      "actor": "runtime",
+      "payload": {
+        "source": "transition_applier",
+        "transition_context": {
+          "failure_kind": "contract_mismatch"
+        }
+      },
+      "trace_id": "trace-backoff-failure-1"
+    }
+  ],
+  "now": "2026-03-09T10:05:00Z",
+  "expected": {
+    "result": {
+      "route_verdict": "hold",
+      "block_reason": "retry_backoff_pending",
+      "policy_verdict": {
+        "retry": {
+          "allowed": false,
+          "retry_due_at": "2026-03-09T10:10:00.000Z",
+          "reasons": ["retry_backoff_pending"]
+        }
+      },
+      "recommended_next": [
+        {
+          "type": "resume_node",
+          "target": "P2-N1",
+          "params": {
+            "wait_until": "2026-03-09T10:10:00.000Z"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "nodes": {
+    "P2-N1": {
+      "retry_policy": {
+        "max_attempts": 3,
+        "backoff_mode": "exponential",
+        "initial_delay_seconds": 5,
+        "max_delay_seconds": 30,
+        "retry_on": ["transient_tool_failure"]
+      }
+    }
+  },
+  "actionContext": {
+    "retryContext": {
+      "failureKind": "transient_tool_failure",
+      "attemptsUsed": 1
+    }
+  },
+  "expected": {
+    "route_effect": "allow",
+    "retry": {
+      "allowed": true,
+      "next_attempt": 2
+    }
+  }
+}

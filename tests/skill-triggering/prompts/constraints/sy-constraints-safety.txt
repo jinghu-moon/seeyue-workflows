@@ -1,0 +1,1 @@
+接下来涉及高风险操作确认，包含 git reset --hard 和 force push，请先给出安全替代方案。

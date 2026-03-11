@@ -1,0 +1,34 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "review" },
+    "node": { "active_id": "P2-N1", "state": "verified", "owner_persona": "quality_reviewer" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "review",
+      "tdd_state": "green_verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" }
+    },
+    "P2-N2": {
+      "status": "ready",
+      "tdd_required": false,
+      "tdd_state": "not_applicable",
+      "priority": "high"
+    }
+  },
+  "policyVerdict": {
+    "completion": { "node_complete_ready": false, "phase_complete_ready": false }
+  },
+  "expected": {
+    "route_verdict": "hold",
+    "active_node": "P2-N1",
+    "block_reason": "node_completion_incomplete",
+    "recommended_next": [
+      {
+        "type": "resume_node",
+        "target": "P2-N1",
+        "params": { "persona": "quality_reviewer" }
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "in_progress" },
+    "node": { "active_id": "P2-N1", "state": "green_pending", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "in_progress",
+      "tdd_state": "green_pending",
+      "owner_persona": "author"
+    },
+    "P2-N2": {
+      "status": "ready",
+      "tdd_required": false,
+      "tdd_state": "not_applicable",
+      "priority": "high"
+    }
+  },
+  "expected": {
+    "route_verdict": "resume",
+    "active_node": "P2-N1",
+    "recommended_next": [
+      {
+        "type": "resume_node",
+        "target": "P2-N1",
+        "params": { "persona": "author" }
+      }
+    ]
+  }
+}

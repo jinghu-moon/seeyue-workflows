@@ -1,0 +1,91 @@
+schema_kind: hook_contract_schema
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define V5 hook IPC envelopes, verdicts, and journal event contracts.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - hooks
+  - hook_client
+  - validators
+  source_documents:
+  - docs/architecture-v5-proposal.md
+contract:
+  stdout_json_only: true
+  stdin_single_read: true
+  verdict_enum:
+  - allow
+  - block
+  - block_with_approval_request
+  - force_continue
+  hook_input:
+    required_fields:
+    - hook_event
+    - engine
+    - payload
+    - timestamp
+    optional_fields:
+    - cwd
+    - tool_name
+    - tool_input
+    - user_input
+    - session_id
+    - trace_id
+  hook_output:
+    required_fields:
+    - verdict
+    - reason
+    - instructions
+    optional_fields:
+    - approval_request
+    - output_templates
+    - input_mutation
+    - journal_events
+    - metadata
+  approval_request_schema:
+    required_fields:
+    - approval_id
+    - action
+    - target_ref
+    - risk_class
+    - approval_mode
+    - grant_scope
+    - status
+    - requested_at
+  journal_event_schema:
+    required_fields:
+    - event
+    - trace_id
+    - payload
+    - recorded_at
+  input_mutation:
+    allowed:
+    - path_normalization
+    - encoding_normalization
+    forbidden:
+    - semantic_redirection
+  session_start:
+    blocking_allowed: false
+    warning_only: true
+  stop:
+    force_continue_exit_code: 0
+    block_exit_code: 2
+    loop_guard_required: true
+engine_translation:
+  claude_code:
+    allow_exit_code: 0
+    block_exit_code: 2
+    force_continue_exit_code: 0
+    stop_force_continue_behavior: keep_working
+  codex:
+    allow_exit_code: 0
+    block_exit_code: 2
+    force_continue_exit_code: 0
+    stop_force_continue_behavior: keep_working
+  gemini_cli:
+    allow_exit_code: 0
+    block_exit_code: 2
+    force_continue_exit_code: 0
+    stop_force_continue_behavior: keep_working

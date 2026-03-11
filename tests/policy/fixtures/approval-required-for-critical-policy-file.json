@@ -1,0 +1,16 @@
+{
+  "actionContext": {
+    "targetPath": "workflow/router.spec.yaml",
+    "commandClass": "safe",
+    "changeClass": "utility"
+  },
+  "expected": {
+    "route_effect": "require_human",
+    "primary_reason": "approval_required",
+    "approval": {
+      "required": true,
+      "approval_mode": "never_auto",
+      "risk_class": "critical"
+    }
+  }
+}

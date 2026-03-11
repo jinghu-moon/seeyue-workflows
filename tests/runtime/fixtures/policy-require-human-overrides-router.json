@@ -1,0 +1,20 @@
+{
+  "session": {
+    "node": { "active_id": "none", "state": "idle", "owner_persona": "planner" }
+  },
+  "actionContext": {
+    "targetPath": "workflow/policy.spec.yaml",
+    "commandClass": "safe",
+    "changeClass": "utility"
+  },
+  "expected": {
+    "result": {
+      "route_verdict": "block",
+      "block_reason": "approval_required",
+      "next_persona": "human",
+      "recommended_next": [
+        { "type": "request_approval", "target": "workflow/policy.spec.yaml" }
+      ]
+    }
+  }
+}

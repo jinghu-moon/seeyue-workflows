@@ -1,0 +1,117 @@
+schema_kind: persona_bindings
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Bind isolated personas to abstract workflow capabilities.
+  authority: machine_source_of_truth
+  source_documents:
+    - docs/architecture-v4.md
+    - workflow/router.spec.yaml
+    - workflow/capabilities.yaml
+  rules:
+    - Persona contracts MUST stay capability-scoped.
+    - Reviewer personas MUST remain logically isolated from the author persona.
+personas:
+  planner:
+    class: planner
+    allowed_capabilities:
+      - planning
+    may_write_files: false
+    may_run_commands: false
+    input_contract:
+      - task_definition
+      - approved_design
+      - current_runtime_state
+    output_contract:
+      - phase_plan
+      - node_contracts
+      - risk_summary
+  author:
+    class: implementation
+    allowed_capabilities:
+      - code_edit
+    may_write_files: true
+    may_run_commands: true
+    input_contract:
+      - active_node
+      - acceptance_criteria
+      - latest_capsule
+    output_contract:
+      - changed_files
+      - implementation_notes
+      - verification_handoff
+  spec_reviewer:
+    class: review
+    allowed_capabilities:
+      - spec_review
+    may_write_files: false
+    may_run_commands: true
+    input_contract:
+      - active_node
+      - acceptance_criteria
+      - implementation_handoff
+    output_contract:
+      - spec_review_verdict
+      - scope_findings
+  quality_reviewer:
+    class: review
+    allowed_capabilities:
+      - quality_review
+    may_write_files: false
+    may_run_commands: true
+    input_contract:
+      - active_node
+      - spec_review_verdict
+      - verification_evidence
+    output_contract:
+      - quality_review_verdict
+      - quality_findings
+  reader:
+    class: analysis
+    allowed_capabilities:
+      - analysis
+    may_write_files: false
+    may_run_commands: true
+    input_contract:
+      - research_question
+      - active_scope
+      - source_paths
+    output_contract:
+      - analysis_capsule
+      - evidence_refs
+  auditor:
+    class: analysis
+    allowed_capabilities:
+      - analysis
+    may_write_files: false
+    may_run_commands: true
+    input_contract:
+      - claim_set
+      - verification_scope
+      - evidence_refs
+    output_contract:
+      - audit_verdict
+      - missing_evidence
+  human:
+    class: approval
+    allowed_capabilities:
+      - human_approval
+    may_write_files: false
+    may_run_commands: false
+    input_contract:
+      - approval_request
+      - risk_summary
+      - target_summary
+    output_contract:
+      - approval_decision
+      - approval_scope
+review_chain:
+  - author
+  - spec_reviewer
+  - quality_reviewer
+isolation_rules:
+  - Spec reviewer MUST NOT be the same invocation as author.
+  - Quality reviewer MUST NOT be the same invocation as author.
+  - Quality reviewer MUST NOT reuse spec review claims without fresh evidence.

@@ -1,0 +1,122 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "review" },
+    "node": { "active_id": "P2-N1", "state": "verified", "owner_persona": "quality_reviewer" },
+    "loop_budget": {
+      "max_nodes": 5,
+      "max_failures": 2,
+      "max_pending_approvals": 2,
+      "consumed_nodes": 1,
+      "consumed_failures": 0
+    }
+  },
+  "phases": {
+    "P3": { "status": "completed" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "review",
+      "tdd_state": "green_verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" },
+      "evidence_refs": ["red", "green", "verify"],
+      "test_contract": {
+        "layer": "integration",
+        "coverage_mode": "patch",
+        "coverage_profile": "standard",
+        "mock_policy": "boundary_only",
+        "acceptance_criteria_refs": ["AC-1", "AC-2"],
+        "red_cmd": "node red P2-N1",
+        "green_cmd": "node green P2-N1",
+        "red_expectation": {
+          "allowed_failure_kinds": ["assertion_failure", "behavior_result_mismatch"],
+          "rejected_failure_kinds": ["syntax_error", "environment_error"],
+          "allowed_exit_codes": [1],
+          "stderr_pattern": null,
+          "error_type": null
+        },
+        "behavior_gate": {
+          "ac_traceability_required": true,
+          "boundary_conditions_required": true
+        }
+      }
+    },
+    "P2-N2": {
+      "status": "completed",
+      "tdd_required": false,
+      "tdd_state": "not_applicable",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" },
+      "evidence_refs": ["e-2"],
+      "output_refs": ["o-2"]
+    },
+    "P2-N3": {
+      "status": "completed",
+      "tdd_state": "verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" },
+      "evidence_refs": ["e-3"],
+      "output_refs": ["o-3"]
+    }
+  },
+  "actionContext": {
+    "redEvidence": {
+      "executed": true,
+      "testFailed": true,
+      "failureKind": "assertion_failure",
+      "exitCode": 1,
+      "recorded": true
+    },
+    "greenEvidence": {
+      "executed": true,
+      "passed": true,
+      "newBlockerIntroduced": false
+    },
+    "behaviorEvidence": {
+      "acReferenced": true,
+      "mapped": true,
+      "allMappedTestsPassed": true
+    },
+    "coverageEvidence": {
+      "schema_version": 1,
+      "adapter_kind": "coverage_adapter",
+      "source_format": "normalized_json",
+      "source_ref": "coverage/coverage-summary.json",
+      "coverage_mode": "patch",
+      "coverage_profile": "standard",
+      "required": 80,
+      "actual": 85,
+      "actual_basis": "lines_pct",
+      "metrics": {
+        "lines_pct": 85,
+        "statements_pct": 84,
+        "functions_pct": 83,
+        "branches_pct": 82
+      },
+      "globalRegressed": false,
+      "touchedRegionRegressed": false,
+      "characterizationAdded": true,
+      "pass": true,
+      "status": "pass",
+      "reasons": [],
+      "recorded_at": "2026-03-09T12:00:00.000Z"
+    },
+    "verifyEvidence": {
+      "executed": true,
+      "passed": true,
+      "recorded_at": "2026-03-09T12:05:00.000Z"
+    },
+    "phaseExitGateEvidence": {
+      "passed": true
+    },
+    "reviewEvidence": {
+      "present": true,
+      "fresh": true
+    }
+  },
+  "expected": {
+    "route_effect": "allow",
+    "completion": {
+      "node_complete_ready": true,
+      "phase_complete_ready": true,
+      "stop_gate_ready": true
+    }
+  }
+}

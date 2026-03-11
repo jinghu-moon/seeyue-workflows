@@ -1,0 +1,373 @@
+schema_kind: policy_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define approval, testing, safety, and completion gates for V4 workflows.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - policy_engine
+  - hooks
+  - validators
+  - router_engine
+  source_documents:
+  - docs/architecture-v4.md
+  - docs/test-gate-spec-v2.md
+  - docs/architecture-v5-proposal.md
+inputs:
+  required_specs:
+  - workflow/runtime.schema.yaml
+  - workflow/router.spec.yaml
+  required_state:
+  - .ai/workflow/session.yaml
+  - .ai/workflow/task-graph.yaml
+  - .ai/workflow/sprint-status.yaml
+  - .ai/workflow/journal.jsonl
+  principles:
+  - evidence_over_claims
+  - test_contract_before_framework
+  - behavior_over_implementation
+  - coverage_is_threshold_not_conclusion
+  - deterministic_approval_relief
+approval_policy:
+  grant_scopes:
+  - once
+  - session
+  grant_scope_semantics:
+    once: approve a single matching action instance only
+    session: approve matching action class within current session only
+  approval_modes:
+  - manual_required
+  - never_auto
+  approval_mode_semantics:
+    manual_required: requires explicit human decision before execution or grant issuance
+    never_auto: must never be auto-approved and MUST require explicit per-request human decision
+  approval_record_contract:
+    active_request_required_fields:
+    - action
+    - target_ref
+    - risk_class
+    - approval_mode
+    - grant_scope
+    - status
+    - requested_at
+    grant_required_fields:
+    - action
+    - target_ref
+    - risk_class
+    - approval_mode
+    - grant_scope
+    - decision
+    - granted_at
+  risk_classes:
+  - low
+  - medium
+  - high
+  - critical
+  approval_required_for:
+    command_classes:
+    - destructive
+    - git_mutating
+    - network_sensitive
+    - privileged
+    - schema_mutation
+    - data_mutation
+    file_classes:
+    - system_file
+    - security_boundary
+    - secret_material
+    - critical_policy_file
+  notify_only_eligibility:
+    enabled: true
+    not_an_approval_scope: true
+    requires_all:
+    - risk_class == low
+    - change_class in [docs, scaffold, utility]
+    - verification_passed == true
+    - change_is_auditable == true
+    forbidden_if_any:
+    - command_class in [destructive, git_mutating, network_sensitive, privileged]
+    - touches_auth_or_security == true
+    - touches_schema_or_public_api == true
+    - touches_data_migration == true
+    - tdd_exception_active == true
+    behavior:
+      human_notification_required: true
+      journal_record_required: true
+      must_not_upgrade_to_auto_approval: true
+  engine_mode_mapping:
+    claude_code:
+      manual_required: default
+      never_auto: manual
+      notify_only: default
+    codex:
+      manual_required: on-request
+      never_auto: on-request
+      notify_only: notify-only
+    gemini_cli:
+      manual_required: plan
+      never_auto: yolo
+      notify_only: default
+  policy_tiers:
+    notify_only:
+      description: low-risk changes with verification and audit trail
+      requires_human_notification: true
+    approval_required:
+      description: requires explicit human approval before action
+test_policy:
+  applies_to:
+    default_task_modes:
+    - feature
+    - bugfix
+    - refactor
+    non_tdd_defaults:
+    - docs
+    behavior_change_rule: if behavior changes, testing gates apply even when task.mode
+      suggests low-risk work
+  node_test_contract:
+    required_when_any:
+    - node.tdd_required == true
+    - node changes behavior
+    - node is bugfix
+    - node is feature
+    - node touches router/policy/hook/adapter/api
+    runtime_field: node.test_contract
+    required_fields:
+    - layer
+    - coverage_mode
+    - coverage_profile
+    - mock_policy
+    - acceptance_criteria_refs
+    - red_cmd
+    - green_cmd
+    - red_expectation
+    - behavior_gate
+    layer_enum:
+    - unit
+    - integration
+    - contract
+    - e2e
+    - smoke
+    coverage_mode_enum:
+    - full
+    - patch
+    coverage_profile_enum:
+    - critical
+    - core
+    - standard
+    - utility
+    - scaffold
+    mock_policy_enum:
+    - none
+    - boundary_only
+    - allowed_with_justification
+  tdd_contract:
+    sequence:
+    - red_pending
+    - red_verified
+    - green_pending
+    - green_verified
+    - refactor_pending
+    - verified
+    production_write_forbidden_when:
+    - node.tdd_required == true
+    - node.tdd_state == red_pending
+    exceptions:
+      record_name: tdd_exception
+      required_fields:
+      - reason
+      - alternative_verification
+      - user_approved
+      must_block_until_user_approved: true
+  red_gate:
+    required_evidence:
+    - red_cmd executed
+    - test failed
+    - failure aligns with missing behavior
+    - red evidence recorded
+    accepted_failure_kinds:
+    - assertion_failure
+    - contract_mismatch
+    - expected_validation_failure
+    - behavior_result_mismatch
+    rejected_failure_kinds:
+    - syntax_error
+    - import_error
+    - environment_error
+    - connection_error
+    - permission_error
+    - fixture_initialization_error
+    required_fields:
+    - exit_code
+    - failure_kind
+    - allowed_failure_kinds
+    - rejected_failure_kinds
+    optional_fields:
+    - stderr_pattern
+    - error_type
+    write_block_behavior:
+      pre_write_must_block_on_invalid_red: true
+      environment_failure_must_not_count_as_red: true
+  green_gate:
+    required_evidence:
+    - green_cmd executed
+    - target test passed
+    - no new blocker introduced
+  behavior_gate:
+    requires:
+    - acceptance criteria explicitly referenced
+    - each required AC maps to at least one test
+    - all required AC mapped tests passed
+    must_not_rely_on:
+    - freeform subjective judgment
+    - test name similarity alone
+  coverage_policy:
+    profiles:
+      critical: 100%
+      core: 90%
+      standard: 80%
+      utility: 60%
+      scaffold: not_enforced
+    patch_coverage:
+      enabled_for_legacy_code: true
+      requires:
+      - new_or_modified_code meets target coverage
+      - global coverage does not regress
+      - touched-region coverage does not regress
+      - bugfix adds characterization_or_reproducer_test
+    coverage_is_not_sufficient_without_behavior_gate: true
+  mock_policy:
+    allowed_for:
+    - third_party_api
+    - time_or_randomness
+    - controlled_network_failure
+    - high_cost_external_resource
+    - explicit_boundary_dependency
+    discouraged_for:
+    - core_business_logic
+    - state_machine_core_path
+    - router_decision_core_path
+    - policy_blocking_core_path
+    must_block_completion_if_any:
+    - mock_only_assertion_without_behavior_validation
+    - private_implementation_only_assertion
+    - oversimplified_mock_hides_contract_issue
+execution_resilience:
+  retry_policy:
+    runtime_field: node.retry_policy
+    default_when_absent: no_automatic_retry
+    required_fields:
+    - max_attempts
+    - backoff_mode
+    optional_fields:
+    - initial_delay_seconds
+    - max_delay_seconds
+    - retry_on
+    allowed_backoff_modes:
+    - fixed
+    - exponential
+    retry_only_when_any:
+    - transient_tool_failure
+    - transient_network_failure
+    - flaky_external_dependency_with_justification
+    must_not_retry_when_any:
+    - syntax_error
+    - deterministic_test_failure
+    - approval_pending
+    - invalid_red
+  timeout_policy:
+    runtime_field: node.timeout_policy
+    default_when_absent: no_node_specific_timeout
+    required_fields:
+    - timeout_seconds
+    - on_timeout
+    optional_fields:
+    - grace_seconds
+    allowed_on_timeout:
+    - fail_node
+    - block_node
+    - require_human
+    timeout_must_emit_event: node_timed_out
+    timeout_must_not_bypass:
+    - review requirements
+    - approval requirements
+    - test gates
+completion_gates:
+  node_gate:
+    complete_requires:
+    - valid_red_observed when tdd_required
+    - green_passed
+    - node.verify passed
+    - behavior_gate pass
+    - coverage pass
+    - required review passed
+    - no pending approval
+    - approval queue within configured budget
+    must_block_on:
+    - production code written before valid red
+    - verify not passed
+    - coverage below requirement
+    - behavior gate fail
+    - approval pending
+    - approval queue limit exceeded
+    - review verdict in [rework, fail]
+  phase_gate:
+    complete_requires:
+    - all required nodes completed
+    - no unresolved failed or rework node
+    - phase.exit_gate passed
+    - no pending approval
+    - approval queue within configured budget
+    - no unresolved recovery state
+  stop_gate:
+    complete_requires:
+    - no pending approval
+    - active node verification complete
+    - active phase exit gate passed or not applicable
+    - review evidence fresh and present
+    - runtime required fields complete
+    - approval queue within configured budget
+    - budget not exhausted without human takeover
+hook_enforcement:
+  pre_write:
+    must_block_when_any:
+    - invalid_red for tdd_required node
+    - production write before valid red
+    - active approval required but not resolved
+    - runtime state incomplete for gated action
+    - approval queue limit exceeded
+  post_bash:
+    must_extract:
+    - red evidence
+    - green evidence
+    - verify evidence
+    - coverage evidence
+  stop:
+    must_block_when_any:
+    - pending approval
+    - node verification incomplete
+    - review evidence stale
+    - runtime state incomplete
+    - approval queue limit exceeded
+    - stop gate not satisfied
+policy_verdicts:
+  route_effects:
+  - allow
+  - hold
+  - block
+  - require_human
+  quality_levels:
+  - PASS
+  - CONCERNS
+  - REWORK
+  - FAIL
+alignment_notes:
+  runtime_sync_required:
+  - keep task_graph.nodes.test_contract aligned with node_test_contract
+  - keep approval grant_scope separate from approval_mode
+  - do not model notify_only as approval grant scope or approval mode
+  deferred_from_v1:
+  - advanced retry/backoff policy tuning
+  - advanced timeout/deadline/SLA policy
+  - execution action schema

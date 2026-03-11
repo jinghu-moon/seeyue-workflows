@@ -1,0 +1,137 @@
+[
+    {
+        "skill":  "sy-workflow",
+        "prompt":  "tests/skill-triggering/prompts/sy-workflow.txt",
+        "offline_keywords":  [
+                                 "模糊想法",
+                                 "可执行任务",
+                                 "按工作流开始"
+                             ]
+    },
+    {
+        "skill":  "sy-code-insight",
+        "prompt":  "tests/skill-triggering/prompts/sy-code-insight.txt",
+        "offline_keywords":  [
+                                 "先不要写代码",
+                                 "影响哪些模块和接口",
+                                 "结构化影响面"
+                             ]
+    },
+    {
+        "skill":  "sy-doc-sync",
+        "prompt":  "tests/skill-triggering/prompts/sy-doc-sync.txt",
+        "offline_keywords":  [
+                                 "readme.ai.md",
+                                 "增量方式同步",
+                                 "更新到和当前代码一致"
+                             ]
+    },
+    {
+        "skill":  "sy-ideation",
+        "prompt":  "tests/skill-triggering/prompts/sy-ideation.txt",
+        "offline_keywords":  [
+                                 "需求不明确",
+                                 "先构思",
+                                 "方案取舍"
+                             ]
+    },
+    {
+        "skill":  "sy-writing-plans",
+        "prompt":  "tests/skill-triggering/prompts/sy-writing-plans.txt",
+        "offline_keywords":  [
+                                 "已批准的设计",
+                                 "实施计划",
+                                 "拆成节点"
+                             ]
+    },
+    {
+        "skill":  "sy-executing-plans",
+        "prompt":  "tests/skill-triggering/prompts/sy-executing-plans.txt",
+        "offline_keywords":  [
+                                 "执行节点",
+                                 "运行测试",
+                                 "验证节点"
+                             ]
+    },
+    {
+        "skill":  "sy-verification-before-completion",
+        "prompt":  "tests/skill-triggering/prompts/sy-verification-before-completion.txt",
+        "offline_keywords":  [
+                                 "全部节点完成",
+                                 "完整验证",
+                                 "评审前"
+                             ]
+    },
+    {
+        "skill":  "sy-requesting-code-review",
+        "prompt":  "tests/skill-triggering/prompts/sy-requesting-code-review.txt",
+        "offline_keywords":  [
+                                 "结构化代码评审",
+                                 "高风险问题",
+                                 "按严重级别"
+                             ]
+    },
+    {
+        "skill":  "sy-receiving-code-review",
+        "prompt":  "tests/skill-triggering/prompts/sy-receiving-code-review.txt",
+        "offline_keywords":  [
+                                 "处理评审反馈",
+                                 "逐条分类",
+                                 "每条验证"
+                             ]
+    },
+    {
+        "skill":  "sy-development-workflow",
+        "prompt":  "tests/skill-triggering/prompts/sy-development-workflow.txt",
+        "offline_keywords":  [
+                                 "旧工作流",
+                                 "兼容转发",
+                                 "路由到拆分技能"
+                             ]
+    },
+    {
+        "skill":  "sy-changelog",
+        "prompt":  "tests/skill-triggering/prompts/sy-changelog.txt",
+        "offline_keywords":  [
+                                 "记一下这次变更",
+                                 "功能粒度",
+                                 "变更日志"
+                             ]
+    },
+    {
+        "skill":  "sy-git-commit",
+        "prompt":  "tests/skill-triggering/prompts/sy-git-commit.txt",
+        "offline_keywords":  [
+                                 "生成可直接执行的",
+                                 "commit/release 命令",
+                                 "验证通过"
+                             ]
+    },
+    {
+        "skill":  "sy-design",
+        "prompt":  "tests/skill-triggering/prompts/sy-design.txt",
+        "offline_keywords":  [
+                                 "技术设计",
+                                 "非目标",
+                                 "风险"
+                             ]
+    },
+    {
+        "skill":  "sy-worktree",
+        "prompt":  "tests/skill-triggering/prompts/sy-worktree.txt",
+        "offline_keywords":  [
+                                 "隔离工作区",
+                                 "工作树",
+                                 "基线检查"
+                             ]
+    },
+    {
+        "skill":  "sy-debug",
+        "prompt":  "tests/skill-triggering/prompts/sy-debug.txt",
+        "offline_keywords":  [
+                                 "根因调试",
+                                 "先收集证据",
+                                 "假设"
+                             ]
+    }
+]

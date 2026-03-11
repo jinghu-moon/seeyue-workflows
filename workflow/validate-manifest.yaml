@@ -1,0 +1,106 @@
+schema_kind: validate_manifest
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Register logical specs, freeze gates, and cross references for V5 validation.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - validators
+  - adapters
+  - runtime
+  source_documents:
+  - docs/architecture-v5-proposal.md
+  - docs/implementation-plan-v5.md
+  rules:
+  - Every spec in workflow/ must be registered here.
+  - Unregistered specs must trigger SPEC_NOT_REGISTERED.
+  - Specs are frozen only when status is frozen and schema_version is stable.
+  - cross_refs must reference registered spec paths.
+specs:
+  workflow/validate-manifest.yaml:
+    schema_kind: validate_manifest
+    status: draft
+    schema_version: 1
+    freeze_gate: P1-N0
+    cross_refs: []
+  workflow/runtime.schema.yaml:
+    schema_kind: runtime_schema
+    status: draft
+    schema_version: 4
+    freeze_gate: P2-N1
+    cross_refs:
+    - workflow/router.spec.yaml
+    - workflow/policy.spec.yaml
+  workflow/router.spec.yaml:
+    schema_kind: router_spec
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N1
+    cross_refs:
+    - workflow/capabilities.yaml
+    - workflow/persona-bindings.yaml
+  workflow/policy.spec.yaml:
+    schema_kind: policy_spec
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N2
+    cross_refs:
+    - workflow/approval-matrix.yaml
+    - workflow/file-classes.yaml
+    - workflow/runtime.schema.yaml
+  workflow/hooks.spec.yaml:
+    schema_kind: hook_spec
+    status: frozen
+    schema_version: 1
+    freeze_gate: P3-N1
+    cross_refs:
+    - workflow/hook-contract.schema.yaml
+  workflow/hook-contract.schema.yaml:
+    schema_kind: hook_contract_schema
+    status: draft
+    schema_version: 1
+    freeze_gate: P3-N1
+    cross_refs:
+    - workflow/output-templates.spec.yaml
+  workflow/skills.spec.yaml:
+    schema_kind: skills_spec
+    status: draft
+    schema_version: 1
+    freeze_gate: P4-N1
+    cross_refs:
+    - workflow/output-templates.spec.yaml
+    - workflow/capabilities.yaml
+  workflow/output-templates.spec.yaml:
+    schema_kind: output_template_registry
+    status: frozen
+    schema_version: 1
+    freeze_gate: P4-N1
+    cross_refs: []
+  workflow/capabilities.yaml:
+    schema_kind: capability_registry
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N1
+    cross_refs: []
+  workflow/persona-bindings.yaml:
+    schema_kind: persona_bindings
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N1
+    cross_refs:
+    - workflow/capabilities.yaml
+  workflow/file-classes.yaml:
+    schema_kind: file_class_registry
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N1
+    cross_refs: []
+  workflow/approval-matrix.yaml:
+    schema_kind: approval_matrix
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N2
+    cross_refs:
+    - workflow/file-classes.yaml

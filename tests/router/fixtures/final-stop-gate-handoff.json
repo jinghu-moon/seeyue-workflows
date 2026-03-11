@@ -1,0 +1,48 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "review" },
+    "node": { "active_id": "P2-N1", "state": "verified", "owner_persona": "quality_reviewer" }
+  },
+  "phases": {
+    "P3": { "status": "completed" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "review",
+      "tdd_state": "green_verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" }
+    },
+    "P2-N2": {
+      "status": "completed",
+      "tdd_required": false,
+      "tdd_state": "not_applicable",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" }
+    },
+    "P2-N3": {
+      "status": "completed",
+      "tdd_state": "verified",
+      "review_state": { "spec_review": "pass", "quality_review": "pass" }
+    }
+  },
+  "policyVerdict": {
+    "completion": {
+      "node_complete_ready": true,
+      "phase_complete_ready": true,
+      "stop_gate_ready": true
+    }
+  },
+  "expected": {
+    "route_verdict": "hold",
+    "active_phase": "P2",
+    "active_node": "P2-N1",
+    "next_persona": "human",
+    "next_capability": "human_approval",
+    "recommended_next": [
+      {
+        "type": "human_intervention",
+        "target": "session"
+      }
+    ],
+    "emit_events": ["node_completed", "phase_completed", "session_stopped"]
+  }
+}

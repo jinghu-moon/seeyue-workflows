@@ -1,0 +1,22 @@
+{
+  "nodes": {
+    "P2-N1": {
+      "timeout_policy": {
+        "timeout_seconds": 120,
+        "grace_seconds": 10,
+        "on_timeout": "require_human"
+      }
+    }
+  },
+  "actionContext": {
+    "timeoutTriggered": true
+  },
+  "expected": {
+    "route_effect": "require_human",
+    "primary_reason": "node_timed_out",
+    "timeout": {
+      "triggered": true,
+      "on_timeout": "require_human"
+    }
+  }
+}

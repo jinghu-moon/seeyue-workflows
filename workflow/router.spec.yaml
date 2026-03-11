@@ -1,0 +1,380 @@
+schema_kind: router_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define deterministic routing, progression, and next-action generation for
+    V4 workflows.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - router_engine
+  - validators
+  - engine_adapters
+  source_documents:
+  - docs/architecture-v4.md
+  - docs/router-spec-draft.md
+inputs:
+  required_state:
+  - .ai/workflow/session.yaml
+  - .ai/workflow/task-graph.yaml
+  - .ai/workflow/sprint-status.yaml
+  - .ai/workflow/journal.jsonl
+  required_specs:
+  - workflow/runtime.schema.yaml
+  optional_specs:
+  - workflow/persona-bindings.yaml
+  - workflow/capabilities.yaml
+  policy_inputs:
+  - validator_verdict
+  - policy_verdict
+  principles:
+  - state_over_chat
+  - durable_state_only
+  - deterministic_replay
+  - policy_before_advance
+outputs:
+  route_verdict:
+    enum:
+    - advance
+    - hold
+    - block
+    - resume
+    - handoff
+  required_fields:
+  - route_verdict
+  - active_phase
+  - active_node
+  - next_persona
+  - next_capability
+  - recommended_next
+  - block_reason
+  - route_basis
+  - emit_events
+  recommended_next_item:
+    type: object
+    required:
+    - type
+    - target
+    - params
+    - reason
+    - blocking_on
+    - priority
+    properties:
+      type:
+        enum:
+        - resume_node
+        - start_node
+        - request_approval
+        - enter_phase
+        - human_intervention
+        - retry_node
+      target:
+        type: string
+      params:
+        type: object
+      reason:
+        type: string
+      blocking_on:
+        type: array
+        items:
+          type: string
+      priority:
+        enum:
+        - now
+        - next
+        - later
+global_blockers:
+  priority_order:
+  - invalid_state
+  - restore_pending
+  - approval_pending
+  - budget_exhausted
+  - review_failed
+  - phase_dependency_unmet
+  - node_dependency_unmet
+  blockers:
+    invalid_state:
+    - validator_fail
+    - missing_required_runtime_fields
+    - session.approvals.pending_count > session.loop_budget.max_pending_approvals
+    restore_pending:
+    - session.recovery.restore_pending == true
+    approval_pending:
+    - session.approvals.pending == true
+    budget_exhausted:
+    - session.loop_budget.consumed_nodes >= session.loop_budget.max_nodes
+    - session.loop_budget.consumed_failures >= session.loop_budget.max_failures
+    review_failed:
+    - active_node.review_state.spec_review in [rework, fail]
+    - active_node.review_state.quality_review in [rework, fail]
+    phase_dependency_unmet:
+    - active_phase.depends_on not all completed
+    node_dependency_unmet:
+    - candidate_node.depends_on not all completed
+  behavior:
+    on_block: emit block_reason and blocker-first recommended_next
+    advance_forbidden_when_any_blocker_hits: true
+phase_routing:
+  execution_mode: single_active_phase
+  parallel_phases_supported: false
+  states:
+  - pending
+  - in_progress
+  - blocked
+  - review
+  - completed
+  allowed_transitions:
+  - pending->in_progress
+  - in_progress->blocked
+  - blocked->in_progress
+  - in_progress->review
+  - review->completed
+  - review->blocked
+  functions:
+    PhaseReady:
+      requires:
+      - phase.status != completed
+      - phase.depends_on all completed or absent
+      - phase.entry_condition pass
+      - no_global_blocker
+      - no_other_active_phase
+    PhaseDone:
+      requires:
+      - required_nodes all completed
+      - no_unresolved_failed_or_rework_node
+      - phase.exit_gate pass
+      - no_pending_approval
+      - no_restore_pending
+  completion_behavior:
+    emit_events:
+    - phase_completed
+    advance_to_next_ready_phase: true
+    update_session_phase_current: true
+    regenerate_recommended_next: true
+node_routing:
+  execution_mode: single_active_node
+  parallel_nodes_supported: false
+  parallel_group_policy:
+    phase_1_status: reserved
+    runtime_behavior: non_null_parallel_group_is_invalid_state
+    scheduler_behavior: MUST ignore parallel expansion and block via invalid_state instead
+  node_required_runtime_fields:
+  - id
+  - phase_id
+  - title
+  - target
+  - action
+  - why
+  - depends_on
+  - verify
+  - risk_level
+  - tdd_required
+  - status
+  - tdd_state
+  - owner_persona
+  - review_state
+  - evidence_refs
+  - output_refs
+  - capability
+  - priority
+  optional_runtime_fields:
+  - condition
+  - parallel_group
+  - approval_ref
+  - retry_policy
+  - timeout_policy
+  states:
+  - pending
+  - ready
+  - in_progress
+  - blocked
+  - review
+  - completed
+  - failed
+  allowed_transitions:
+  - pending->ready
+  - ready->in_progress
+  - in_progress->blocked
+  - blocked->in_progress
+  - in_progress->review
+  - review->completed
+  - review->blocked
+  - in_progress->failed
+  - failed->blocked
+  - blocked->ready
+  functions:
+    NodeReady:
+      requires:
+      - node.phase_id == session.phase.current
+      - node.status not in [completed]
+      - node.depends_on all completed
+      - node.condition pass or absent
+      - no_global_blocker
+      - tdd_state allows progress when tdd_required
+      - approval pass or absent
+      - capability binding resolved when capability present
+    NodeDone:
+      requires:
+      - node.verify pass
+      - node.evidence_refs present
+      - review pass
+      - tdd_state == verified or tdd_not_required
+      - behavior_gate pass
+      - coverage pass
+      - no_pending_approval
+  failure_behavior:
+    failed_is_terminal: false
+    default_transition: failed->blocked
+    retry_requires:
+    - retry explicitly allowed by policy
+    - node.retry_policy declared or policy default retry applies
+    - budget available
+    - no_global_blocker
+    - failed preconditions restored
+    must_emit_events:
+    - node_failed
+  timeout_behavior:
+    timeout_requires:
+    - node.timeout_policy declared or policy default timeout applies
+    when_triggered:
+    - emit node_timed_out
+    - apply node.timeout_policy.on_timeout or policy default
+    route_by_action:
+      fail_node: mark node failed and continue through failure_behavior
+      block_node: mark node blocked and generate recovery-focused recommended_next
+      require_human: route_verdict require_human and generate escalation recommended_next
+  ready_set_ordering:
+    primary: node.priority
+    secondary: topological_order_within_phase
+    tertiary: context_proximity
+    tie_breaker: stable_node_id
+    numeric_route_score_supported: false
+  conditional_nodes:
+    supported: true
+    mode: minimal_declarative
+    allowed_inputs:
+    - durable_runtime_state
+    - policy_verdict
+    - prior_node_result
+    forbidden_inputs:
+    - chat_history
+    - freeform_script_execution
+    false_behavior:
+      enter_required_execution_set: false
+      emit_events:
+      - node_bypassed
+persona_capability_routing:
+  personas:
+  - planner
+  - author
+  - spec_reviewer
+  - quality_reviewer
+  - reader
+  - auditor
+  - human
+  default_bindings:
+  - when: missing_plan_structure
+    next_persona: planner
+    next_capability: planning
+  - when: node_ready_for_implementation
+    next_persona: author
+    next_capability: code_edit
+  - when: implementation_complete_waiting_spec_review
+    next_persona: spec_reviewer
+    next_capability: spec_review
+  - when: spec_review_passed_waiting_quality_review
+    next_persona: quality_reviewer
+    next_capability: quality_review
+  - when: analysis_needed
+    next_persona: reader
+    next_capability: analysis
+  - when: claim_verification_needed
+    next_persona: auditor
+    next_capability: analysis
+  - when: approval_or_exception_needed
+    next_persona: human
+    next_capability: human_approval
+  review_chain:
+  - author
+  - spec_reviewer
+  - quality_reviewer
+recommended_next:
+  max_items: 3
+  priority_order:
+  - resume_action
+  - approval_action
+  - active_node_next_step
+  - next_ready_node
+  - next_ready_phase
+  - human_intervention
+  rules:
+  - first item MUST be the most executable next action
+  - if a blocker exists, first item MUST address the blocker
+  - conflicting recommendations MUST NOT be emitted together
+  - items MUST be machine-readable and adapter-consumable
+  - when completion.stop_gate_ready == true and no next phase or node is executable, first item MUST be human_intervention targeting session
+resume_routing:
+  ResumeNeeded:
+    requires_any:
+    - session.recovery.restore_pending == true
+    - recent journal shows interrupted unfinished node
+    - checkpoint exists and session not cleanly closed
+    - validator requires restore
+  after_restore:
+  - verify checkpoint integrity
+  - restore session.phase.current
+  - restore session.node.active_id
+  - recompute blockers
+  - recompute recommended_next
+budget_routing:
+  BudgetAvailable:
+    requires:
+    - session.loop_budget.consumed_nodes < session.loop_budget.max_nodes
+    - session.loop_budget.consumed_failures < session.loop_budget.max_failures
+  on_exhausted:
+    route_verdict: block
+    block_reason: budget_exhausted
+    emit_events:
+    - budget_exhausted
+    must_generate_human_next_step: true
+event_emission:
+  required_events:
+  - phase_entered
+  - phase_completed
+  - node_started
+  - node_completed
+  - node_failed
+  - node_timed_out
+  - node_bypassed
+  - review_verdict_recorded
+  - session_stopped
+  - session_resumed
+  - budget_exhausted
+  - approval_requested
+  - approval_resolved
+  rules:
+  - critical routing decisions MUST emit events
+  - state changes MUST NOT occur without matching event emission
+  - terminal handoff MUST emit session_stopped
+route_basis:
+  required_sections:
+  - session_fields
+  - phase_checks
+  - node_checks
+  - policy_verdicts
+  - blockers
+  - sorting_decision
+alignment_notes:
+  runtime_sync_required:
+  - keep sprint_status.recommended_next identical to router.recommended_next_item
+  - keep journal payload.route_decision and payload.route_basis aligned with router outputs
+  - keep approval grant_scope separate from approval_mode
+  not_in_router_v1:
+  - full node action/input/output schema
+  - advanced retry/backoff policy tuning
+  - advanced timeout/deadline/SLA orchestration
+  - numeric route score
+  - non-null parallel_group scheduling
+  - true multi-active-node scheduling
+  - parallel phase execution

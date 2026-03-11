@@ -1,0 +1,13 @@
+{
+  "session": {
+    "recovery": { "restore_pending": true, "restore_reason": "missing_tool_call_metadata" }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "restore_requires_human",
+    "next_persona": "human",
+    "recommended_next": [
+      { "type": "human_intervention", "target": "P2-N1" }
+    ]
+  }
+}

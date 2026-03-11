@@ -1,0 +1,89 @@
+schema_kind: capability_registry
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define abstract workflow capabilities for V4 routing and persona binding.
+  authority: machine_source_of_truth
+  source_documents:
+    - docs/architecture-v4.md
+    - workflow/router.spec.yaml
+  rules:
+    - Capabilities MUST describe execution intent, not concrete tool calls.
+    - Capability identifiers MUST remain stable across adapters.
+capabilities:
+  planning:
+    category: planning
+    default_persona: planner
+    allowed_personas:
+      - planner
+    writes_files: false
+    runs_commands: false
+    produces_review_verdict: false
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli
+  code_edit:
+    category: implementation
+    default_persona: author
+    allowed_personas:
+      - author
+    writes_files: true
+    runs_commands: true
+    produces_review_verdict: false
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli
+  spec_review:
+    category: review
+    default_persona: spec_reviewer
+    allowed_personas:
+      - spec_reviewer
+    writes_files: false
+    runs_commands: true
+    produces_review_verdict: true
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli
+  quality_review:
+    category: review
+    default_persona: quality_reviewer
+    allowed_personas:
+      - quality_reviewer
+    writes_files: false
+    runs_commands: true
+    produces_review_verdict: true
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli
+  analysis:
+    category: analysis
+    default_persona: reader
+    allowed_personas:
+      - reader
+      - auditor
+    writes_files: false
+    runs_commands: true
+    produces_review_verdict: false
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli
+  human_approval:
+    category: approval
+    default_persona: human
+    allowed_personas:
+      - human
+    writes_files: false
+    runs_commands: false
+    produces_review_verdict: false
+    requires_human: true
+    engine_support:
+      - claude_code
+      - codex
+      - gemini_cli

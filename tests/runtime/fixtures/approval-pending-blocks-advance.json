@@ -1,0 +1,35 @@
+{
+  "session": {
+    "approvals": {
+      "pending": true,
+      "pending_count": 1,
+      "last_grant_scope": "none",
+      "last_approval_mode": "manual_required",
+      "active_request": {
+        "action": "edit_file",
+        "target_ref": "workflow/router.spec.yaml",
+        "risk_class": "critical",
+        "approval_mode": "never_auto",
+        "grant_scope": "once",
+        "status": "pending",
+        "requested_at": "2026-03-08T12:05:00Z"
+      },
+      "grants": []
+    }
+  },
+  "expected": {
+    "result": {
+      "route_verdict": "block",
+      "block_reason": "approval_pending",
+      "next_persona": "human",
+      "recommended_next": [
+        { "type": "request_approval", "target": "workflow/router.spec.yaml" }
+      ]
+    },
+    "sprint_status": {
+      "recommended_next": [
+        { "type": "request_approval", "target": "workflow/router.spec.yaml" }
+      ]
+    }
+  }
+}

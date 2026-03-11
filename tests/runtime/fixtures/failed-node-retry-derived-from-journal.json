@@ -1,0 +1,60 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "blocked" },
+    "node": { "active_id": "P2-N1", "state": "failed", "owner_persona": "human" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "failed",
+      "tdd_state": "green_pending",
+      "retry_policy": {
+        "max_attempts": 3,
+        "retry_on": ["contract_mismatch", "timeout"],
+        "backoff_mode": "exponential"
+      }
+    }
+  },
+  "journal": [
+    {
+      "ts": "2026-03-08T12:05:00Z",
+      "run_id": "wf-20260308-101",
+      "event": "node_failed",
+      "phase": "P2",
+      "node_id": "P2-N1",
+      "actor": "runtime",
+      "payload": {
+        "source": "transition_applier",
+        "transition_context": {
+          "failure_kind": "contract_mismatch"
+        }
+      },
+      "trace_id": "trace-engine-retry-journal-1"
+    }
+  ],
+  "expected": {
+    "result": {
+      "route_verdict": "resume",
+      "active_node": "P2-N1",
+      "policy_verdict": {
+        "retry": { "allowed": true, "next_attempt": 2 }
+      },
+      "recommended_next": [
+        {
+          "type": "retry_node",
+          "target": "P2-N1",
+          "params": { "next_attempt": 2 }
+        }
+      ]
+    },
+    "sprint_status": {
+      "active_phase": "P2",
+      "recommended_next": [
+        {
+          "type": "retry_node",
+          "target": "P2-N1",
+          "params": { "next_attempt": 2 }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+# SY:GENERATED:BEGIN {"generator":"seeyue-compile-adapter","version":1,"engine":"codex","pass":"policy","registry_revision":"2026-03-11","spec_hash":"616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b"}
+# Generated artifact for `codex`. Do not edit manually.
+# Source of truth lives under `workflow/*.yaml` and `.agents/skills`.
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[history]
+persistence = "save-all"
+
+[features]
+child_agents_md = true
+web_search_request = true
+# SY:GENERATED:END
+

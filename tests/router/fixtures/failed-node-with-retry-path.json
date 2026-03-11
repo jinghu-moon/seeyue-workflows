@@ -1,0 +1,28 @@
+{
+  "session": {
+    "node": { "active_id": "P2-N1", "state": "failed", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "failed",
+      "tdd_state": "failed",
+      "retry_policy": {
+        "max_attempts": 3,
+        "backoff_mode": "fixed",
+        "retry_on": ["transient_tool_failure"]
+      }
+    }
+  },
+  "policyVerdict": {
+    "retry": { "allowed": true, "next_attempt": 2 }
+  },
+  "expected": {
+    "route_verdict": "resume",
+    "next_persona": "author",
+    "next_capability": "code_edit",
+    "recommended_next": [
+      { "type": "retry_node", "target": "P2-N1", "params": { "next_attempt": 2 } }
+    ],
+    "emit_events": ["node_started"]
+  }
+}

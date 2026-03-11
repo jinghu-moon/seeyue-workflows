@@ -1,0 +1,1 @@
+这是多节点任务，请先做 parallel preflight，并声明 entry_condition exit_gate rollback_boundary。

@@ -1,0 +1,38 @@
+{
+  "session": {
+    "node": { "active_id": "P2-N1", "state": "green_pending", "owner_persona": "author" }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "in_progress",
+      "timeout_policy": {
+        "timeout_seconds": 120,
+        "grace_seconds": 10,
+        "on_timeout": "require_human"
+      }
+    }
+  },
+  "policyVerdict": {
+    "route_effect": "require_human",
+    "primary_reason": "node_timed_out",
+    "target_ref": "P2-N1",
+    "approval": {
+      "required": true,
+      "resolved": false,
+      "notify_only": false,
+      "risk_class": "high",
+      "approval_mode": "manual_required",
+      "allowed_grant_scopes": ["once"]
+    }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "node_timed_out",
+    "next_persona": "human",
+    "next_capability": "human_approval",
+    "recommended_next": [
+      { "type": "request_approval", "target": "P2-N1", "params": { "risk_class": "high", "approval_mode": "manual_required", "grant_scope": "once" } }
+    ],
+    "emit_events": ["node_timed_out", "approval_requested"]
+  }
+}

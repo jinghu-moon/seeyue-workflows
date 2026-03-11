@@ -1,0 +1,17 @@
+{
+  "session": {
+    "approvals": {
+      "pending": true,
+      "pending_count": 1,
+      "active_request": { "target_ref": "workflow/router.spec.yaml" }
+    },
+    "recovery": { "restore_pending": true, "restore_reason": "pending_approval_survived_restart" }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "approval_pending",
+    "recommended_next": [
+      { "type": "request_approval", "target": "workflow/router.spec.yaml" }
+    ]
+  }
+}
