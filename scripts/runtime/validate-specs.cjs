@@ -11,12 +11,18 @@ function parseArgs(argv) {
     validateAll: false,
     validateManifestOnly: false,
     freezeGate: null,
+    validateScope: "full",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--root") {
       index += 1;
       result.rootDir = path.resolve(argv[index]);
+      continue;
+    }
+    if (token === "--scope") {
+      index += 1;
+      result.validateScope = argv[index];
       continue;
     }
     if (token === "--gate") {
@@ -52,7 +58,7 @@ function main() {
   }
 
   try {
-    const result = validateWorkflowSpecs(args);
+    const result = validateWorkflowSpecs({ ...args, validateScope: args.validateScope });
     if (!result.ok) {
       for (const issue of result.issues) {
         const prefix = issue.severity === "warning" ? "WARN" : "ERROR";

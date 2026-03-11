@@ -9,6 +9,7 @@ const { loadYamlFile } = require("../../scripts/runtime/yaml-loader.cjs");
 const { compileAdapterBundle } = require("../../scripts/adapters/compile-adapter.cjs");
 const { validateOutputEntries } = require("../../scripts/runtime/validate-output.cjs");
 const { appendOutputLog, readOutputLog } = require("../../scripts/runtime/output-log.cjs");
+const { persistOutputTemplatesForTest } = require("../../scripts/runtime/hook-client.cjs");
 
 const { validateWorkflowSpecs } = require("../../scripts/runtime/spec-validator.cjs");
 
@@ -181,6 +182,17 @@ function assertAdapterBundleIncludesOutputTemplates(projectRoot) {
 }
 
 const cases = {
+  "hook-client-output-log": () => {
+    const rootDir = createFixtureRoot();
+    const templateId = "status-indicator";
+    const templatesSpec = loadYamlFile(path.join(rootDir, "workflow", "output-templates.spec.yaml"));
+    const template = templatesSpec.templates[templateId];
+    const entry = buildDummyEntry(templateId, template);
+    persistOutputTemplatesForTest(rootDir, [entry]);
+    const entries = readOutputLog(rootDir);
+    assert(entries.length >= 1, "expected output log entry to be appended by hook-client");
+    assert(entries[entries.length - 1].template_id === templateId, "expected hook-client to log template id");
+  },
   "output-templates-freeze-gate": () => {
     const rootDir = createFixtureRoot();
     const manifest = loadYamlFile(path.join(rootDir, "workflow", "validate-manifest.yaml"));

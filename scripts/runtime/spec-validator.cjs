@@ -795,6 +795,7 @@ function validateWorkflowSpecs(options = {}) {
   const validateAll = Boolean(options.validateAll);
   const validateManifestOnly = Boolean(options.validateManifestOnly);
   const freezeGate = typeof options.freezeGate === "string" ? options.freezeGate : null;
+  const validateScope = String(options.validateScope || "full").toLowerCase();
 
   const issues = [];
   const manifest = loadManifest(rootDir);
@@ -823,15 +824,57 @@ function validateWorkflowSpecs(options = {}) {
   }
 
   validateEnvelope(specs, manifestEntries, issues, freezeGate);
-  const capabilityIds = validateCapabilities(specs.get("workflow/capabilities.yaml"), issues);
-  const personaIds = validatePersonaBindings(specs.get("workflow/persona-bindings.yaml"), capabilityIds, issues);
-  const fileClassIds = validateFileClasses(specs.get("workflow/file-classes.yaml"), issues);
-  const approvalMatrix = validateApprovalMatrix(specs.get("workflow/approval-matrix.yaml"), fileClassIds, issues);
-  validateHookSpec(specs.get("workflow/hooks.spec.yaml"), issues);
-  validateHookContractSpec(specs.get("workflow/hook-contract.schema.yaml"), issues);
-  const outputTemplateIds = validateOutputTemplatesSpec(specs.get("workflow/output-templates.spec.yaml"), issues);
-  validateSkillsSpec(specs.get("workflow/skills.spec.yaml"), rootDir, capabilityIds, outputTemplateIds, issues);
-  validateCrossReferences(specs, capabilityIds, personaIds, fileClassIds, approvalMatrix, issues);
+
+  if (validateScope === "targeted" && requestedSpecs.length > 0) {
+    const targetSet = new Set(requestedSpecs.map(normalizeSpecPath));
+    for (const [specPath, spec] of specs.entries()) {
+      if (!targetSet.has(specPath)) {
+        continue;
+      }
+      if (specPath === "workflow/capabilities.yaml") {
+        validateCapabilities(spec, issues);
+        continue;
+      }
+      if (specPath === "workflow/persona-bindings.yaml") {
+        validatePersonaBindings(spec, [], issues);
+        continue;
+      }
+      if (specPath === "workflow/file-classes.yaml") {
+        validateFileClasses(spec, issues);
+        continue;
+      }
+      if (specPath === "workflow/approval-matrix.yaml") {
+        validateApprovalMatrix(spec, [], issues);
+        continue;
+      }
+      if (specPath === "workflow/hooks.spec.yaml") {
+        validateHookSpec(spec, issues);
+        continue;
+      }
+      if (specPath === "workflow/hook-contract.schema.yaml") {
+        validateHookContractSpec(spec, issues);
+        continue;
+      }
+      if (specPath === "workflow/output-templates.spec.yaml") {
+        validateOutputTemplatesSpec(spec, issues);
+        continue;
+      }
+      if (specPath === "workflow/skills.spec.yaml") {
+        validateSkillsSpec(spec, rootDir, [], [], issues);
+        continue;
+      }
+    }
+  } else {
+    const capabilityIds = validateCapabilities(specs.get("workflow/capabilities.yaml"), issues);
+    const personaIds = validatePersonaBindings(specs.get("workflow/persona-bindings.yaml"), capabilityIds, issues);
+    const fileClassIds = validateFileClasses(specs.get("workflow/file-classes.yaml"), issues);
+    const approvalMatrix = validateApprovalMatrix(specs.get("workflow/approval-matrix.yaml"), fileClassIds, issues);
+    validateHookSpec(specs.get("workflow/hooks.spec.yaml"), issues);
+    validateHookContractSpec(specs.get("workflow/hook-contract.schema.yaml"), issues);
+    const outputTemplateIds = validateOutputTemplatesSpec(specs.get("workflow/output-templates.spec.yaml"), issues);
+    validateSkillsSpec(specs.get("workflow/skills.spec.yaml"), rootDir, capabilityIds, outputTemplateIds, issues);
+    validateCrossReferences(specs, capabilityIds, personaIds, fileClassIds, approvalMatrix, issues);
+  }
 
   const hasError = issues.some((issue) => issue.severity !== "warning");
 

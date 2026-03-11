@@ -211,6 +211,9 @@ function buildOutputEnvelope(result) {
   return envelope;
 }
 
+function persistOutputTemplatesForTest(rootDir, outputTemplates) {
+  persistOutputTemplates(rootDir, outputTemplates);
+}
 function emitResult(result) {
   const exitCode = Number.isInteger(result.exitCode)
     ? result.exitCode
@@ -2290,6 +2293,7 @@ async function runHookAndExit(event) {
 }
 
 module.exports = {
+  persistOutputTemplatesForTest,
   dispatchHookEvent,
   runHookAndExit,
   buildAllowResult,
@@ -2304,3 +2308,9 @@ module.exports = {
   loadRuntimeSnapshot,
   projectWorkflowCompatState,
 };
+
+
+
+
+
+
