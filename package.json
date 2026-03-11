@@ -43,7 +43,7 @@
   },
   "version": "0.2.0",
   "description": "Standalone workflow repository for seeyue skills, hooks, tests, and docs.",
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "engines": {
     "node": ">=22",
     "python": ">=3.11"
