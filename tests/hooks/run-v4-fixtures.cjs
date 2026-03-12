@@ -21,6 +21,7 @@ const posttoolBashVerifyHook = path.join(projectRoot, "scripts", "hooks", "sy-po
 const posttoolWriteHook = path.join(projectRoot, "scripts", "hooks", "sy-posttool-write.cjs");
 const pretoolWriteHook = path.join(projectRoot, "scripts", "hooks", "sy-pretool-write.cjs");
 const stopHook = path.join(projectRoot, "scripts", "hooks", "sy-stop.cjs");
+const sessionStartHook = path.join(projectRoot, "scripts", "hooks", "sy-session-start.cjs");
 
 function assert(condition, message) {
   if (!condition) {
@@ -452,6 +453,17 @@ function runApprovalRequestZhCnV2() {
   assert(result.stderr.includes("需要人工审批"), `expected zh-CN approval headline but got ${JSON.stringify(result.stderr)}`);
   assert(result.stderr.includes("操作类型：写入文件"), `expected operation description but got ${JSON.stringify(result.stderr)}`);
   assert(result.stderr.includes("风险等级：关键 (critical)"), `expected critical risk in stderr but got ${JSON.stringify(result.stderr)}`);
+}
+
+
+function runSessionStartNonblocking() {
+  const rootDir = makeTempRoot("sy-hooks-v4-sessionstart-");
+  const result = runHook(rootDir, sessionStartHook, {
+    cwd: rootDir,
+  });
+  const output = parseHookOutput(result.stdout);
+  assert(result.code === 0, `expected SessionStart exit 0 but got exit=${result.code}`);
+  assert(output.verdict === "allow" || output.verdict === "force_continue", `expected non-blocking verdict but got ${JSON.stringify(output)}`);
 }
 
 function runStopManualRestoreRequiresHuman() {
@@ -930,6 +942,7 @@ const CASES = {
   "stop-requires-resume-frontier": runStopRequiresResumeFrontier,
   "stop-without-resume-frontier": runStopWithoutResumeFrontier,
   "verify-evidence-capture": runVerifyEvidenceCapture,
+  "sessionstart-nonblocking": runSessionStartNonblocking,
 };
 
 function main() {
