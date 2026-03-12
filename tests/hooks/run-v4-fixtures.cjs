@@ -925,6 +925,7 @@ const CASES = {
   "red-evidence-capture": runRedEvidenceCapture,
   "green-evidence-capture": runGreenEvidenceCapture,
   "shared-runtime-client": runSharedRuntimeClient,
+  "hook-client-envelope": runSharedRuntimeClient,
   "stop-manual-restore-requires-human": runStopManualRestoreRequiresHuman,
   "stop-requires-resume-frontier": runStopRequiresResumeFrontier,
   "stop-without-resume-frontier": runStopWithoutResumeFrontier,
