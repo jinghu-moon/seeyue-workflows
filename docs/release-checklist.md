@@ -20,6 +20,9 @@
 - [ ] `npm run test:runtime:p2`
 - [ ] `npm run test:runtime:context`
 - [ ] `npm run test:runtime:recovery`
+- [ ] `node tests/output/run-output-template-fixtures.cjs`
+- [ ] `node tests/output/run-output-log-fixtures.cjs`
+- [ ] `node tests/output/run-output-contract-fixtures.cjs`
 
 ### hooks 与 adapter
 

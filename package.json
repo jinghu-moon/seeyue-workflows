@@ -41,7 +41,7 @@
     "test:output:templates": "node tests/output/run-output-template-fixtures.cjs",
     "test:output:log": "node tests/output/run-output-log-fixtures.cjs"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Standalone workflow repository for seeyue skills, hooks, tests, and docs.",
   "license": "AGPL-3.0-or-later",
   "engines": {

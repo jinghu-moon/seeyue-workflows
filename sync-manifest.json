@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "release": {
-    "workflow_version": "0.2.0",
-    "release_date": "2026-03-09",
+    "workflow_version": "0.2.1",
+    "release_date": "2026-03-11",
     "breaking_change": false,
     "upgrade_notes": [],
     "adapter_versions": {
@@ -11,7 +11,7 @@
       "gemini_cli": 1
     },
     "compatibility": {
-      "minimum_sync_version": "0.2.0"
+      "minimum_sync_version": "0.2.1"
     }
   },
   "entries": [

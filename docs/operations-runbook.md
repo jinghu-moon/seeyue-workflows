@@ -19,6 +19,9 @@
 - [`../tests/runtime/run-transition-fixtures.cjs`](../tests/runtime/run-transition-fixtures.cjs)
 - [`../tests/runtime/run-coverage-adapter-fixtures.cjs`](../tests/runtime/run-coverage-adapter-fixtures.cjs)
 - [`../tests/runtime/run-report-builder-fixtures.cjs`](../tests/runtime/run-report-builder-fixtures.cjs)
+- [`../tests/output/run-output-template-fixtures.cjs`](../tests/output/run-output-template-fixtures.cjs)
+- [`../tests/output/run-output-log-fixtures.cjs`](../tests/output/run-output-log-fixtures.cjs)
+- [`../tests/output/run-output-contract-fixtures.cjs`](../tests/output/run-output-contract-fixtures.cjs)
 - [`../tests/runtime/run-context-fixtures.cjs`](../tests/runtime/run-context-fixtures.cjs)
 - [`../tests/runtime/run-recovery-fixtures.cjs`](../tests/runtime/run-recovery-fixtures.cjs)
 - [`../tests/runtime/run-bootstrap-fixtures.cjs`](../tests/runtime/run-bootstrap-fixtures.cjs)
@@ -33,6 +36,9 @@ npm run test:runtime:p2
 npm run test:runtime:transition
 npm run test:runtime:coverage
 npm run test:runtime:report
+node tests/output/run-output-template-fixtures.cjs
+node tests/output/run-output-log-fixtures.cjs
+node tests/output/run-output-contract-fixtures.cjs
 npm run test:runtime:context
 npm run test:runtime:recovery
 npm run test:runtime:bootstrap
@@ -89,7 +95,7 @@ npm run runtime:new-run -- --task-id "P4" --task-title "Start next verified run"
 执行效果：
 
 - 旧 run 会先归档到 `.ai/archive/<old_run_id>/`
-- 归档内容至少包含 `session.yaml`、`task-graph.yaml`、`sprint-status.yaml`、`journal.jsonl`、`ledger.md`、`capsules/`、`checkpoints/` 与关键 `analysis` 产物
+- 归档内容至少包含 `session.yaml`、`task-graph.yaml`、`sprint-status.yaml`、`journal.jsonl`、`output.log`、`ledger.md`、`capsules/`、`checkpoints/` 与关键 `analysis` 产物
 - active `.ai/workflow/*` 会被重建，active `analysis` 暂存产物会被清理
 - graph 会按模板重置，首个可执行 node 会被重新标记为 `ready`
 - 新 run 会写入 `session_started`、`phase_entered`，并生成新的 `recommended_next`
@@ -159,9 +165,10 @@ node tests/runtime/run-context-fixtures.cjs
 最少检查以下产物：
 
 1. `journal.jsonl` 是否连续记录关键事件
-2. `checkpoints/` 是否存在可恢复快照
-3. `capsules/` 与 handoff 是否能支持 persona 切换
-4. `ledger.md` 是否仍与当前规则一致
+2. `output.log` 是否包含关键输出模板与变量
+3. `checkpoints/` 是否存在可恢复快照
+4. `capsules/` 与 handoff 是否能支持 persona 切换
+5. `ledger.md` 是否仍与当前规则一致
 
 相关实现：
 

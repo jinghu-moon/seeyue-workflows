@@ -74,6 +74,9 @@ node "<SOURCE_ROOT>/scripts/adapters/gemini-cli.cjs" --root "<SOURCE_ROOT>" --ou
 
 - [`scripts/runtime/validate-specs.cjs`](../scripts/runtime/validate-specs.cjs)
 - [`tests/hooks/sy-hooks-smoke.cjs`](../tests/hooks/sy-hooks-smoke.cjs)
+- [`tests/output/run-output-template-fixtures.cjs`](../tests/output/run-output-template-fixtures.cjs)
+- [`tests/output/run-output-log-fixtures.cjs`](../tests/output/run-output-log-fixtures.cjs)
+- [`tests/output/run-output-contract-fixtures.cjs`](../tests/output/run-output-contract-fixtures.cjs)
 - [`tests/e2e/run-engine-conformance.cjs`](../tests/e2e/run-engine-conformance.cjs)
 - [`tests/e2e/run-doc-link-check.cjs`](../tests/e2e/run-doc-link-check.cjs)
 
@@ -82,6 +85,9 @@ node "<SOURCE_ROOT>/scripts/adapters/gemini-cli.cjs" --root "<SOURCE_ROOT>" --ou
 ```bash
 node "<SOURCE_ROOT>/scripts/runtime/validate-specs.cjs" --root "<SOURCE_ROOT>" --all
 node "<SOURCE_ROOT>/tests/hooks/sy-hooks-smoke.cjs"
+node "<SOURCE_ROOT>/tests/output/run-output-template-fixtures.cjs"
+node "<SOURCE_ROOT>/tests/output/run-output-log-fixtures.cjs"
+node "<SOURCE_ROOT>/tests/output/run-output-contract-fixtures.cjs"
 node "<SOURCE_ROOT>/tests/e2e/run-engine-conformance.cjs" --all
 node "<SOURCE_ROOT>/tests/e2e/run-doc-link-check.cjs"
 ```

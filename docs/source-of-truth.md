@@ -18,6 +18,11 @@
 - [persona bindings](../workflow/persona-bindings.yaml)
 - [file classes](../workflow/file-classes.yaml)
 - [approval matrix](../workflow/approval-matrix.yaml)
+- [hooks spec](../workflow/hooks.spec.yaml)
+- [skills spec](../workflow/skills.spec.yaml)
+- [hook contract schema](../workflow/hook-contract.schema.yaml)
+- [validate manifest](../workflow/validate-manifest.yaml)
+- [output templates spec](../workflow/output-templates.spec.yaml)
 
 这些文件定义：
 
