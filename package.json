@@ -2,7 +2,8 @@
   "name": "seeyue-workflows",
   "private": true,
   "scripts": {
-    "test:hooks:smoke": "node tests/hooks/sy-hooks-smoke.cjs",
+    "test:hooks:smoke": "node tests/hooks/sy-hooks-smoke.cjs && node tests/hooks/run-hook-template-fixtures.cjs",
+    "test:hooks:templates": "node tests/hooks/run-hook-template-fixtures.cjs",
     "test:skills:core": "node tests/skill-triggering/run-all.cjs --mode local --cases tests/skill-triggering/cases.json",
     "test:skills:core:auto": "node tests/skill-triggering/run-all.cjs --mode auto --timeout-ms 600000 --cases tests/skill-triggering/cases.auto.json",
     "test:skills:core:runner": "node tests/skill-triggering/run-all.cjs --mode runner --timeout-ms 600000 --cases tests/skill-triggering/cases.auto.json",
@@ -41,7 +42,7 @@
     "test:output:templates": "node tests/output/run-output-template-fixtures.cjs",
     "test:output:log": "node tests/output/run-output-log-fixtures.cjs"
   },
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Standalone workflow repository for seeyue skills, hooks, tests, and docs.",
   "license": "AGPL-3.0-or-later",
   "engines": {

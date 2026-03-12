@@ -3,7 +3,7 @@ name: sy-constraints
 description: Use when running any sy-* workflow to load minimal constraint skills and enforce hook-backed hard guards.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

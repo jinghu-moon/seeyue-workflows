@@ -8,7 +8,7 @@ disable-model-invocation: true
 metadata:
   version: "2.0.0"
   updated: "2026-01-29"
-argument-hint: [context]
+argument-hint: "[context]"
 ---
 
 # Git Commit Message Generator

@@ -9,7 +9,7 @@ allowed-tools:
   - Glob
   - Grep
   - WebSearch
-argument-hint: [action] [node]
+argument-hint: "[action, node]"
 disable-model-invocation: false
 ---
 

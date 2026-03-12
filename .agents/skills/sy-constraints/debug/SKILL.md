@@ -3,7 +3,7 @@ name: sy-constraints/debug
 description: Use when a bug, failing check, or unexpected behavior appears and a fix is being considered.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

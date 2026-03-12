@@ -1,7 +1,7 @@
 ---
 name: sy-code-insight
 description: Use when project/task/module understanding is required before planning or implementation, and analysis artifacts must be persisted under `.ai/` for session continuity.
-argument-hint: [operation] [target] [options]
+argument-hint: "[operation, target, options]"
 disable-model-invocation: false
 ---
 

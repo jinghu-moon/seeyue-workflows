@@ -120,6 +120,17 @@ function parseFrontmatter(markdownText) {
   return frontmatter;
 }
 
+function stripWrappingQuotes(value) {
+  const trimmed = String(value || "").trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
 function buildSkillMetadata(bundle, options = {}) {
   assertCodexBundle(bundle);
   const rootDir = resolveRootDir(options, bundle);
@@ -136,7 +147,9 @@ function buildSkillMetadata(bundle, options = {}) {
       throw new Error(`CODEX_ADAPTER_MISSING_SKILL_METADATA skill_file=${normalizePath(path.relative(rootDir, skillFile))}`);
     }
     const disableModelInvocation = String(frontmatter["disable-model-invocation"] || "").trim().toLowerCase() === "true";
-    const argumentHint = typeof frontmatter["argument-hint"] === "string" ? frontmatter["argument-hint"].trim() : "";
+    const argumentHint = typeof frontmatter["argument-hint"] === "string"
+      ? stripWrappingQuotes(frontmatter["argument-hint"])
+      : "";
     const relativeSkillDir = normalizePath(path.relative(rootDir, path.dirname(skillFile)));
     return {
       name: frontmatter.name,

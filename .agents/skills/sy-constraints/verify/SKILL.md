@@ -3,7 +3,7 @@ name: sy-constraints/verify
 description: Use when preparing any fixed/completed/ready claim so verification evidence is fresh, complete, and auditable.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

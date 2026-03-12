@@ -4,7 +4,7 @@ description: Use when discovery, benchmark, or ideation outputs must converge in
 allowed-tools:
   - Read
   - WebSearch
-argument-hint: [task]
+argument-hint: "[task]"
 disable-model-invocation: false
 ---
 

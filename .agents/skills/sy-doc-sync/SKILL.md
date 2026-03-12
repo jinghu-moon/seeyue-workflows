@@ -1,7 +1,7 @@
 ---
 name: sy-doc-sync
 description: Use when a module-level `README.AI.md` must be created or incrementally synchronized with current code and interfaces.
-argument-hint: [action] [path]
+argument-hint: "[action, path]"
 disable-model-invocation: false
 ---
 

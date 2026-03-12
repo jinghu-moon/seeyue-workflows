@@ -3,7 +3,7 @@ name: sy-development-workflow
 description: Use when legacy prompts reference the old unified development workflow skill and routing must be forwarded to the new split sy-* workflow skills.
 allowed-tools:
   - Read
-argument-hint: [command] [task]
+argument-hint: "[command, task]"
 disable-model-invocation: false
 ---
 

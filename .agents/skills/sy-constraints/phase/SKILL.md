@@ -3,7 +3,7 @@ name: sy-constraints/phase
 description: Use when planning or executing multi-node work to enforce DAG safety, phase boundary contracts, checkpoints, and resumable flow.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

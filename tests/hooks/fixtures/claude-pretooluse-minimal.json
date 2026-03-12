@@ -1,0 +1,11 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "s-1",
+  "cwd": "/repo",
+  "transcript_path": "/tmp/claude.json",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "docs/notes.md",
+    "content": "hello"
+  }
+}

@@ -4,7 +4,7 @@ description: Use when deciding whether to adopt, extend, or build a solution bef
 allowed-tools:
   - Read
   - WebSearch
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

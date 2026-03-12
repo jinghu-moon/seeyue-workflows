@@ -6,7 +6,7 @@ allowed-tools:
   - Glob
   - Grep
   - WebSearch
-argument-hint: [topic]
+argument-hint: "[topic]"
 disable-model-invocation: false
 ---
 

@@ -3,7 +3,7 @@ name: sy-constraints/workspace
 description: Use when setting branch/worktree/sandbox context so baseline health and isolation are validated before execution.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

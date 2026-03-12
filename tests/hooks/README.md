@@ -14,6 +14,12 @@ or
 npm run test:hooks:smoke
 ```
 
+## Template Fixtures
+
+```bash
+node tests/hooks/run-hook-template-fixtures.cjs
+```
+
 ## Coverage
 
 - `sy-pretool-bash.cjs`: allow safe command + block force push
@@ -21,3 +27,4 @@ npm run test:hooks:smoke
 - `sy-pretool-write-session.cjs`: block invalid `current_phase` in canonical `session.yaml` writes (legacy `session.md` 兼容)
 - `sy-posttool-bash-verify.cjs`: capture verify evidence into staging report
 - `sy-stop.cjs`: block incomplete execute checkpoint + allow review stop with fresh report
+- `run-hook-template-fixtures.cjs`: minimal hook payload fixtures + Gemini hook bridge mappings

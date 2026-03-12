@@ -3,7 +3,7 @@ name: sy-constraints/safety
 description: Use when any risky command or sensitive operation is considered, so explicit confirmation and safe alternatives are enforced.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

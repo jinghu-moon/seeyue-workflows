@@ -3,7 +3,7 @@ name: sy-constraints/appsec
 description: Use when touching auth, input boundaries, APIs, secrets, or sensitive data so baseline application security controls are enforced.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

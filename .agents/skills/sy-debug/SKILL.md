@@ -8,7 +8,7 @@ allowed-tools:
   - Bash
   - Glob
   - Grep
-argument-hint: [issue]
+argument-hint: "[issue]"
 disable-model-invocation: false
 ---
 

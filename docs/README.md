@@ -5,6 +5,7 @@
 - [V4 架构方案](./architecture-v4.md)：说明执行引擎、约束分层、TDD 合约与运行态模型。
 - [接入指南](./adoption-guide.md)：说明如何把 `seeyue-workflows` 接入目标仓库。
 - [运行手册](./operations-runbook.md)：说明巡检、恢复、审计、发布的操作顺序。
+- [Hooks 开发流程说明](./hooks-guide.md)：按开发流程说明 hooks 规范、实现、适配器与验证顺序。
 - [发布检查清单](./release-checklist.md)：说明版本发布前后必须检查的命令与产物。
 - [版本化策略](./versioning-policy.md)：说明 `workflow version`、`adapter version`、`schema_version` 的关系。
 - [事实源说明](./source-of-truth.md)：说明 machine source of truth、运行态状态源与同步边界。
@@ -16,6 +17,7 @@
 - [仓库结构](./repo-structure.md)
 - [迁移映射](./migration-map.md)
 - [机器对齐清单](./machine-alignment-checklist.md)
+- [Hooks 改造建议清单](./hooks-improvement-checklist.md)
 
 ## 评审与修复
 

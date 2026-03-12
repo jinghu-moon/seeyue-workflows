@@ -3,3 +3,6 @@ node_modules/
 tests/skill-triggering/output/
 *.log
 refer/
+.spec-workflow/
+.serena/
+.ai/

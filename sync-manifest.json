@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "release": {
-    "workflow_version": "0.2.1",
-    "release_date": "2026-03-11",
+    "workflow_version": "0.2.2",
+    "release_date": "2026-03-12",
     "breaking_change": false,
     "upgrade_notes": [],
     "adapter_versions": {
@@ -11,7 +11,7 @@
       "gemini_cli": 1
     },
     "compatibility": {
-      "minimum_sync_version": "0.2.1"
+      "minimum_sync_version": "0.2.2"
     }
   },
   "entries": [
@@ -189,6 +189,16 @@
       "type": "file",
       "source": "docs/operations-runbook.md",
       "target": "docs/workflow/operations-runbook.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/hooks-improvement-checklist.md",
+      "target": "docs/workflow/hooks-improvement-checklist.md"
+    },
+    {
+      "type": "file",
+      "source": "docs/hooks-guide.md",
+      "target": "docs/workflow/hooks-guide.md"
     },
     {
       "type": "file",

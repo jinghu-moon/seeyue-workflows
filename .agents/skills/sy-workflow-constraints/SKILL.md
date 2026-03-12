@@ -3,7 +3,7 @@ name: sy-workflow-constraints
 description: Use when executing sy-* workflow phases to enforce minimal constraint loading, phase gates, and hook-backed hard controls.
 allowed-tools:
   - Read
-argument-hint: [phase]
+argument-hint: "[phase]"
 disable-model-invocation: false
 ---
 

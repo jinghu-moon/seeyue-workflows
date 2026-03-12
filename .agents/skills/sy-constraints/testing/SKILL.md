@@ -3,7 +3,7 @@ name: sy-constraints/testing
 description: Use when implementing behavior changes or bug fixes so TDD order, anti-pattern gates, coverage baselines, and behavior validation are enforced.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

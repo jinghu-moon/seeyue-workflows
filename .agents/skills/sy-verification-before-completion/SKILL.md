@@ -6,7 +6,7 @@ allowed-tools:
   - Bash
   - Glob
   - Grep
-argument-hint: [scope]
+argument-hint: "[scope]"
 disable-model-invocation: false
 ---
 

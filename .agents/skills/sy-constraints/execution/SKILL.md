@@ -3,7 +3,7 @@ name: sy-constraints/execution
 description: Use when planning or executing phased work to enforce source-of-truth, phase gates, validation gates, and rollback boundaries.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

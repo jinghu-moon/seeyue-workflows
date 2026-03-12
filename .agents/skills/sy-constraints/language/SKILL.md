@@ -3,7 +3,7 @@ name: sy-constraints/language
 description: Use when defining, editing, or auditing workflow rules so language partitions and RFC keyword discipline stay consistent.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

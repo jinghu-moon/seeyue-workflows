@@ -6,7 +6,7 @@ allowed-tools:
   - Glob
   - Grep
   - WebSearch
-argument-hint: [task]
+argument-hint: "[task]"
 disable-model-invocation: false
 ---
 

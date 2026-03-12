@@ -3,7 +3,7 @@ name: sy-constraints/review
 description: Use when handling user or reviewer feedback so each item is clarified, classified, implemented, and verified with evidence.
 allowed-tools:
   - Read
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

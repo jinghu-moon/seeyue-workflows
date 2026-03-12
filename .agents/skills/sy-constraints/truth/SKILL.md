@@ -4,7 +4,7 @@ description: Use when making factual or technical claims that require citation, 
 allowed-tools:
   - Read
   - WebSearch
-argument-hint: [context]
+argument-hint: "[context]"
 disable-model-invocation: false
 ---
 

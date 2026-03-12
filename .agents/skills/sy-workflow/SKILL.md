@@ -3,7 +3,7 @@ name: sy-workflow
 description: Use when users want a single entry to start, route, resume, or inspect the sy-* phased development workflow.
 allowed-tools:
   - Read
-argument-hint: [command] [task]
+argument-hint: "[command, task]"
 disable-model-invocation: false
 ---
 

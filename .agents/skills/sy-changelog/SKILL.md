@@ -1,7 +1,7 @@
 ---
 name: sy-changelog
 description: Use when recording, merging, viewing, or clearing structured feature-level change logs for downstream commit/release message generation.
-argument-hint: [action] [scope]
+argument-hint: "[action, scope]"
 disable-model-invocation: false
 ---
 

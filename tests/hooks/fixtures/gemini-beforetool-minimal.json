@@ -1,0 +1,12 @@
+{
+  "hook_event_name": "BeforeTool",
+  "session_id": "s-1",
+  "cwd": "/repo",
+  "transcript_path": "/tmp/gemini.json",
+  "timestamp": "2025-01-01T00:00:00Z",
+  "tool_name": "write_file",
+  "tool_input": {
+    "path": "docs/notes.md",
+    "content": "hello"
+  }
+}

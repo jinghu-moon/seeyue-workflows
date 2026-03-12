@@ -1,0 +1,30 @@
+{
+  "session_id": "session-1",
+  "cwd": "/repo",
+  "triggered_at": "2025-01-01T00:00:00Z",
+  "hook_event": {
+    "event_type": "after_tool_use",
+    "turn_id": "turn-1",
+    "call_id": "call-1",
+    "tool_name": "local_shell",
+    "tool_kind": "local_shell",
+    "tool_input": {
+      "input_type": "local_shell",
+      "params": {
+        "command": ["echo", "ok"],
+        "workdir": null,
+        "timeout_ms": 60000,
+        "sandbox_permissions": "use_default",
+        "justification": null,
+        "prefix_rule": null
+      }
+    },
+    "executed": true,
+    "success": true,
+    "duration_ms": 42,
+    "mutating": false,
+    "sandbox": "none",
+    "sandbox_policy": "danger-full-access",
+    "output_preview": "ok"
+  }
+}
