@@ -507,6 +507,22 @@ function runStopManualRestoreRequiresHuman() {
   assert(result.stderr.includes("检查点：node-restore-003"), `expected checkpoint id in stderr but got ${JSON.stringify(result.stderr)}`);
 }
 
+
+function runHookGapReport() {
+  const { writeCodexArtifacts } = require("../../scripts/adapters/codex.cjs");
+  const rootDir = makeTempRoot("sy-hooks-gap-report-");
+  const result = writeCodexArtifacts({ rootDir: projectRoot, outputRootDir: rootDir });
+  const gapPath = path.join(rootDir, ".ai", "workflow", "capability-gap.json");
+  assert(fs.existsSync(gapPath), `expected capability-gap.json at ${gapPath}`);
+  const report = JSON.parse(fs.readFileSync(gapPath, "utf8"));
+  const codexStatuses = report.events.filter((entry) => entry.required === true).map((entry) => entry.engine_status?.codex);
+  assert(codexStatuses.length > 0, "expected required events in gap report");
+  assert(codexStatuses.every((status) => status === "bridged"), "expected codex required events to be bridged");
+  assert(report.schema_kind === "hook_capability_gap_report", `unexpected schema_kind ${JSON.stringify(report.schema_kind)}`);
+  assert(report.total_events > 0, "expected non-empty events");
+  assert(report.summary && report.summary.gaps_by_engine, "expected summary.gaps_by_engine");
+}
+
 function runBudgetExhausted() {
   const rootDir = makeTempRoot("sy-hooks-v4-budget-");
   buildStructuredRuntime(rootDir, {
@@ -943,6 +959,7 @@ const CASES = {
   "stop-without-resume-frontier": runStopWithoutResumeFrontier,
   "verify-evidence-capture": runVerifyEvidenceCapture,
   "sessionstart-nonblocking": runSessionStartNonblocking,
+  "hook-gap-report": runHookGapReport,
 };
 
 function main() {
