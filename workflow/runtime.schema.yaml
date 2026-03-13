@@ -653,6 +653,21 @@ task_graph:
                 - fail_node
                 - block_node
                 - require_human
+          tdd_exception:
+            type: object
+            nullable: true
+            additional_properties: false
+            required:
+            - reason
+            - alternative_verification
+            - user_approved
+            properties:
+              reason:
+                type: string
+              alternative_verification:
+                type: string
+              user_approved:
+                type: boolean
           test_contract:
             type: object
             nullable: true

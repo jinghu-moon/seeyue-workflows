@@ -96,21 +96,29 @@ Stop Gate 负责判断：
 
 每个行为变更 node 建议至少声明：
 
-- `test_layer`
-- `red_cmd`
-- `green_cmd`
-- `verify_cmd`
+- `layer`
 - `coverage_mode`
-- `coverage_required`
-- `behavior_gate`
+- `coverage_profile`
 - `mock_policy`
 - `acceptance_criteria_refs`
+- `red_cmd`
+- `green_cmd`
+- `red_expectation`
+- `behavior_gate`
+
+并在 `node.verify` 中声明：
+
+- `cmd`
+- `pass_signal`
 
 推荐语义：
 
-- `test_layer`：`unit | integration | contract | e2e | smoke`
+- `layer`：`unit | integration | contract | e2e | smoke`
 - `coverage_mode`：`full | patch`
+- `coverage_profile`：`critical | core | standard | utility | scaffold`
 - `mock_policy`：`none | boundary_only | allowed_with_justification`
+- `red_expectation`：`allowed_failure_kinds / rejected_failure_kinds / allowed_exit_codes(可选) / stderr_pattern(可选) / error_type(可选)`
+- `behavior_gate`：`ac_traceability_required`（可选 `boundary_conditions_required`）
 
 ### 4.3 RED 门
 
@@ -154,6 +162,7 @@ RED 门的合法条件：
 - `failure_kind`
 - `allowed_failure_kinds`
 - `rejected_failure_kinds`
+- `allowed_exit_codes`（可选）
 - 必要时增加 `stderr_pattern` 或 `error_type`
 
 原则：
@@ -195,7 +204,7 @@ GREEN 成立的条件：
 
 - RED 已合法观察
 - GREEN 已通过
-- `verify_cmd` 已通过
+- `node.verify.cmd` 已通过且命中 `pass_signal`
 - `behavior_gate=pass`
 - 达到覆盖率要求
 - 所需 review 已通过

@@ -73,8 +73,8 @@
 
 ## Source Files
 
-- [`package.json`](../package.json)
-- [`CHANGELOG.md`](../CHANGELOG.md)
-- [`sync-manifest.json`](../sync-manifest.json)
-- [`docs/release-checklist.md`](./release-checklist.md)
-- [`docs/source-of-truth.md`](./source-of-truth.md)
+- [`package.json`](../../../package.json)
+- [`CHANGELOG.md`](../../../CHANGELOG.md)
+- [`sync-manifest.json`](../../../sync-manifest.json)
+- [`docs/archive/implemented/release-checklist.md`](./release-checklist.md)
+- [`docs/archive/implemented/source-of-truth.md`](./source-of-truth.md)

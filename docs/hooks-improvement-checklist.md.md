@@ -1,5 +1,6 @@
-# seeyue-workflows Hooks 系统架构重构清单  
-## Windows 平台硬约束优化方案  
+# seeyue-workflows Hooks 系统架构重构清单
+
+## Windows 平台硬约束优化方案
 
 ---
 
@@ -7,9 +8,9 @@
 
 seeyue-workflows 的 hooks 层承担三大硬约束职责：
 
-1. **防止阶段越界**（Phase Boundary Enforcement）：确保工作流状态机的单向流转，禁止非法回退
-2. **防止危险写入**（Dangerous Write Prevention）：拦截破坏性文件操作和命令执行
-3. **确保完整收口**（Incomplete Closure Prevention）：强制检查点创建和状态持久化
+1.  **防止阶段越界**（Phase Boundary Enforcement）：确保工作流状态机的单向流转，禁止非法回退
+2.  **防止危险写入**（Dangerous Write Prevention）：拦截破坏性文件操作和命令执行
+3.  **确保完整收口**（Incomplete Closure Prevention）：强制检查点创建和状态持久化
 
 本文档基于对 Claude Code、Gemini CLI、Codex、Everything Claude Code、Superpowers 五个优秀开源项目的深度源码分析，结合 seeyue-workflows 现有实现，提出 **100% 专注于 Windows 平台** 的架构重构方案。
 
@@ -20,12 +21,14 @@ seeyue-workflows 的 hooks 层承担三大硬约束职责：
 ### 1.1 四层分离架构（借鉴 Gemini CLI）
 
 **现状问题**：
+
 - `hook-client.cjs` 单文件 1900+ 行，职责混杂（注册、计划、执行、聚合）
 - 策略逻辑分散在多个 hook 文件中，难以统一管理
 - 缺少明确的执行计划生成和结果聚合机制
 
 **改进方案**：
-```
+
+```plaintext
 scripts/runtime/
 ├── hook-registry.cjs      # 注册层：从多源加载 hooks（Runtime > Project > User > System）
 ├── hook-planner.cjs       # 计划层：基于事件和上下文匹配 hooks，生成执行计划
@@ -34,11 +37,13 @@ scripts/runtime/
 ```
 
 **Windows 优化**：
+
 - **Registry**：使用 Windows 注册表存储 hook 指纹（`HKCU\Software\seeyue\hooks\fingerprints`），实现持久化信任管理
 - **Runner**：优先使用 Node.js 执行 `.cjs` 脚本，避免 bash 依赖；对 `.ps1` 脚本使用 `powershell.exe -ExecutionPolicy Bypass`
 - **Aggregator**：利用 Windows 事件日志（Event Log）记录 hook 执行统计，支持企业审计
 
 **参考源码**：
+
 - `gemini-cli-main/packages/core/src/hooks/hookSystem.ts` (行 45-120)
 - `gemini-cli-main/packages/core/src/hooks/hookPlanner.ts` (行 30-85)
 
@@ -47,11 +52,13 @@ scripts/runtime/
 ### 1.2 三态决策模型（借鉴 Claude Code）
 
 **现状问题**：
+
 - 当前仅支持二态决策（allow/deny），缺少 `ask` 状态
 - 无法实现“需要人工确认”的中间态审批流程
 - `PermissionRequest` 事件缺失，无法自动化权限管理
 
 **改进方案**：
+
 ```javascript
 // hook-aggregator.cjs
 const DECISION_STATES = {
@@ -73,11 +80,13 @@ function aggregateDecisions(hookResults, eventType) {
 ```
 
 **Windows 优化**：
-- ASK 状态处理：使用 Windows Toast 通知（`powershell.exe -Command "New-BurntToastNotification"`）弹出审批请求
-- 权限持久化：将用户审批结果存储到 `%APPDATA%\seeyue\permissions.json`，支持 alwaysAllow 记忆
-- 超时降级：ASK 状态超时 30 秒后自动降级为 DENY（安全优先）
+
+- **ASK 状态处理**：使用 Windows Toast 通知（`powershell.exe -Command "New-BurntToastNotification"`）弹出审批请求
+- **权限持久化**：将用户审批结果存储到 `%APPDATA%\seeyue\permissions.json`，支持 alwaysAllow 记忆
+- **超时降级**：ASK 状态超时 30 秒后自动降级为 DENY（安全优先）
 
 **参考源码**：
+
 - `claude-code-main/plugins/plugin-dev/skills/hook-development/references/advanced.md` (行 156-189)
 - `claude-code-main/examples/hooks/permission_handler.py` (行 45-78)
 
@@ -86,12 +95,14 @@ function aggregateDecisions(hookResults, eventType) {
 ### 1.3 事件矩阵完整性（补齐缺失事件）
 
 **现状问题**：
+
 - 缺少 BeforeModel 事件，无法拦截模型请求
 - 缺少 PermissionRequest 事件，无法自动化权限审批
 - 缺少 PreCompact 事件，上下文压缩前无法保存状态
 - 缺少 PostToolUseFailure 事件，工具失败后无法记录详细错误
 
 **改进方案**：
+
 ```yaml
 # workflow/hooks.spec.yaml（扩展）
 events:
@@ -113,11 +124,13 @@ events:
 ```
 
 **Windows 优化**：
-- BeforeModel：使用 Windows Performance Counter 记录模型调用频率，实现速率限制
-- PreCompact：将胶囊状态保存到 NTFS 备用数据流（Alternate Data Stream），避免污染主文件系统
-- PostToolUseFailure：使用 Windows Error Reporting API 记录崩溃信息
+
+- **BeforeModel**：使用 Windows Performance Counter 记录模型调用频率，实现速率限制
+- **PreCompact**：将胶囊状态保存到 NTFS 备用数据流（Alternate Data Stream），避免污染主文件系统
+- **PostToolUseFailure**：使用 Windows Error Reporting API 记录崩溃信息
 
 **参考源码**：
+
 - `claude-code-main/CHANGELOG.md` (行 234-267，13 事件生命周期)
 - `gemini-cli-main/docs/hooks/reference.md` (行 89-145，BeforeModel 详解)
 
@@ -126,11 +139,13 @@ events:
 ### 1.4 指纹信任机制（借鉴 Gemini CLI）
 
 **现状问题**：
+
 - 项目 hooks 无签名验证，存在供应链攻击风险
 - hook 脚本变更后无需重新授权，可能被恶意篡改
 - 缺少信任管理 UI，用户无法查看已信任的 hooks
 
 **改进方案**：
+
 ```javascript
 // hook-registry.cjs
 const crypto = require('crypto');
@@ -161,11 +176,13 @@ function verifyTrust(hookPath, hookName) {
 ```
 
 **Windows 优化**：
-- 指纹存储：使用 Windows Credential Manager（`cmdkey.exe`）存储指纹，利用系统级加密
-- 信任 UI：使用 PowerShell GUI（System.Windows.Forms）显示授权对话框，展示 hook 详细信息
-- 企业策略：支持通过 GPO（组策略对象）预配置受信任的 hooks 列表
+
+- **指纹存储**：使用 Windows Credential Manager（`cmdkey.exe`）存储指纹，利用系统级加密
+- **信任 UI**：使用 PowerShell GUI（`System.Windows.Forms`）显示授权对话框，展示 hook 详细信息
+- **企业策略**：支持通过 GPO（组策略对象）预配置受信任的 hooks 列表
 
 **参考源码**：
+
 - `gemini-cli-main/packages/core/src/hooks/hookRegistry.ts` (行 156-203)
 - `gemini-cli-main/docs/hooks/best-practices.md` (行 78-112，信任管理)
 
@@ -174,11 +191,13 @@ function verifyTrust(hookPath, hookName) {
 ### 1.5 Profile Gating 系统（借鉴 Everything Claude Code）
 
 **现状问题**：
+
 - 所有 hooks 规则一刀切，无法根据场景调整严格程度
 - 开发环境和生产环境使用相同的约束，影响开发效率
 - 新规则无法渐进式部署，容易引入破坏性变更
 
 **改进方案**：
+
 ```javascript
 // hook-planner.cjs
 const PROFILES = {
@@ -201,11 +220,13 @@ function filterHooksByProfile(hooks, profile) {
 ```
 
 **Windows 优化**：
-- Profile 切换：通过环境变量 `SY_HOOK_PROFILE` 或注册表键 `HKCU\Software\seeyue\HookProfile` 控制
-- CI 集成：在 GitHub Actions Windows Runner 中自动设置 STRICT profile
-- 开发模式：检测 Visual Studio 调试器（`IsDebuggerPresent()`），自动降级为 MINIMAL profile
+
+- **Profile 切换**：通过环境变量 `SY_HOOK_PROFILE` 或注册表键 `HKCU\Software\seeyue\HookProfile` 控制
+- **CI 集成**：在 GitHub Actions Windows Runner 中自动设置 STRICT profile
+- **开发模式**：检测 Visual Studio 调试器（`IsDebuggerPresent()`），自动降级为 MINIMAL profile
 
 **参考源码**：
+
 - `everything-claude-code-main/scripts/hooks/run-with-flags.js` (行 34-89)
 - `everything-claude-code-main/scripts/lib/hook-flags.js` (行 12-56)
 
@@ -216,11 +237,13 @@ function filterHooksByProfile(hooks, profile) {
 ### 2.1 阶段状态机硬约束（强化现有实现）
 
 **现状分析**：
+
 - `hook-client.cjs` 已实现 `LEGAL_V4_PHASE_STATUSES` 集合验证（行 95-102）
 - `REGRESSION_MAP` 防止从 `review`/`done` 回退到 `plan`/`execute`（行 104-107）
 - 但缺少状态转换的原子性保证和并发控制
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/phase-guard.cjs
 const fs = require('fs');
@@ -308,12 +331,14 @@ class PhaseGuard {
 ```
 
 **Windows 优化**：
-- 文件锁机制：使用 `wx` 标志实现独占创建，避免竞态条件
-- 过期锁清理：检测锁文件的 `mtimeMs`，自动清理僵尸锁
-- 原子重命名：利用 NTFS 的原子 rename 操作保证状态一致性
-- 进程 PID 记录：锁文件中记录持有进程 PID，便于调试死锁
+
+- **文件锁机制**：使用 `wx` 标志实现独占创建，避免竞态条件
+- **过期锁清理**：检测锁文件的 `mtimeMs`，自动清理僵尸锁
+- **原子重命名**：利用 NTFS 的原子 rename 操作保证状态一致性
+- **进程 PID 记录**：锁文件中记录持有进程 PID，便于调试死锁
 
 **参考源码**：
+
 - `refer/v4-architecture-patch-risks.md` (行 67-89，Stop hook 重入问题)
 - `scripts/runtime/checkpoints.cjs` (行 45-52，现有锁实现)
 
@@ -322,11 +347,13 @@ class PhaseGuard {
 ### 2.2 检查点强制创建（借鉴 Gemini CLI）
 
 **现状分析**：
-- `checkpoints.cjs` 实现了 pre_destructive 检查点（行 28-80）
+
+- `checkpoints.cjs` 实现了 `pre_destructive` 检查点（行 28-80）
 - 但检查点创建时机不够精确，可能在变更后才创建
 - 缺少增量检查点机制，每次都全量保存状态
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/checkpoints.cjs（增强）
 const CHECKPOINT_TRIGGERS = {
@@ -424,12 +451,14 @@ class IncrementalCheckpoint {
 ```
 
 **Windows 优化**：
-- 硬链接优化：使用 `fs.linkSync()` 创建硬链接，节省磁盘空间（NTFS 支持）
-- VSS 集成：对于关键文件，调用 Volume Shadow Copy Service 创建卷快照
-- 压缩存储：使用 NTFS 压缩属性（`compact.exe /c`）压缩检查点目录
-- 快速恢复：利用 NTFS 事务（TxF）保证恢复操作的原子性
+
+- **硬链接优化**：使用 `fs.linkSync()` 创建硬链接，节省磁盘空间（NTFS 支持）
+- **VSS 集成**：对于关键文件，调用 Volume Shadow Copy Service 创建卷快照
+- **压缩存储**：使用 NTFS 压缩属性（`compact.exe /c`）压缩检查点目录
+- **快速恢复**：利用 NTFS 事务（TxF）保证恢复操作的原子性
 
 **参考源码**：
+
 - `gemini-cli-main/docs/hooks/best-practices.md` (行 145-178，检查点最佳实践)
 - `scripts/runtime/checkpoints.cjs` (行 28-80，现有实现)
 
@@ -438,11 +467,13 @@ class IncrementalCheckpoint {
 ### 2.3 Stop 事件防重入（强化现有实现）
 
 **现状分析**：
+
 - `sy-stop.cjs` 使用文件锁防止重入（`/tmp/.sy_stop_hook_active`）
 - 但 Windows 上 `/tmp` 路径不存在，需要使用 `%TEMP%`
 - 缺少锁超时机制，可能导致永久死锁
 
 **改进方案**：
+
 ```javascript
 // scripts/hooks/sy-stop.cjs（增强）
 const os = require('os');
@@ -507,12 +538,14 @@ try {
 ```
 
 **Windows 优化**：
-- 临时目录：使用 `os.tmpdir()` 自动适配 Windows `%TEMP%` 路径
-- 进程检测：通过 `tasklist /FI "PID eq ${pid}"` 验证锁持有进程是否存活
-- 强制清理：提供 `sy-stop-unlock.cmd` 脚本手动清理僵尸锁
-- 事件日志：将锁获取/释放记录到 Windows 事件日志，便于审计
+
+- **临时目录**：使用 `os.tmpdir()` 自动适配 Windows `%TEMP%` 路径
+- **进程检测**：通过 `tasklist /FI "PID eq ${pid}"` 验证锁持有进程是否存活
+- **强制清理**：提供 `sy-stop-unlock.cmd` 脚本手动清理僵尸锁
+- **事件日志**：将锁获取/释放记录到 Windows 事件日志，便于审计
 
 **参考源码**：
+
 - `refer/v4-architecture-patch-risks.md` (行 67-89)
 - `scripts/hooks/sy-stop.cjs` (行 23-45)
 
@@ -521,11 +554,13 @@ try {
 ### 2.4 会话生命周期管理（补齐 SessionEnd）
 
 **现状问题**：
+
 - 缺少 SessionEnd 事件，会话结束时无法清理资源
 - 临时文件、锁文件可能残留，影响下次会话
 - 无法生成会话摘要报告
 
 **改进方案**：
+
 ```javascript
 // scripts/hooks/sy-session-end.cjs（新增）
 const fs = require('fs');
@@ -620,11 +655,13 @@ console.log(JSON.stringify({
 ```
 
 **Windows 优化**：
-- 资源清理：使用 `taskkill /F /FI "WINDOWTITLE eq seeyue*"` 强制终止残留进程
-- 日志归档：调用 `compact.exe` 压缩历史会话日志
-- 摘要通知：使用 Windows Toast 通知显示会话统计
+
+- **资源清理**：使用 `taskkill /F /FI "WINDOWTITLE eq seeyue*"` 强制终止残留进程
+- **日志归档**：调用 `compact.exe` 压缩历史会话日志
+- **摘要通知**：使用 Windows Toast 通知显示会话统计
 
 **参考源码**：
+
 - `claude-code-main/CHANGELOG.md` (行 267-289，SessionEnd 事件)
 
 ---
@@ -634,11 +671,13 @@ console.log(JSON.stringify({
 ### 3.1 NTFS 权限级文件保护（超越文件类分类）
 
 **现状分析**：
-- `file-classes.yaml` 定义了 system_file、security_boundary 等分类
+
+- `file-classes.yaml` 定义了 `system_file`、`security_boundary` 等分类
 - 但仅在 hook 层面检查，无法防止绕过 hook 的直接文件操作
 - 缺少操作系统级别的强制访问控制
 
 **改进方案**：
+
 ```powershell
 # scripts/windows/apply-ntfs-protection.ps1
 param(
@@ -685,6 +724,7 @@ foreach ($class in $fileClasses.classes) {
 ```
 
 **集成到 SessionStart**：
+
 ```javascript
 // scripts/hooks/sy-session-start.cjs（增强）
 function applyNTFSProtection() {
@@ -707,12 +747,14 @@ function applyNTFSProtection() {
 ```
 
 **Windows 优化**：
-- ACL 精细控制：为不同文件类设置不同的权限级别（只读、拒绝删除、拒绝执行）
-- 审计启用：使用 `auditpol.exe` 启用文件访问审计，记录所有修改尝试
-- 加密保护：对 secret_material 类文件使用 EFS（加密文件系统）加密
-- 临时解锁：提供 `sy-unlock-file.ps1` 脚本临时解除保护（需管理员权限）
+
+- **ACL 精细控制**：为不同文件类设置不同的权限级别（只读、拒绝删除、拒绝执行）
+- **审计启用**：使用 `auditpol.exe` 启用文件访问审计，记录所有修改尝试
+- **加密保护**：对 `secret_material` 类文件使用 EFS（加密文件系统）加密
+- **临时解锁**：提供 `sy-unlock-file.ps1` 脚本临时解除保护（需管理员权限）
 
 **参考源码**：
+
 - `workflow/file-classes.yaml` (行 12-45)
 - `scripts/hooks/sy-pretool-write.cjs` (行 67-89，现有文件类检查)
 
@@ -721,11 +763,13 @@ function applyNTFSProtection() {
 ### 3.2 PowerShell 命令拦截（替代 Bash 正则）
 
 **现状分析**：
+
 - `sy-hook-lib.cjs` 使用正则表达式匹配危险命令（行 37-76）
 - 但正则容易被绕过（如 `git  push`、`git\tpush`）
 - 无法处理 PowerShell 特有的危险命令（如 `Remove-Item -Recurse -Force`）
 
 **改进方案**：
+
 ```javascript
 // scripts/hooks/sy-pretool-bash.cjs（增强）
 const { execSync } = require('child_process');
@@ -798,12 +842,14 @@ function blockDangerousCommand(command) {
 ```
 
 **Windows 优化**：
-- AST 解析：使用 PowerShell 的抽象语法树（AST）精确解析命令结构
-- 参数验证：检查 `-Force`、`-Recurse`、`-Confirm:$false` 等危险参数组合
-- 别名展开：自动展开 PowerShell 别名（如 `rm` → `Remove-Item`）
-- 管道分析：检测危险的管道操作（如 `Get-ChildItem | Remove-Item`）
+
+- **AST 解析**：使用 PowerShell 的抽象语法树（AST）精确解析命令结构
+- **参数验证**：检查 `-Force`、`-Recurse`、`-Confirm:$false` 等危险参数组合
+- **别名展开**：自动展开 PowerShell 别名（如 `rm` → `Remove-Item`）
+- **管道分析**：检测危险的管道操作（如 `Get-ChildItem | Remove-Item`）
 
 **参考源码**：
+
 - `scripts/hooks/sy-hook-lib.cjs` (行 37-76，现有正则匹配)
 - `claude-code-main/examples/hooks/bash_command_validator_example.py` (行 123-156)
 
@@ -812,11 +858,13 @@ function blockDangerousCommand(command) {
 ### 3.3 注册表状态持久化（替代 YAML 文件）
 
 **现状分析**：
+
 - `session.yaml` 和 `session.md` 存储工作流状态
 - 文件读写存在竞态条件和损坏风险
 - 缺少版本控制和回滚机制
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/registry-store.cjs（新增）
 const { execSync } = require('child_process');
@@ -898,12 +946,14 @@ module.exports = { RegistryStore };
 ```
 
 **Windows 优化**：
-- 原子性：使用注册表的事务性操作保证一致性
-- 版本控制：每次更新前自动备份到带时间戳的键
-- 权限隔离：使用 HKCU（当前用户）而非 HKLM（本地机器），避免需要管理员权限
-- 快速查询：注册表查询比文件 I/O 快 10-100 倍
+
+- **原子性**：使用注册表的事务性操作保证一致性
+- **版本控制**：每次更新前自动备份到带时间戳的键
+- **权限隔离**：使用 HKCU（当前用户）而非 HKLM（本地机器），避免需要管理员权限
+- **快速查询**：注册表查询比文件 I/O 快 10-100 倍
 
 **参考源码**：
+
 - `scripts/runtime/store.cjs` (行 45-123，现有文件存储)
 
 ---
@@ -911,11 +961,13 @@ module.exports = { RegistryStore };
 ### 3.4 Windows 事件日志集成（企业审计）
 
 **现状分析**：
+
 - `journal.jsonl` 记录审计日志，但格式非标准
 - 无法与企业 SIEM 系统集成
 - 缺少日志轮转和归档机制
 
 **改进方案**：
+
 ```powershell
 # scripts/windows/write-event-log.ps1
 param(
@@ -954,6 +1006,7 @@ Write-EventLog `
 ```
 
 **集成到 Hooks**：
+
 ```javascript
 // scripts/hooks/sy-hook-lib.cjs（增强）
 function logToWindowsEventLog(eventType, message, eventId, data) {
@@ -983,12 +1036,14 @@ logToWindowsEventLog('Warning', 'Blocked dangerous command', 1001, {
 ```
 
 **Windows 优化**：
+
 - **标准化事件 ID**：定义事件 ID 范围（1000-1999：信息，2000-2999：警告，3000-3999：错误）
 - **SIEM 集成**：事件日志可被 Splunk、ELK、Azure Sentinel 等工具自动采集
 - **查询接口**：提供 PowerShell 脚本快速查询 seeyue 相关事件
 - **性能优化**：异步写入事件日志，避免阻塞主流程
 
 **事件 ID 定义**：
+
 ```javascript
 const EVENT_IDS = {
   // 信息类（1000-1999）
@@ -1011,6 +1066,7 @@ const EVENT_IDS = {
 ```
 
 **参考源码**：
+
 - `scripts/runtime/hook-client.cjs` (行 234-267，现有日志记录)
 
 ---
@@ -1018,11 +1074,13 @@ const EVENT_IDS = {
 ### 3.5 VSS（卷影复制）深度集成
 
 **现状分析**：
+
 - 检查点机制依赖文件复制，占用大量磁盘空间
 - 无法恢复到任意历史时间点
 - 缺少系统级的快照保护
 
 **改进方案**：
+
 ```powershell
 # scripts/windows/create-vss-snapshot.ps1
 param(
@@ -1062,6 +1120,7 @@ if ($snapshot) {
 ```
 
 **集成到检查点系统**：
+
 ```javascript
 // scripts/runtime/checkpoints.cjs（增强）
 function createVSSCheckpoint(label) {
@@ -1111,12 +1170,14 @@ function restoreFromVSS(snapshotId) {
 ```
 
 **Windows 优化**：
-- 零空间开销：VSS 使用写时复制（Copy-on-Write），仅存储差异数据
-- 系统级保护：即使 seeyue 进程崩溃，快照仍然保留
-- 快速恢复：通过符号链接直接访问快照内容，无需复制
-- 自动清理：设置快照保留策略（如保留最近 10 个快照）
+
+- **零空间开销**：VSS 使用写时复制（Copy-on-Write），仅存储差异数据
+- **系统级保护**：即使 seeyue 进程崩溃，快照仍然保留
+- **快速恢复**：通过符号链接直接访问快照内容，无需复制
+- **自动清理**：设置快照保留策略（如保留最近 10 个快照）
 
 **参考源码**：
+
 - `scripts/runtime/checkpoints.cjs` (行 28-80)
 
 ---
@@ -1126,11 +1187,13 @@ function restoreFromVSS(snapshotId) {
 ### 4.1 TDD 红门强化（证据链完整性）
 
 **现状分析**：
+
 - `sy-pretool-write.cjs` 检查 TDD 红门（行 67-89）
 - 但仅检查 `V4_RED_READY_STATES` 集合，缺少证据验证
 - 无法防止伪造的测试输出
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/tdd-validator.cjs（新增）
 const crypto = require('crypto');
@@ -1257,6 +1320,7 @@ module.exports = { TDDValidator };
 ```
 
 **集成到 PreToolUse:Write**：
+
 ```javascript
 // scripts/hooks/sy-pretool-write.cjs（增强）
 const { TDDValidator } = require('../runtime/tdd-validator.cjs');
@@ -1284,12 +1348,14 @@ function checkTDDGate(input) {
 ```
 
 **Windows 优化**：
-- 签名密钥管理：使用 Windows Credential Manager 安全存储签名密钥
-- 证据时效性：强制 RED 证据在 1 小时内有效，防止过期证据复用
-- 输出指纹：对测试输出计算哈希，防止相同输出重复使用
-- 审计追踪：所有 TDD 门检查记录到 Windows 事件日志
+
+- **签名密钥管理**：使用 Windows Credential Manager 安全存储签名密钥
+- **证据时效性**：强制 RED 证据在 1 小时内有效，防止过期证据复用
+- **输出指纹**：对测试输出计算哈希，防止相同输出重复使用
+- **审计追踪**：所有 TDD 门检查记录到 Windows 事件日志
 
 **参考源码**：
+
 - `scripts/hooks/sy-pretool-write.cjs` (行 67-89)
 - `scripts/runtime/hook-client.cjs` (行 456-489，V4_RED_READY_STATES)
 
@@ -1298,11 +1364,13 @@ function checkTDDGate(input) {
 ### 4.2 秘密扫描增强（多层检测）
 
 **现状分析**：
+
 - `sy-hook-lib.cjs` 实现了基础秘密扫描（行 123-156）
 - 但仅使用正则匹配，误报率高
 - 缺少上下文分析和熵值检测
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/secret-scanner.cjs（增强）
 const crypto = require('crypto');
@@ -1429,12 +1497,14 @@ module.exports = { EnhancedSecretScanner };
 ```
 
 **Windows 优化**：
-- Windows Defender 集成：调用 Windows Defender API 扫描已知恶意模式
-- Azure Key Vault 检测：识别 Azure Key Vault 引用格式，允许安全的密钥引用
-- BitLocker 加密检测：对包含秘密的文件自动启用 BitLocker 加密
-- DLP 集成：与 Windows Information Protection (WIP) 集成，防止秘密泄露
+
+- **Windows Defender 集成**：调用 Windows Defender API 扫描已知恶意模式
+- **Azure Key Vault 检测**：识别 Azure Key Vault 引用格式，允许安全的密钥引用
+- **BitLocker 加密检测**：对包含秘密的文件自动启用 BitLocker 加密
+- **DLP 集成**：与 Windows Information Protection (WIP) 集成，防止秘密泄露
 
 **参考源码**：
+
 - `scripts/hooks/sy-hook-lib.cjs` (行 123-156)
 - `claude-code-main/plugins/security-guidance/hooks/security_reminder_hook.py` (行 89-134)
 
@@ -1443,11 +1513,13 @@ module.exports = { EnhancedSecretScanner };
 ### 4.3 占位符检测（防止虚假提交）
 
 **现状分析**：
+
 - `sy-hook-lib.cjs` 实现了基础占位符检测（行 178-203）
 - 但仅检查固定模式，容易被绕过
 - 缺少语义分析和代码完整性验证
 
 **改进方案**：
+
 ```javascript
 // scripts/runtime/placeholder-detector.cjs（增强）
 class PlaceholderDetector {
@@ -1595,12 +1667,14 @@ module.exports = { PlaceholderDetector };
 ```
 
 **Windows 优化**：
-- Visual Studio Code Analysis：调用 VS Code 的语言服务器进行深度语义分析
-- TypeScript 编译检查：对 `.ts` 文件运行 `tsc --noEmit` 验证类型完整性
-- ESLint 集成：运行 ESLint 规则检测代码质量问题
-- 并行检测：使用 Windows Job Objects 并行运行多个检测器
+
+- **Visual Studio Code Analysis**：调用 VS Code 的语言服务器进行深度语义分析
+- **TypeScript 编译检查**：对 `.ts` 文件运行 `tsc --noEmit` 验证类型完整性
+- **ESLint 集成**：运行 ESLint 规则检测代码质量问题
+- **并行检测**：使用 Windows Job Objects 并行运行多个检测器
 
 **参考源码**：
+
 - `scripts/hooks/sy-hook-lib.cjs` (行 178-203)
 
 ---
@@ -1608,11 +1682,13 @@ module.exports = { PlaceholderDetector };
 ### 4.4 完整性验证清单（Stop 事件）
 
 **现状分析**：
+
 - `sy-stop.cjs` 仅创建检查点，缺少完整性验证
 - 无法确保所有必需的工件都已生成
 - 缺少阶段完成度评分
 
 **改进方案**：
+
 ```javascript
 // scripts/hooks/sy-stop.cjs（增强）
 class CompletenessValidator {
@@ -1786,12 +1862,14 @@ if (!validation.complete) {
 ```
 
 **Windows 优化**：
-- 并行验证：使用 Windows Thread Pool 并行运行多个验证器
-- 缓存结果：将验证结果缓存到注册表，避免重复检查
-- 进度通知：使用 Windows Toast 显示验证进度
-- 报告生成：生成 HTML 格式的完整性报告，使用默认浏览器打开
+
+- **并行验证**：使用 Windows Thread Pool 并行运行多个验证器
+- **缓存结果**：将验证结果缓存到注册表，避免重复检查
+- **进度通知**：使用 Windows Toast 显示验证进度
+- **报告生成**：生成 HTML 格式的完整性报告，使用默认浏览器打开
 
 **参考源码**：
+
 - `scripts/hooks/sy-stop.cjs` (行 45-89)
 - `workflow/policy.spec.yaml` (行 123-167，完整性要求)
 
@@ -1802,21 +1880,24 @@ if (!validation.complete) {
 ### 5.1 优先级分级（P0-P3）
 
 **P0（立即实施，1-2 周）**：
-1. 四层分离架构重构（Registry/Planner/Runner/Aggregator）
-2. 三态决策模型（allow/deny/ask）
-3. 指纹信任机制
-4. 阶段状态机硬约束强化
-5. Stop 事件防重入修复
+
+1.  四层分离架构重构（Registry/Planner/Runner/Aggregator）
+2.  三态决策模型（allow/deny/ask）
+3.  指纹信任机制
+4.  阶段状态机硬约束强化
+5.  Stop 事件防重入修复
 
 **P1（短期实施，3-4 周）**：
-6. 事件矩阵补齐（BeforeModel、PermissionRequest、PreCompact、PostToolUseFailure）
-7. Profile Gating 系统
-8. 检查点强制创建（增量 + VSS）
-9. TDD 红门强化（证据链完整性）
+
+6.  事件矩阵补齐（BeforeModel、PermissionRequest、PreCompact、PostToolUseFailure）
+7.  Profile Gating 系统
+8.  检查点强制创建（增量 + VSS）
+9.  TDD 红门强化（证据链完整性）
 10. 秘密扫描增强（多层检测）
 11. NTFS 权限级文件保护
 
 **P2（中期实施，5-8 周）**：
+
 12. PowerShell 命令拦截（AST 解析）
 13. 注册表状态持久化
 14. Windows 事件日志集成
@@ -1825,6 +1906,7 @@ if (!validation.complete) {
 17. VSS 深度集成
 
 **P3（长期优化，9-12 周）**：
+
 18. HTTP Hooks 支持（远程策略服务）
 19. CLI 管理命令（`/hooks` 交互界面）
 20. 遥测与监控仪表板
@@ -1837,6 +1919,7 @@ if (!validation.complete) {
 ### 5.2 向后兼容策略
 
 **渐进式迁移**：
+
 ```javascript
 // scripts/runtime/compatibility-layer.cjs
 class CompatibilityLayer {
@@ -1889,6 +1972,7 @@ class CompatibilityLayer {
 ```
 
 **功能开关**：
+
 ```javascript
 // scripts/runtime/feature-flags.cjs
 const FEATURE_FLAGS = {
@@ -1916,6 +2000,7 @@ module.exports = { FEATURE_FLAGS, isFeatureEnabled };
 ```
 
 **迁移脚本**：
+
 ```powershell
 # scripts/windows/migrate-to-v2.ps1
 param(
@@ -1983,6 +2068,7 @@ Write-Host "  3. Review the migration log at .ai/workflow/migration.log"
 ### 5.3 测试与验证策略
 
 **单元测试框架**：
+
 ```javascript
 // tests/hooks/hook-registry.test.cjs
 const { HookRegistry } = require('../../scripts/runtime/hook-registry.cjs');
@@ -2042,6 +2128,7 @@ describe('HookRegistry', () => {
 ```
 
 **集成测试**：
+
 ```javascript
 // tests/hooks/integration/pretool-write.test.cjs
 const { execSync } = require('child_process');
@@ -2123,6 +2210,7 @@ describe('PreToolUse:Write Integration', () => {
 ```
 
 **端到端测试**：
+
 ```powershell
 # tests/e2e/full-workflow.test.ps1
 Describe "Full Workflow E2E Test" {
@@ -2208,6 +2296,7 @@ Describe "Full Workflow E2E Test" {
 ```
 
 **性能基准测试**：
+
 ```javascript
 // tests/performance/hook-performance.bench.cjs
 const Benchmark = require('benchmark');
@@ -2256,7 +2345,7 @@ suite
 
 ### 5.4 文档与培训
 
-#### 开发者文档
+**开发者文档**：
 
 ```markdown
 # seeyue-workflows Hooks 开发指南
@@ -2339,17 +2428,17 @@ Hooks 必须输出 JSON 到 stdout：
 
 ### 决策类型
 
-- `allow`: 放行操作
-- `deny`: 阻断操作
-- `ask`: 请求人工确认（需要启用三态决策）
+- **allow**：放行操作
+- **deny**：阻断操作
+- **ask**：请求人工确认（需要启用三态决策）
 
 ### 最佳实践
 
-1. **快速失败**：尽早返回决策，避免不必要的计算
-2. **详细日志**：使用 `console.error()` 输出调试信息（不影响 stdout）
-3. **错误处理**：捕获所有异常，返回 deny 决策而非崩溃
-4. **性能优化**：缓存昂贵的检查结果
-5. **Windows 兼容**：使用 `path.join()` 而非硬编码路径分隔符
+1.  **快速失败**：尽早返回决策，避免不必要的计算
+2.  **详细日志**：使用 `console.error()` 输出调试信息（不影响 stdout）
+3.  **错误处理**：捕获所有异常，返回 deny 决策而非崩溃
+4.  **性能优化**：缓存昂贵的检查结果
+5.  **Windows 兼容**：使用 `path.join()` 而非硬编码路径分隔符
 
 ### 高级主题
 
@@ -2413,7 +2502,7 @@ if (process.platform === 'win32') {
 }
 ```
 
-#### 管理员手册
+**管理员手册**：
 
 ```markdown
 # seeyue-workflows 管理员手册
@@ -2573,6 +2662,45 @@ if ($failureRate -gt 10) {
     Send-MailMessage -To "admin@company.com" -Subject "seeyue-workflows: High failure rate" -Body "Failure rate: $failureRate/hour"
 }
 ```
+
+---
+
+## 【总结】
+
+本重构方案基于对 Claude Code、Gemini CLI、Codex、Everything Claude Code、Superpowers 五个优秀开源项目的深度源码分析，结合 seeyue-workflows 现有实现，提出了 **100% 专注于 Windows 平台** 的架构优化方案。
+
+### 核心改进点
+
+1.  **架构级重构**：四层分离架构、三态决策模型、事件矩阵补齐、指纹信任机制、Profile Gating 系统
+2.  **生命周期防越界**：阶段状态机硬约束、检查点强制创建、Stop 事件防重入、会话生命周期管理
+3.  **Windows 原生优化**：NTFS 权限保护、PowerShell AST 解析、注册表状态存储、Windows 事件日志、VSS 深度集成
+4.  **状态收口验证**：TDD 红门强化、秘密扫描增强、占位符检测、完整性验证清单
+
+### 实施优先级
+
+- **P0（1-2 周）**：四层架构、三态决策、指纹信任、状态机强化、Stop 防重入
+- **P1（3-4 周）**：事件矩阵补齐、Profile 系统、检查点增强、TDD/秘密/NTFS 保护
+- **P2（5-8 周）**：PowerShell 拦截、注册表存储、事件日志、占位符/完整性验证、VSS 集成
+- **P3（9-12 周）**：HTTP Hooks、CLI 管理、遥测监控、企业集成、性能优化
+
+### 关键成功因素
+
+1.  **向后兼容**：渐进式迁移、功能开关、双写模式
+2.  **充分测试**：单元测试、集成测试、端到端测试、性能基准
+3.  **完善文档**：开发者指南、管理员手册、故障排查手册
+4.  **持续优化**：监控指标、告警规则、性能分析
+
+---
+
+**参考文件索引**：
+
+- seeyue-workflows 核心：`scripts/hooks/*.cjs`、`scripts/runtime/*.cjs`、`workflow/*.yaml`
+- Claude Code：`refer/agent-source-code/claude-code-main/plugins/`
+- Gemini CLI：`refer/agent-source-code/gemini-cli-main/packages/core/src/hooks/`
+- Codex：`refer/agent-source-code/codex-main/codex-rs/hooks/src/`
+- Everything Claude Code：`refer/everything-claude-code-main/scripts/hooks/`
+- Superpowers：`refer/superpowers-main/hooks/`
+- 架构文档：`refer/v4-architecture-*.md`、`refer/workflow-skills-system-design*.md`
 
 ---
 
@@ -2774,49 +2902,52 @@ module.exports = { PerformanceMonitor };
 
 ## 【附录 D：故障排查决策树】
 
-**问题：Hook 执行失败**  
-├─ 检查 hook 文件是否存在  
-│  ├─ 不存在 → 检查 hooks.spec.yaml 配置  
-│  └─ 存在 → 继续  
-├─ 检查 hook 语法错误  
-│  ├─ 运行 `node scripts/hooks/hook-name.cjs` 测试  
-│  └─ 查看错误输出  
-├─ 检查输入格式  
-│  ├─ 验证 JSON 格式是否正确  
-│  └─ 检查必需字段是否存在  
-├─ 检查权限问题  
-│  ├─ Windows：检查执行策略 `Get-ExecutionPolicy`  
-│  └─ 检查文件权限 `icacls scripts/hooks/hook-name.cjs`  
-└─ 查看详细日志  
-   ├─ journal.jsonl：`Get-Content .ai\workflow\journal.jsonl | Select-String "error"`  
-   └─ Windows 事件日志：`Get-EventLog -LogName Application -Source "seeyue-workflows" -EntryType Error`
+**问题：Hook 执行失败**
 
-**问题：状态损坏**  
-├─ 尝试从检查点恢复  
-│  ├─ 列出可用检查点：`node scripts/runtime/list-checkpoints.cjs`  
-│  └─ 恢复：`node scripts/runtime/restore-checkpoint.cjs --id <checkpoint-id>`  
-├─ 尝试从 VSS 快照恢复  
-│  ├─ 列出快照：`vssadmin list shadows`  
-│  └─ 恢复：`powershell.exe -File scripts/windows/restore-vss-snapshot.ps1 -SnapshotId "{GUID}"`  
-├─ 检查文件锁  
-│  ├─ 查找锁文件：`Get-ChildItem -Path . -Recurse -Filter "*.lock"`  
-│  └─ 手动删除：`Remove-Item .ai\workflow\session.yaml.lock`  
-└─ 重新初始化（最后手段）  
-   └─ `node scripts/runtime/init-workflow.cjs --force`
+- **检查 hook 文件是否存在**
+  - 不存在 → 检查 hooks.spec.yaml 配置
+  - 存在 → 继续
+- **检查 hook 语法错误**
+  - 运行 `node scripts/hooks/hook-name.cjs` 测试
+  - 查看错误输出
+- **检查输入格式**
+  - 验证 JSON 格式是否正确
+  - 检查必需字段是否存在
+- **检查权限问题**
+  - Windows：检查执行策略 `Get-ExecutionPolicy`
+  - 检查文件权限 `icacls scripts/hooks/hook-name.cjs`
+- **查看详细日志**
+  - journal.jsonl：`Get-Content .ai\workflow\journal.jsonl | Select-String "error"`
+  - Windows 事件日志：`Get-EventLog -LogName Application -Source "seeyue-workflows" -EntryType Error`
 
-**问题：性能缓慢**  
-├─ 分析性能瓶颈  
-│  ├─ 运行基准测试：`node tests/performance/hook-performance.bench.cjs`  
-│  └─ 查看性能统计：`node scripts/runtime/analyze-performance.cjs`  
-├─ 识别慢速 hooks  
-│  ├─ 查看注册表统计：`reg query "HKCU\Software\seeyue\perf"`  
-│  └─ 禁用慢速 hooks：`$env:SY_DISABLED_HOOKS = "slow-hook-1,slow-hook-2"`  
-├─ 优化配置  
-│  ├─ 降低 Profile 级别：`$env:SY_HOOK_PROFILE = "minimal"`  
-│  └─ 启用缓存：`$env:SY_ENABLE_CACHE = "true"`  
-└─ 清理历史数据  
-   ├─ 归档旧日志：`powershell.exe -File scripts/windows/archive-logs.ps1`  
-   └─ 清理旧检查点：`node scripts/runtime/cleanup-checkpoints.cjs --keep 10`
+**问题：状态损坏**
+
+- **尝试从检查点恢复**
+  - 列出可用检查点：`node scripts/runtime/list-checkpoints.cjs`
+  - 恢复：`node scripts/runtime/restore-checkpoint.cjs --id <checkpoint-id>`
+- **尝试从 VSS 快照恢复**
+  - 列出快照：`vssadmin list shadows`
+  - 恢复：`powershell.exe -File scripts/windows/restore-vss-snapshot.ps1 -SnapshotId "{GUID}"`
+- **检查文件锁**
+  - 查找锁文件：`Get-ChildItem -Path . -Recurse -Filter "*.lock"`
+  - 手动删除：`Remove-Item .ai\workflow\session.yaml.lock`
+- **重新初始化（最后手段）**
+  - `node scripts/runtime/init-workflow.cjs --force`
+
+**问题：性能缓慢**
+
+- **分析性能瓶颈**
+  - 运行基准测试：`node tests/performance/hook-performance.bench.cjs`
+  - 查看性能统计：`node scripts/runtime/analyze-performance.cjs`
+- **识别慢速 hooks**
+  - 查看注册表统计：`reg query "HKCU\Software\seeyue\perf"`
+  - 禁用慢速 hooks：`$env:SY_DISABLED_HOOKS = "slow-hook-1,slow-hook-2"`
+- **优化配置**
+  - 降低 Profile 级别：`$env:SY_HOOK_PROFILE = "minimal"`
+  - 启用缓存：`$env:SY_ENABLE_CACHE = "true"`
+- **清理历史数据**
+  - 归档旧日志：`powershell.exe -File scripts/windows/archive-logs.ps1`
+  - 清理旧检查点：`node scripts/runtime/cleanup-checkpoints.cjs --keep 10`
 
 ---
 
@@ -2865,23 +2996,26 @@ module.exports = { PerformanceMonitor };
 
 ### F.1 安装与配置
 
-**Q: 为什么需要管理员权限？**  
-A: 仅在以下场景需要管理员权限：  
-- 首次注册 Windows 事件日志源（`New-EventLog`）  
-- 应用 NTFS 文件保护（修改 ACL）  
-- 配置 GPO 企业策略  
-- 创建 VSS 快照（某些系统配置）  
+**Q: 为什么需要管理员权限？**
+
+A: 仅在以下场景需要管理员权限：
+- 首次注册 Windows 事件日志源（`New-EventLog`）
+- 应用 NTFS 文件保护（修改 ACL）
+- 配置 GPO 企业策略
+- 创建 VSS 快照（某些系统配置）
 
 日常使用不需要管理员权限。
 
-**Q: 如何在没有 PowerShell 的环境中运行？**  
-A: seeyue-workflows v2 专为 Windows 平台设计，强依赖 PowerShell 5.1+。如果环境限制无法使用 PowerShell，建议：  
-1. 使用 v1 版本（纯 Node.js 实现）  
-2. 联系管理员安装 PowerShell  
-3. 使用 Windows Subsystem for Linux (WSL) 作为替代  
+**Q: 如何在没有 PowerShell 的环境中运行？**
 
-**Q: 如何配置代理环境？**  
-A: 设置以下环境变量：  
+A: seeyue-workflows v2 专为 Windows 平台设计，强依赖 PowerShell 5.1+。如果环境限制无法使用 PowerShell，建议：
+1.  使用 v1 版本（纯 Node.js 实现）
+2.  联系管理员安装 PowerShell
+3.  使用 Windows Subsystem for Linux (WSL) 作为替代
+
+**Q: 如何配置代理环境？**
+
+A: 设置以下环境变量：
 ```powershell
 $env:HTTP_PROXY = "http://proxy.company.com:8080"
 $env:HTTPS_PROXY = "http://proxy.company.com:8080"
@@ -2890,8 +3024,9 @@ $env:NO_PROXY = "localhost,127.0.0.1,.company.com"
 
 ### F.2 Hook 开发
 
-**Q: Hook 执行超时怎么办？**  
-A: 默认超时为 60 秒。可以通过以下方式调整：  
+**Q: Hook 执行超时怎么办？**
+
+A: 默认超时为 60 秒。可以通过以下方式调整：
 ```yaml
 # workflow/hooks.spec.yaml
 hooks:
@@ -2899,7 +3034,7 @@ hooks:
     timeout: 120000  # 120 秒
 ```
 
-或在 hook 内部实现异步逻辑：  
+或在 hook 内部实现异步逻辑：
 ```javascript
 // 快速返回，后台继续执行
 console.log(JSON.stringify({ continue: true }));
@@ -2911,8 +3046,9 @@ setTimeout(() => {
 }, 0);
 ```
 
-**Q: 如何调试 Hook？**  
-A: 使用以下方法：  
+**Q: 如何调试 Hook？**
+
+A: 使用以下方法：
 ```powershell
 # 1. 直接运行 hook 并提供测试输入
 $testInput = @{
@@ -2931,26 +3067,28 @@ $env:SY_LOG_LEVEL = "debug"
 node --inspect-brk scripts/hooks/sy-pretool-write.cjs
 ```
 
-**Q: Hook 可以访问哪些资源？**  
-A: Hook 可以访问：  
-- 当前工作目录（input.cwd）  
-- 工作流状态文件（.ai/workflow/session.yaml）  
-- 审计日志（.ai/workflow/journal.jsonl）  
-- 环境变量  
-- 注册表（HKCU\Software\seeyue）  
-- 文件系统（受 NTFS 权限限制）  
+**Q: Hook 可以访问哪些资源？**
 
-Hook 不应该：  
-- 修改全局系统配置  
-- 访问其他用户的数据  
-- 执行长时间运行的任务（> 60s）  
-- 依赖外部网络服务（除非配置了 failOpen）  
+A: Hook 可以访问：
+- 当前工作目录（input.cwd）
+- 工作流状态文件（.ai/workflow/session.yaml）
+- 审计日志（.ai/workflow/journal.jsonl）
+- 环境变量
+- 注册表（HKCU\Software\seeyue）
+- 文件系统（受 NTFS 权限限制）
+
+Hook 不应该：
+- 修改全局系统配置
+- 访问其他用户的数据
+- 执行长时间运行的任务（> 60s）
+- 依赖外部网络服务（除非配置了 failOpen）
 
 ### F.3 性能优化
 
-**Q: 如何减少 Hook 执行时间？**  
-A: 优化策略：  
-1. 使用缓存：  
+**Q: 如何减少 Hook 执行时间？**
+
+A: 优化策略：
+1.  使用缓存：
 ```javascript
 const cache = new Map();
 function expensiveCheck(input) {
@@ -2962,7 +3100,7 @@ function expensiveCheck(input) {
 }
 ```
 
-2. 提前退出：  
+2.  提前退出：
 ```javascript
 // 快速路径：跳过不相关的检查
 if (input.tool_name !== 'Write') {
@@ -2971,7 +3109,7 @@ if (input.tool_name !== 'Write') {
 }
 ```
 
-3. 使用 Profile：  
+3.  使用 Profile：
 ```javascript
 const profile = process.env.SY_HOOK_PROFILE || 'standard';
 if (profile === 'minimal') {
@@ -2979,7 +3117,7 @@ if (profile === 'minimal') {
 }
 ```
 
-4. 并行执行：  
+4.  并行执行：
 ```javascript
 const results = await Promise.all([
   checkSecrets(content),
@@ -2988,26 +3126,28 @@ const results = await Promise.all([
 ]);
 ```
 
-**Q: 检查点占用太多磁盘空间怎么办？**  
-A: 优化方案：  
-1. 使用增量检查点（自动启用）  
-2. 启用 NTFS 压缩：  
-   ```powershell
-   compact /c /s:.ai\workflow\checkpoints
-   ```
-3. 使用 VSS 快照（零空间开销）：  
-   ```powershell
-   $env:SY_USE_VSS = "true"
-   ```
-4. 定期清理旧检查点：  
-   ```powershell
-   node scripts/runtime/cleanup-checkpoints.cjs --keep 10 --older-than 7d
-   ```
+**Q: 检查点占用太多磁盘空间怎么办？**
+
+A: 优化方案：
+1.  使用增量检查点（自动启用）
+2.  启用 NTFS 压缩：
+```powershell
+compact /c /s:.ai\workflow\checkpoints
+```
+3.  使用 VSS 快照（零空间开销）：
+```powershell
+$env:SY_USE_VSS = "true"
+```
+4.  定期清理旧检查点：
+```powershell
+node scripts/runtime/cleanup-checkpoints.cjs --keep 10 --older-than 7d
+```
 
 ### F.4 故障排查
 
-**Q: "Hook fingerprint mismatch" 错误如何解决？**  
-A: 这表示 hook 文件被修改，需要重新授权：  
+**Q: "Hook fingerprint mismatch" 错误如何解决？**
+
+A: 这表示 hook 文件被修改，需要重新授权：
 ```powershell
 # 查看当前指纹
 node scripts/runtime/show-fingerprints.cjs
@@ -3019,8 +3159,9 @@ node scripts/runtime/trust-all-hooks.cjs
 node scripts/runtime/trust-hook.cjs --name sy-pretool-write
 ```
 
-**Q: "Phase transition denied" 错误如何解决？**  
-A: 检查阶段转换是否合法：  
+**Q: "Phase transition denied" 错误如何解决？**
+
+A: 检查阶段转换是否合法：
 ```powershell
 # 查看当前状态
 node scripts/runtime/show-state.cjs
@@ -3032,8 +3173,9 @@ node scripts/runtime/show-transitions.cjs
 node scripts/runtime/reset-phase.cjs --phase execute
 ```
 
-**Q: "TDD Red Gate" 阻断如何解决？**  
-A: 必须先运行失败的测试：  
+**Q: "TDD Red Gate" 阻断如何解决？**
+
+A: 必须先运行失败的测试：
 ```powershell
 # 1. 编写测试
 # 2. 运行测试（应该失败）
@@ -3045,13 +3187,14 @@ node scripts/runtime/verify-red-evidence.cjs
 # 4. 如果证据有效，现在可以写入实现代码
 ```
 
-如果确实需要绕过（仅用于紧急修复）：  
+如果确实需要绕过（仅用于紧急修复）：
 ```powershell
 $env:SY_SKIP_TDD_GATE = "true"  # 临时绕过
 ```
 
-**Q: 注册表访问被拒绝怎么办？**  
-A: 检查权限：  
+**Q: 注册表访问被拒绝怎么办？**
+
+A: 检查权限：
 ```powershell
 # 查看注册表权限
 Get-Acl "HKCU:\Software\seeyue" | Format-List
@@ -3069,19 +3212,21 @@ Set-Acl "HKCU:\Software\seeyue" $acl
 
 ### F.5 企业部署
 
-**Q: 如何在企业环境中集中管理配置？**  
-A: 使用 GPO（组策略对象）：  
-1. 创建 GPO：`seeyue-workflows-policy`  
-2. 配置注册表策略：  
-   - `HKLM\SOFTWARE\Policies\seeyue\HookProfile = strict`  
-   - `HKLM\SOFTWARE\Policies\seeyue\RequiredHooks = sy-pretool-write,sy-pretool-bash`  
-3. 链接到 OU（组织单位）  
-4. 强制刷新：`gpupdate /force`  
+**Q: 如何在企业环境中集中管理配置？**
 
-**Q: 如何与 SIEM 系统集成？**  
-A: seeyue-workflows 写入 Windows 事件日志，可被主流 SIEM 采集：  
+A: 使用 GPO（组策略对象）：
+1.  创建 GPO：`seeyue-workflows-policy`
+2.  配置注册表策略：
+   - `HKLM\SOFTWARE\Policies\seeyue\HookProfile = strict`
+   - `HKLM\SOFTWARE\Policies\seeyue\RequiredHooks = sy-pretool-write,sy-pretool-bash`
+3.  链接到 OU（组织单位）
+4.  强制刷新：`gpupdate /force`
 
-**Splunk**：  
+**Q: 如何与 SIEM 系统集成？**
+
+A: seeyue-workflows 写入 Windows 事件日志，可被主流 SIEM 采集：
+
+**Splunk**：
 ```ini
 [WinEventLog://Application]
 disabled = 0
@@ -3090,7 +3235,7 @@ sourcetype = WinEventLog:Application
 whitelist = Source="seeyue-workflows"
 ```
 
-**ELK (Winlogbeat)**：  
+**ELK (Winlogbeat)**：
 ```yaml
 winlogbeat.event_logs:
   - name: Application
@@ -3099,7 +3244,7 @@ winlogbeat.event_logs:
       - name: seeyue-workflows
 ```
 
-**Azure Sentinel**：  
+**Azure Sentinel**：
 ```kusto
 Event
 | where Source == "seeyue-workflows"
@@ -3107,8 +3252,9 @@ Event
 | summarize count() by EventID, Computer
 ```
 
-**Q: 如何实现多团队隔离？**  
-A: 使用不同的注册表路径：  
+**Q: 如何实现多团队隔离？**
+
+A: 使用不同的注册表路径：
 ```javascript
 // 团队 A
 const store = new RegistryStore('HKCU\\Software\\seeyue\\team-a');
@@ -3117,7 +3263,7 @@ const store = new RegistryStore('HKCU\\Software\\seeyue\\team-a');
 const store = new RegistryStore('HKCU\\Software\\seeyue\\team-b');
 ```
 
-或使用不同的工作目录：  
+或使用不同的工作目录：
 ```powershell
 # 团队 A
 cd D:\Projects\team-a\project
@@ -3132,24 +3278,24 @@ $env:SY_WORKSPACE = "team-b"
 
 ## 【附录 G：术语表】
 
-| 术语        | 定义                                      | 示例                                |
-| ----------- | ----------------------------------------- | ----------------------------------- |
-| Hook        | 在特定事件触发时执行的脚本                | `sy-pretool-write.cjs`              |
-| Event       | 触发 hook 的时机                          | `PreToolUse:Write`                  |
-| Decision    | Hook 的执行结果                           | `allow`, `deny`, `ask`              |
-| Profile     | Hook 执行的严格程度级别                   | `minimal`, `standard`, `strict`     |
-| Fingerprint | Hook 文件的 SHA256 哈希值                 | `a3f5b2c...`                        |
-| Phase       | 工作流的当前阶段                          | `plan`, `execute`, `review`, `done` |
-| Checkpoint  | 工作流状态的快照                          | `pre_destructive_20260312`          |
-| Journal     | 审计日志文件                              | `.ai/workflow/journal.jsonl`        |
-| Registry    | Windows 注册表存储                        | `HKCU\Software\seeyue`              |
-| VSS         | Volume Shadow Copy Service                | Windows 卷影复制服务                |
-| NTFS ACL    | NTFS 访问控制列表                         | 文件权限管理                        |
-| AST         | Abstract Syntax Tree                      | PowerShell 抽象语法树               |
-| GPO         | Group Policy Object                       | 组策略对象                          |
-| SIEM        | Security Information and Event Management | 安全信息和事件管理                  |
-| TDD         | Test-Driven Development                   | 测试驱动开发                        |
-| RED Gate    | TDD 红门，要求先有失败测试                | 防止未经测试的代码提交              |
+| 术语        | 定义                                      | 示例                         |
+| ----------- | ----------------------------------------- | ---------------------------- |
+| Hook        | 在特定事件触发时执行的脚本                | `sy-pretool-write.cjs`       |
+| Event       | 触发 hook 的时机                          | `PreToolUse:Write`           |
+| Decision    | Hook 的执行结果                           | allow, deny, ask             |
+| Profile     | Hook 执行的严格程度级别                   | minimal, standard, strict    |
+| Fingerprint | Hook 文件的 SHA256 哈希值                 | a3f5b2c...                   |
+| Phase       | 工作流的当前阶段                          | plan, execute, review, done  |
+| Checkpoint  | 工作流状态的快照                          | pre_destructive_20260312     |
+| Journal     | 审计日志文件                              | `.ai/workflow/journal.jsonl` |
+| Registry    | Windows 注册表存储                        | `HKCU\Software\seeyue`       |
+| VSS         | Volume Shadow Copy Service                | Windows 卷影复制服务         |
+| NTFS ACL    | NTFS 访问控制列表                         | 文件权限管理                 |
+| AST         | Abstract Syntax Tree                      | PowerShell 抽象语法树        |
+| GPO         | Group Policy Object                       | 组策略对象                   |
+| SIEM        | Security Information and Event Management | 安全信息和事件管理           |
+| TDD         | Test-Driven Development                   | 测试驱动开发                 |
+| RED Gate    | TDD 红门，要求先有失败测试                | 防止未经测试的代码提交       |
 
 ---
 
@@ -3157,39 +3303,39 @@ $env:SY_WORKSPACE = "team-b"
 
 ### H.1 版本历史
 
-**v1.0（当前版本）**  
-- 基础 hook 系统  
-- 文件存储（YAML/Markdown）  
-- 简单的命令阻断  
-- 基础秘密扫描  
+**v1.0（当前版本）**
+- 基础 hook 系统
+- 文件存储（YAML/Markdown）
+- 简单的命令阻断
+- 基础秘密扫描
 
-**v2.0（本重构方案）**  
-- 四层分离架构  
-- 三态决策模型  
-- 注册表存储  
-- Windows 原生优化  
-- Profile Gating 系统  
-- 增强的验证机制  
+**v2.0（本重构方案）**
+- 四层分离架构
+- 三态决策模型
+- 注册表存储
+- Windows 原生优化
+- Profile Gating 系统
+- 增强的验证机制
 
 ### H.2 未来路线图
 
-**v2.1（Q2 2026）**  
-- HTTP Hooks 支持  
-- CLI 管理界面  
-- 实时性能监控仪表板  
-- 自动化测试覆盖率 > 80%  
+**v2.1（Q2 2026）**
+- HTTP Hooks 支持
+- CLI 管理界面
+- 实时性能监控仪表板
+- 自动化测试覆盖率 > 80%
 
-**v2.2（Q3 2026）**  
-- Azure Key Vault 集成  
-- Azure DevOps 集成  
-- GitHub Actions Windows Runner 优化  
-- 多语言支持（Python、C# hooks）  
+**v2.2（Q3 2026）**
+- Azure Key Vault 集成
+- Azure DevOps 集成
+- GitHub Actions Windows Runner 优化
+- 多语言支持（Python、C# hooks）
 
-**v3.0（Q4 2026）**  
-- 分布式 hook 执行  
-- 机器学习驱动的异常检测  
-- 自适应 Profile 调整  
-- 云端策略同步  
+**v3.0（Q4 2026）**
+- 分布式 hook 执行
+- 机器学习驱动的异常检测
+- 自适应 Profile 调整
+- 云端策略同步
 
 ---
 
@@ -3199,25 +3345,25 @@ $env:SY_WORKSPACE = "team-b"
 
 ### 核心价值
 
-1. **硬约束保障**：通过操作系统级的 NTFS 权限、注册表存储、VSS 快照，实现真正不可绕过的硬约束  
-2. **Windows 原生优势**：充分利用 PowerShell AST、Credential Manager、Event Log、Performance Counters 等 Windows 特性  
-3. **企业级可靠性**：支持 GPO 集中管理、SIEM 集成、审计追踪，满足企业合规要求  
-4. **渐进式迁移**：向后兼容、功能开关、双写模式，确保平滑过渡  
-5. **完善的工程实践**：全面的测试、详细的文档、清晰的故障排查指南  
+1.  **硬约束保障**：通过操作系统级的 NTFS 权限、注册表存储、VSS 快照，实现真正不可绕过的硬约束
+2.  **Windows 原生优势**：充分利用 PowerShell AST、Credential Manager、Event Log、Performance Counters 等 Windows 特性
+3.  **企业级可靠性**：支持 GPO 集中管理、SIEM 集成、审计追踪，满足企业合规要求
+4.  **渐进式迁移**：向后兼容、功能开关、双写模式，确保平滑过渡
+5.  **完善的工程实践**：全面的测试、详细的文档、清晰的故障排查指南
 
 ### 实施建议
 
-1. **优先实施 P0 项**：四层架构、三态决策、指纹信任是基础，必须首先完成  
-2. **充分测试**：每个阶段完成后进行全面测试，确保稳定性  
-3. **持续监控**：部署后密切关注性能指标和错误率  
-4. **收集反馈**：从实际使用中发现问题并快速迭代  
+1.  优先实施 P0 项：四层架构、三态决策、指纹信任是基础，必须首先完成
+2.  充分测试：每个阶段完成后进行全面测试，确保稳定性
+3.  持续监控：部署后密切关注性能指标和错误率
+4.  收集反馈：从实际使用中发现问题并快速迭代
 
 ### 预期收益
 
-- **安全性提升 10x**：操作系统级保护 + 多层验证  
-- **性能提升 5-10x**：注册表存储 + 增量检查点 + 并行执行  
-- **可维护性提升 5x**：清晰的架构 + 完善的文档 + 自动化测试  
-- **企业就绪**：GPO 支持 + SIEM 集成 + 审计追踪  
+- **安全性提升 10x**：操作系统级保护 + 多层验证
+- **性能提升 5-10x**：注册表存储 + 增量检查点 + 并行执行
+- **可维护性提升 5x**：清晰的架构 + 完善的文档 + 自动化测试
+- **企业就绪**：GPO 支持 + SIEM 集成 + 审计追踪
 
 ---
 
@@ -3228,19 +3374,21 @@ $env:SY_WORKSPACE = "team-b"
 
 ---
 
-**致谢**  
-感谢以下开源项目提供的宝贵参考：  
-- <https://github.com/anthropics/claude-code> - Anthropic  
-- <https://github.com/google/gemini-cli> - Google  
-- <https://github.com/codex-rs/codex> - Codex Team  
-- <https://github.com/everything-claude-code> - Community  
-- <https://github.com/superpowers> - Community  
+### 致谢
+
+感谢以下开源项目提供的宝贵参考：
+- [Claude Code](https://github.com/anthropics/claude-code) - Anthropic
+- [Gemini CLI](https://github.com/google/gemini-cli) - Google
+- [Codex](https://github.com/codex-rs/codex) - Codex Team
+- [Everything Claude Code](https://github.com/everything-claude-code) - Community
+- [Superpowers](https://github.com/superpowers) - Community
 
 ---
 
-**许可证**  
+### 许可证
+
 本文档采用 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) 许可证。  
-代码实现采用 [MIT 许可证](https://opensource.org/licenses/MIT)。
+代码实现采用 [MIT](https://opensource.org/licenses/MIT) 许可证。
 
 ---
 

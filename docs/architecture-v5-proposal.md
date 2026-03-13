@@ -24,6 +24,12 @@ V5 是对 V4 的结构性加固，而非重写。核心目标是把 “Hooks 与
 - 引入 validate-manifest 与冻结门控，使“何时可实现”具备机器化约束。
 - 明确三类编译产物（routing/skill/policy）与 generated/seeded 边界。
 
+### 0.3 当前落地情况（以仓库实现为准）
+
+- 已落地：`workflow/skills.spec.yaml`、`workflow/hook-contract.schema.yaml`、`workflow/validate-manifest.yaml`、`workflow/output-templates.spec.yaml`；Hook Client + thin hooks；journal append 安全；输出模板校验与 output.log 持久化；hook capability-gap 报告。
+- 部分落地：spec freeze gate 的校验能力已在 validator 中提供，但强制进入实现阶段的流程约束仍依赖人工执行。
+- 待补齐：hook contract 版本强校验、generated/seeded 边界的强制校验与回归测试覆盖完善。
+
 ---
 
 ## 1. 核心不变量

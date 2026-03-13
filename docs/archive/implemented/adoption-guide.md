@@ -7,12 +7,12 @@
 
 接入前先阅读：
 
-- [V4 架构方案](./architecture-v4.md)
+- [V4 架构方案](../../architecture-v4.md)
 - [事实源说明](./source-of-truth.md)
 - [版本化策略](./versioning-policy.md)
-- [runtime schema](../workflow/runtime.schema.yaml)
-- [router spec](../workflow/router.spec.yaml)
-- [policy spec](../workflow/policy.spec.yaml)
+- [runtime schema](../../../workflow/runtime.schema.yaml)
+- [router spec](../../../workflow/router.spec.yaml)
+- [policy spec](../../../workflow/policy.spec.yaml)
 
 ## 前置条件
 
@@ -32,8 +32,8 @@
 
 使用以下脚本同步工作流资产：
 
-- [`scripts/sync-workflow-assets.py`](../scripts/sync-workflow-assets.py)
-- [`sync-manifest.json`](../sync-manifest.json)
+- [`scripts/sync-workflow-assets.py`](../../../scripts/sync-workflow-assets.py)
+- [`sync-manifest.json`](../../../sync-manifest.json)
 
 命令：
 
@@ -54,9 +54,9 @@ python "<SOURCE_ROOT>/scripts/sync-workflow-assets.py" --target-root "<TARGET_RO
 
 通过 adapter 生成各引擎侧入口文件：
 
-- Claude Code：[`scripts/adapters/claude-code.cjs`](../scripts/adapters/claude-code.cjs)
-- Codex：[`scripts/adapters/codex.cjs`](../scripts/adapters/codex.cjs)
-- Gemini CLI：[`scripts/adapters/gemini-cli.cjs`](../scripts/adapters/gemini-cli.cjs)
+- Claude Code：[`scripts/adapters/claude-code.cjs`](../../../scripts/adapters/claude-code.cjs)
+- Codex：[`scripts/adapters/codex.cjs`](../../../scripts/adapters/codex.cjs)
+- Gemini CLI：[`scripts/adapters/gemini-cli.cjs`](../../../scripts/adapters/gemini-cli.cjs)
 
 命令：
 
@@ -66,19 +66,19 @@ node "<SOURCE_ROOT>/scripts/adapters/codex.cjs" --root "<SOURCE_ROOT>" --output 
 node "<SOURCE_ROOT>/scripts/adapters/gemini-cli.cjs" --root "<SOURCE_ROOT>" --output "<TARGET_ROOT>" --write
 ```
 
-生成后，核对 [`../CLAUDE.md`](../CLAUDE.md)、[`../AGENTS.md`](../AGENTS.md)、[`../GEMINI.md`](../GEMINI.md) 是否与事实源一致。
+生成后，核对 [`../CLAUDE.md`](../../../CLAUDE.md)、[`../AGENTS.md`](../../../AGENTS.md)、[`../GEMINI.md`](../../../GEMINI.md) 是否与事实源一致。
 
 ### 3. 运行验证
 
 至少执行以下验证：
 
-- [`scripts/runtime/validate-specs.cjs`](../scripts/runtime/validate-specs.cjs)
-- [`tests/hooks/sy-hooks-smoke.cjs`](../tests/hooks/sy-hooks-smoke.cjs)
-- [`tests/output/run-output-template-fixtures.cjs`](../tests/output/run-output-template-fixtures.cjs)
-- [`tests/output/run-output-log-fixtures.cjs`](../tests/output/run-output-log-fixtures.cjs)
-- [`tests/output/run-output-contract-fixtures.cjs`](../tests/output/run-output-contract-fixtures.cjs)
-- [`tests/e2e/run-engine-conformance.cjs`](../tests/e2e/run-engine-conformance.cjs)
-- [`tests/e2e/run-doc-link-check.cjs`](../tests/e2e/run-doc-link-check.cjs)
+- [`scripts/runtime/validate-specs.cjs`](../../../scripts/runtime/validate-specs.cjs)
+- [`tests/hooks/sy-hooks-smoke.cjs`](../../../tests/hooks/sy-hooks-smoke.cjs)
+- [`tests/output/run-output-template-fixtures.cjs`](../../../tests/output/run-output-template-fixtures.cjs)
+- [`tests/output/run-output-log-fixtures.cjs`](../../../tests/output/run-output-log-fixtures.cjs)
+- [`tests/output/run-output-contract-fixtures.cjs`](../../../tests/output/run-output-contract-fixtures.cjs)
+- [`tests/e2e/run-engine-conformance.cjs`](../../../tests/e2e/run-engine-conformance.cjs)
+- [`tests/e2e/run-doc-link-check.cjs`](../../../tests/e2e/run-doc-link-check.cjs)
 
 命令：
 

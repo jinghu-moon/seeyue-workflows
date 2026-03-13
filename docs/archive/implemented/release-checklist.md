@@ -9,8 +9,8 @@
 - [版本化策略](./versioning-policy.md)
 - [事实源说明](./source-of-truth.md)
 - [运行手册](./operations-runbook.md)
-- [V4 架构方案](./architecture-v4.md)
-- [变更日志](../CHANGELOG.md)
+- [V4 架构方案](../../architecture-v4.md)
+- [变更日志](../../../CHANGELOG.md)
 
 ## 发布前
 
@@ -36,14 +36,14 @@
 
 - [ ] `node tests/e2e/run-doc-link-check.cjs`
 - [ ] `npm run test:e2e:release`
-- [ ] [`../sync-manifest.json`](../sync-manifest.json) 已包含 skills、hooks、tests、docs 的发布边界
-- [ ] [`./versioning-policy.md`](./versioning-policy.md) 与 [`../CHANGELOG.md`](../CHANGELOG.md) 的版本语义一致
+- [ ] [`../sync-manifest.json`](../../../sync-manifest.json) 已包含 skills、hooks、tests、docs 的发布边界
+- [ ] [`./versioning-policy.md`](./versioning-policy.md) 与 [`../CHANGELOG.md`](../../../CHANGELOG.md) 的版本语义一致
 - [ ] [`./adoption-guide.md`](./adoption-guide.md)、[`./source-of-truth.md`](./source-of-truth.md)、[`./operations-runbook.md`](./operations-runbook.md) 已同步更新
 
 ## 发布后
 
 - [ ] `package.json.version`、`CHANGELOG.md`、`sync-manifest.json.release.workflow_version` 三者一致
-- [ ] 三个 engine vendor 输出与 [`../CLAUDE.md`](../CLAUDE.md)、[`../AGENTS.md`](../AGENTS.md)、[`../GEMINI.md`](../GEMINI.md) 对齐
+- [ ] 三个 engine vendor 输出与 [`../CLAUDE.md`](../../../CLAUDE.md)、[`../AGENTS.md`](../../../AGENTS.md)、[`../GEMINI.md`](../../../GEMINI.md) 对齐
 - [ ] 同步脚本 `--check` 通过，且无额外漂移
 - [ ] 发布记录已回填到运行手册或发布说明
 
@@ -53,5 +53,5 @@
 
 1. 回退 `workflow/*.yaml` 或相关 runtime 代码
 2. 重新生成并覆盖 vendor 文档
-3. 重新校正 [`../sync-manifest.json`](../sync-manifest.json) 的边界声明
-4. 在 [`../CHANGELOG.md`](../CHANGELOG.md) 追加回滚说明
+3. 重新校正 [`../sync-manifest.json`](../../../sync-manifest.json) 的边界声明
+4. 在 [`../CHANGELOG.md`](../../../CHANGELOG.md) 追加回滚说明

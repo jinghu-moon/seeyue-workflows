@@ -156,6 +156,45 @@ function normalizeStringList(value) {
   return Array.from(new Set(items));
 }
 
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+  return false;
+}
+
+function normalizeTddException(value) {
+  const record = asObject(value);
+  if (Object.keys(record).length === 0) {
+    return null;
+  }
+  return {
+    reason: String(record.reason || "").trim(),
+    alternative_verification: String(record.alternative_verification || "").trim(),
+    user_approved: normalizeBoolean(record.user_approved),
+  };
+}
+
+function normalizeScopeTarget(value) {
+  const trimmed = String(value || "").trim().replace(/`/g, "").replace(/\\/g, "/");
+  if (!trimmed) {
+    return null;
+  }
+  if (!/^[A-Za-z0-9_./-]+$/.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
 function formatTaggedLines(tag, label, reason, extraLines) {
   const lines = [`[${tag}] ${label}: ${reason}`];
   for (const line of normalizeInstructions(extraLines)) {
@@ -475,6 +514,8 @@ function buildPolicyContext(state, cwd, filePath) {
   const snapshot = state.runtimeReady ? state.snapshot : null;
   const redEvidence = snapshot ? findLatestRedEvidence(snapshot, state.activeNodeId) : null;
   const approvalGranted = snapshot ? hasApprovedWriteGrant(snapshot, targetPath, fileClass) : false;
+  const tddException = snapshot ? normalizeTddException(snapshot.activeNode?.tdd_exception) : null;
+  const tddExceptionActive = Boolean(tddException);
 
   return {
     specs,
@@ -482,6 +523,8 @@ function buildPolicyContext(state, cwd, filePath) {
     fileClass,
     snapshot,
     redEvidence,
+    tddException,
+    tddExceptionActive,
     actionContext: {
       targetPath,
       fileClass,
@@ -491,7 +534,7 @@ function buildPolicyContext(state, cwd, filePath) {
       verificationPassed: false,
       changeIsAuditable: true,
       approvalGranted,
-      tddExceptionActive: false,
+      tddExceptionActive,
       touchesAuthOrSecurity: fileClass === "security_boundary",
       touchesSchemaOrPublicApi: ["critical_policy_file", "security_boundary"].includes(fileClass),
       touchesDataMigration: false,
@@ -590,26 +633,180 @@ function handlePretoolWrite(payload) {
   }
 
   const state = loadWorkflowState(cwd, policy);
+  const policyContext = filePath ? buildPolicyContext(state, cwd, filePath) : null;
+  const targetPath = policyContext?.targetPath || filePath;
+  const fileClass = policyContext?.fileClass || null;
+  const isRuntimeStateFile = Boolean(targetPath && String(targetPath).startsWith(".ai/"));
+  const isEvidenceFile = filePath ? /\.(md|jsonl|json|yaml|yml|txt|log)$/i.test(filePath) : false;
+
+  if (filePath && !fileClass && !isRuntimeStateFile) {
+    return buildBlockResult(
+      "sy-pretool-write/gate1-file-class",
+      "无法识别文件分类，拒绝写入",
+      [
+        `file: ${filePath}`,
+        "请先补充 workflow/file-classes.yaml 的匹配规则，再继续写入。",
+      ],
+    );
+  }
+
+  if (state.runtimeReady && approvalQueueExceeded(state.snapshot?.session || {})) {
+    return buildBlockResult(
+      "sy-pretool-write/gate1-approval-queue",
+      "审批队列超过上限，拒绝写入",
+      [
+        `pending_count: ${state.snapshot?.session?.approvals?.pending_count ?? "unknown"}`,
+        `max_pending_approvals: ${state.snapshot?.session?.loop_budget?.max_pending_approvals ?? "unknown"}`,
+        "请先处理待审批项或调整预算上限。",
+      ],
+    );
+  }
+
+  const shouldValidateRuntime =
+    Boolean(
+      state.runtimeReady
+      && state.snapshot
+      && filePath
+      && isProductionCode(filePath)
+      && !isRuntimeStateFile
+      && fileClass
+      && !["docs_file", "test_file"].includes(fileClass),
+    );
+
+  if (shouldValidateRuntime) {
+    const session = state.snapshot.session || {};
+    const activeNode = state.snapshot.activeNode || null;
+    const phaseCurrent = String(session?.phase?.current || "").trim();
+    const phaseStatus = String(session?.phase?.status || "").trim().toLowerCase();
+    if (!phaseCurrent || !phaseStatus) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-phase",
+        "运行态 phase 信息缺失，禁止写入生产代码",
+        [
+          `file: ${filePath}`,
+          "要求：session.phase.current 与 session.phase.status 必须完整。",
+        ],
+      );
+    }
+    if (phaseStatus === "completed") {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-phase",
+        "当前 phase 已完成，禁止继续写入生产代码",
+        [
+          `file: ${filePath}`,
+          `phase: ${phaseCurrent} (${phaseStatus})`,
+        ],
+      );
+    }
+    if (!session?.node || session.node.active_id === undefined || session.node.active_id === null) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-node",
+        "运行态 active node 信息缺失，禁止写入生产代码",
+        [
+          `file: ${filePath}`,
+          "要求：session.node.active_id 必须存在。",
+        ],
+      );
+    }
+    if (!activeNode) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-node",
+        "当前没有 active node，禁止写入生产代码",
+        [
+          `file: ${filePath}`,
+          `phase: ${phaseCurrent} (${phaseStatus})`,
+          "要求：先进入有效 node 再写入生产代码。",
+        ],
+      );
+    }
+    const nodeStatus = String(activeNode.status || "").toLowerCase();
+    if (!["in_progress", "blocked", "review"].includes(nodeStatus)) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-node",
+        "当前 node 状态不允许写入生产代码",
+        [
+          `file: ${filePath}`,
+          `node: ${activeNode.id || "unknown"} (${nodeStatus || "unknown"})`,
+          "允许状态：in_progress | blocked | review。",
+        ],
+      );
+    }
+    if (activeNode.phase_id && phaseCurrent && activeNode.phase_id !== phaseCurrent) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-phase",
+        "node.phase_id 与 session.phase.current 不一致，禁止写入生产代码",
+        [
+          `file: ${filePath}`,
+          `node.phase_id: ${activeNode.phase_id}`,
+          `session.phase.current: ${phaseCurrent}`,
+        ],
+      );
+    }
+  }
+
+  let scopeDrift = false;
+  if (shouldValidateRuntime) {
+    const activeNode = state.snapshot.activeNode || null;
+    const target = normalizeScopeTarget(activeNode?.target);
+    if (target) {
+      const inside = isInsideTarget(filePath, target, cwd);
+      if (inside === false) {
+        scopeDrift = true;
+      }
+    }
+  }
 
   if (cfg.tddGateEnabled !== false && filePath && isProductionCode(filePath)) {
     if (state.runtimeReady && state.snapshot && state.snapshot.activeNode) {
       const activeNode = state.snapshot.activeNode;
       const tddState = String(activeNode.tdd_state || state.fields.node_state || "").toLowerCase();
       if (activeNode.tdd_required === true) {
-        if (!V4_RED_READY_STATES.has(tddState)) {
-          return blockForMissingRed(filePath, activeNode.id, tddState);
+        const tddException = policyContext?.tddException || null;
+        if (tddException) {
+          const missing = [];
+          if (!tddException.reason) {
+            missing.push("reason");
+          }
+          if (!tddException.alternative_verification) {
+            missing.push("alternative_verification");
+          }
+          if (!tddException.user_approved) {
+            missing.push("user_approved=true");
+          }
+          if (missing.length > 0) {
+            return buildBlockResult(
+              "sy-pretool-write/gate2-tdd-exception",
+              "TDD 例外记录不完整或未获批准，禁止写入生产代码",
+              [
+                filePath ? `文件：${filePath}` : "",
+                `节点：${activeNode.id || "unknown"}`,
+                `缺少字段：${missing.join(", ")}`,
+                "要求：补齐 reason / alternative_verification，并设置 user_approved=true。",
+              ].filter(Boolean),
+            );
+          }
         }
+        const tddExceptionApproved = Boolean(
+          tddException
+          && tddException.user_approved === true
+          && tddException.reason
+          && tddException.alternative_verification,
+        );
+        if (!tddExceptionApproved) {
+          if (!V4_RED_READY_STATES.has(tddState)) {
+            return blockForMissingRed(filePath, activeNode.id, tddState);
+          }
 
-        const policyContext = buildPolicyContext(state, cwd, filePath);
-        const verdict = evaluatePolicy({
-          session: state.snapshot.session,
-          taskGraph: state.snapshot.taskGraph,
-          actionContext: policyContext.actionContext,
-          specs: policyContext.specs,
-        });
+          const verdict = evaluatePolicy({
+            session: state.snapshot.session,
+            taskGraph: state.snapshot.taskGraph,
+            actionContext: policyContext.actionContext,
+            specs: policyContext.specs,
+          });
 
-        if (policyContext.redEvidence && (verdict.primary_reason === "invalid_red" || verdict.test_gates?.pre_write_block === true)) {
-          return blockForInvalidRed(filePath, activeNode.id, policyContext.redEvidence);
+          if (policyContext.redEvidence && (verdict.primary_reason === "invalid_red" || verdict.test_gates?.pre_write_block === true)) {
+            return blockForInvalidRed(filePath, activeNode.id, policyContext.redEvidence);
+          }
         }
       }
     } else if (state.exists && state.phase === "execute" && state.fields) {
@@ -629,8 +826,7 @@ function handlePretoolWrite(payload) {
     }
   }
 
-  if (filePath) {
-    const policyContext = buildPolicyContext(state, cwd, filePath);
+  if (policyContext) {
     const verdict = evaluatePolicy({
       session: state.snapshot?.session || {},
       taskGraph: state.snapshot?.taskGraph || {},
@@ -639,12 +835,28 @@ function handlePretoolWrite(payload) {
     });
 
     if (verdict.approval?.required === true && verdict.approval?.resolved !== true) {
+      const approvalLines = buildApprovalLines(policyContext.targetPath, verdict);
+      if (scopeDrift) {
+        approvalLines.push(`注意：写入路径不在当前 node.target 范围内 (${state.snapshot?.activeNode?.target || "unknown"})。`);
+      }
       return buildBlockResult(
         "sy-pretool-write/gate3-approval",
         "需要人工审批后才能继续写入",
-        buildApprovalLines(policyContext.targetPath, verdict),
+        approvalLines,
       );
     }
+  }
+
+  if (scopeDrift) {
+    return buildBlockResult(
+      "sy-pretool-write/gate3-scope",
+      "写入路径超出当前 node.target 约束范围",
+      [
+        `file: ${filePath}`,
+        `target: ${state.snapshot?.activeNode?.target || "unknown"}`,
+        "如需调整范围：请先更新 node.target 或通过检查点声明范围扩展。",
+      ],
+    );
   }
 
   if (content) {
@@ -680,7 +892,6 @@ function handlePretoolWrite(payload) {
     }
   }
 
-  const isEvidenceFile = /\.(md|jsonl|json|yaml|yml|txt|log)$/i.test(filePath);
   if (!isEvidenceFile && filePath) {
     const debugState = loadDebugState(state.fields);
     if (debugState.active && debugState.phase !== null && debugState.phase < 5) {
@@ -699,7 +910,6 @@ function handlePretoolWrite(payload) {
   }
 
   if (shouldCreatePreDestructiveCheckpoint(state, cwd, filePath)) {
-    const policyContext = buildPolicyContext(state, cwd, filePath);
     try {
       ensurePreDestructiveCheckpoint(cwd, {
         actor: "hook",
@@ -1735,6 +1945,7 @@ function handlePretoolBash(payload) {
   const state = loadWorkflowState(cwd, policy);
   const specs = getWorkflowSpecs();
   const approvalGranted = Boolean(commitAuthorized || pushAuthorized || hasApprovedCommandGrant(state.snapshot, command, commandClass));
+  const tddExceptionActive = Boolean(state.runtimeReady && normalizeTddException(state.snapshot?.activeNode?.tdd_exception));
 
   const verdict = evaluatePolicy({
     session: state.snapshot?.session || {},
@@ -1747,7 +1958,7 @@ function handlePretoolBash(payload) {
       verificationPassed: false,
       changeIsAuditable: true,
       approvalGranted,
-      tddExceptionActive: false,
+      tddExceptionActive,
       touchesAuthOrSecurity: commandClass === "privileged",
       touchesSchemaOrPublicApi: commandClass === "schema_mutation",
       touchesDataMigration: commandClass === "data_mutation",
@@ -2045,6 +2256,66 @@ function getCompletedNodeIds(state) {
   return [lastCompletedNode];
 }
 
+function numericOrNull(value) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : null;
+}
+
+function runtimeFieldsCompleteForStop(session, activePhase, activeNode) {
+  if (!session || typeof session !== "object") {
+    return false;
+  }
+  if (!session.run_id || !session?.phase?.current || !session?.phase?.status) {
+    return false;
+  }
+  if (!session?.node || !session.node.owner_persona) {
+    return false;
+  }
+  if (session.node.active_id === undefined || session.node.active_id === null) {
+    return false;
+  }
+  if (session.node.active_id !== "none" && !activeNode) {
+    return false;
+  }
+  if (!activePhase) {
+    return false;
+  }
+  if (!session?.timestamps?.updated_at) {
+    return false;
+  }
+  const budget = session.loop_budget;
+  if (!budget) {
+    return false;
+  }
+  if (numericOrNull(budget.max_nodes) === null || numericOrNull(budget.max_failures) === null || numericOrNull(budget.max_pending_approvals) === null) {
+    return false;
+  }
+  return true;
+}
+
+function approvalQueueExceeded(session) {
+  const pendingCount = numericOrNull(session?.approvals?.pending_count);
+  const maxPending = numericOrNull(session?.loop_budget?.max_pending_approvals);
+  if (pendingCount === null || maxPending === null) {
+    return false;
+  }
+  return pendingCount > maxPending;
+}
+
+function loopBudgetExceeded(session) {
+  const consumedNodes = numericOrNull(session?.loop_budget?.consumed_nodes);
+  const maxNodes = numericOrNull(session?.loop_budget?.max_nodes);
+  const consumedFailures = numericOrNull(session?.loop_budget?.consumed_failures);
+  const maxFailures = numericOrNull(session?.loop_budget?.max_failures);
+  if (consumedNodes !== null && maxNodes !== null && consumedNodes > maxNodes) {
+    return true;
+  }
+  if (consumedFailures !== null && maxFailures !== null && consumedFailures > maxFailures) {
+    return true;
+  }
+  return false;
+}
+
 function handleStop(payload) {
   const cwd = resolveCwd(payload);
   const { policy } = loadPolicy(cwd);
@@ -2132,6 +2403,21 @@ function runStopGates(cwd, policy, cfg) {
   }
 
   const failures = [];
+
+  if (state.runtimeReady && state.snapshot) {
+    const session = asObject(state.snapshot.session);
+    const activePhase = state.snapshot.activePhase;
+    const activeNode = state.snapshot.activeNode;
+    if (!runtimeFieldsCompleteForStop(session, activePhase, activeNode)) {
+      failures.push("runtime 状态字段不完整（phase/node/budget/timestamps）");
+    }
+    if (approvalQueueExceeded(session)) {
+      failures.push("审批队列超过 max_pending_approvals");
+    }
+    if (loopBudgetExceeded(session)) {
+      failures.push("循环预算耗尽（max_nodes 或 max_failures 已超限）");
+    }
+  }
 
   if (state.phase === "plan") {
     if (!state.fields?.updated_at) {

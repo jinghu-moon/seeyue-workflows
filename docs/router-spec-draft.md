@@ -2,7 +2,8 @@
 
 状态：人类审阅稿  
 定位：用于后续翻译成 `workflow/router.spec.yaml` 的逻辑草案  
-说明：本文件面向人类审核，不是最终机器规格
+说明：本文件面向人类审核，不是最终机器规格  
+现状：现行实现以 `workflow/router.spec.yaml` 与 `scripts/runtime/router.cjs` 为准，本文件已按实现收敛
 
 ## 1. 文档目标
 
@@ -51,24 +52,22 @@ Router 不负责：
 
 Router 每次决策至少读取以下输入：
 
-- `session`
+- `session`（包含 approvals / recovery / loop_budget 字段）
 - `task_graph`
 - `sprint_status`
-- `journal` 最近事件摘要
-- 当前 `approval` 状态
-- 当前 `recovery` 状态
-- 当前预算状态
-- 当前 validator / policy verdict
-- capability / persona binding 信息
+- `validator_verdict`
+- `policy_verdict`
 
 建议输入来源：
 
 - `session.yaml`
 - `task-graph.yaml`
 - `sprint-status.yaml`
-- `journal.jsonl`
-- `workflow/persona-bindings.yaml`
-- 后续可选：`workflow/capabilities.yaml`
+
+现行实现暂不直接消费（保留为可扩展输入）：
+
+- `journal` 最近事件摘要
+- capability / persona binding 信息
 
 原则：
 
@@ -132,26 +131,25 @@ Router 每轮必须至少产出：
 
 ## 6. 全局阻塞条件（Global Blockers）
 
-Router 在尝试推进前，必须先检查以下 blocker：
+Router 在尝试推进前，必须先检查以下 blocker（与现行实现一致）：
 
-- 存在 `pending approval`
-- 存在 `restore_pending`
-- 预算耗尽
-- runtime 状态不完整
-- validator 返回失败
-- 当前 node 处于 `failed`
-- 当前 review 结论为 `rework` 或 `fail`
-- 当前 phase 的前置 phase 未完成
-- 当前 node 的前置 node 未完成
+- `validator_verdict.valid=false`（包含 runtime 字段缺失与审批队列超限）
+- `session.approvals.pending=true`
+- `session.recovery.restore_pending=true`
+- `policy_verdict.route_effect=require_human`
+- 预算耗尽（nodes 或 failures 超限）
+- 当前 phase 依赖未满足
+- 当前 node review 失败（rework / fail）
+- 当前 node 失败且无可用恢复路径
 
 建议 blocker 优先级从高到低：
 
 1. 状态非法 / validator fail
-2. 恢复阻塞
-3. 审批阻塞
+2. 审批阻塞（pending 或 policy require_human）
+3. 恢复阻塞
 4. 预算阻塞
 5. review 阻塞
-6. phase / node 依赖未满足
+6. phase 依赖未满足
 
 规则：
 
@@ -436,14 +434,18 @@ V4 建议固定 review 顺序：
 
 ### 11.2 生成优先级
 
-建议按以下优先级生成：
+当前实现按以下顺序生成（从高到低）：
 
-1. 恢复动作
-2. 审批动作
-3. 当前 active node 的下一步
-4. 当前 phase 中可进入的下一个 node
-5. 下一个可进入 phase
-6. 人工介入建议
+1. `invalid_state`（validator 失败）
+2. `approval_pending`
+3. `restore_pending`
+4. `policy_verdict.route_effect=require_human`
+5. `budget_exhausted`
+6. active node 继续 / 重试 / review handoff
+7. phase 完成推进
+8. stop gate 终止 handoff
+9. ready node 启动
+10. 无可执行节点的人类介入
 
 ### 11.3 推荐项 Machine Schema
 
@@ -526,11 +528,12 @@ recommended_next:
 
 ## 13. Budget 路由规则
 
-Router 必须检查三类预算：
+Router 当前直接检查两类预算：
 
 - 节点预算
 - 失败预算
-- 审批队列预算
+
+审批队列预算（`pending_count`）由 validator 归入 `invalid_state`，在全局阻塞阶段处理。
 
 ### 13.1 `BudgetAvailable()` 判定
 
@@ -538,7 +541,6 @@ Router 必须检查三类预算：
 
 - `consumed_nodes < max_nodes`
 - `consumed_failures < max_failures`
-- `pending_count <= max_pending_approvals`
 
 ### 13.2 预算耗尽后的行为
 

@@ -82,7 +82,7 @@
 3. Hook 脚本实现：`scripts/hooks/*.cjs` 仅做物理拦截与最小逻辑，禁止直接读写 runtime 状态，必须通过 Hook Client。
 4. Adapter 输出：`scripts/adapters/compile-adapter.cjs` 生成 `.claude/settings.json`、`.gemini/settings.json`、`.codex/config.toml`，并写出 `.ai/workflow/capability-gap.json`。
 5. 验证与回归：`tests/hooks/run-v4-fixtures.cjs`、`tests/hooks/sy-hooks-smoke.cjs`、`tests/e2e/run-engine-conformance.cjs --all`。
-6. 发布检查：`docs/release-checklist.md` 与 `sync-manifest.json` 对齐发布与同步边界。
+6. 发布检查：`docs/archive/implemented/release-checklist.md` 与 `sync-manifest.json` 对齐发布与同步边界。
 
 ## Hook 运行顺序
 

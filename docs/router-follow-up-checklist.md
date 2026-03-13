@@ -45,6 +45,25 @@
 - true multi-active-node scheduling
 - parallel phase execution
 
+## 2.4 当前落地情况（对照实现）
+
+- R1：已落地（`workflow/router.spec.yaml` 内已有 `PhaseReady/PhaseDone/NodeReady/NodeDone`）
+- R2：已落地（`recommended_next` 机器 schema 已定义并被路由输出使用）
+- R3：已落地（`next_capability` 已在路由输出与实现中使用）
+- R4：已落地（`ready_set_ordering` + 实现中基于 `priority` 排序与稳定 tie-breaker）
+- R5：已落地（`condition` 已入 schema，路由实现支持最小表达式）
+- R6：部分落地（`phase_completed` 已发出，`node_bypassed` 仍未在路由输出中触发）
+- C1：已落地（`workflow/capabilities.yaml` + `spec-validator` 校验）
+- C2：已落地（能力层已与具体 tool schema 解耦）
+- E1：未落地（尚无 `execution.spec` 或 node inputs/actions/outputs schema）
+- P1：已落地（`retry_policy` 已在 policy + runtime 中生效）
+- P2：已落地（`timeout_policy` 已在 policy + scheduler/router 中生效）
+- P3：已落地（policy 中已区分可重试失败类型）
+- O1：已落地（`route_basis` 已输出）
+- F1：未落地（未支持多 active node）
+- F2：未落地（未支持 phase 并行）
+- F3：未落地（`numeric route score` 仍禁用）
+
 ## 3. 任务清单
 
 | ID | 优先级 | 任务 | 目标文件 | 说明 |

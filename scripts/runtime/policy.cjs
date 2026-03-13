@@ -149,7 +149,22 @@ function isTestGateRequired(node, actionContext) {
   return Boolean(actionContext.behaviorChange);
 }
 
-function validateRedGate(node, actionContext) {
+function normalizeFailureKindList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+}
+
+function getRedGateDefaults(policySpec) {
+  const redGate = policySpec?.test_policy?.red_gate || {};
+  return {
+    accepted: normalizeFailureKindList(redGate.accepted_failure_kinds),
+    rejected: normalizeFailureKindList(redGate.rejected_failure_kinds),
+  };
+}
+
+function validateRedGate(node, actionContext, policySpec) {
   const evidence = actionContext.redEvidence;
   if (!evidence) {
     return {
@@ -159,15 +174,21 @@ function validateRedGate(node, actionContext) {
       pre_write_block: false,
     };
   }
+  const defaults = getRedGateDefaults(policySpec);
   const contract = node?.test_contract?.red_expectation || { allowed_failure_kinds: [], rejected_failure_kinds: [] };
   const allowedExitCodes = Array.isArray(contract.allowed_exit_codes) && contract.allowed_exit_codes.length > 0 ? contract.allowed_exit_codes : [1];
-  const rejectedKinds = new Set(contract.rejected_failure_kinds || []);
+  const allowedKinds = normalizeFailureKindList(contract.allowed_failure_kinds);
+  const effectiveAllowed = allowedKinds.length > 0 ? allowedKinds : defaults.accepted;
+  const rejectedKinds = new Set([
+    ...normalizeFailureKindList(contract.rejected_failure_kinds),
+    ...defaults.rejected,
+  ]);
   const valid =
     evidence.executed === true &&
     evidence.testFailed === true &&
     evidence.recorded === true &&
     !rejectedKinds.has(evidence.failureKind) &&
-    (contract.allowed_failure_kinds || []).includes(evidence.failureKind) &&
+    effectiveAllowed.includes(evidence.failureKind) &&
     allowedExitCodes.includes(evidence.exitCode);
   return {
     observed: true,
@@ -241,7 +262,7 @@ function validateCoverageGate(node, session, actionContext) {
   };
 }
 
-function buildTestGates(session, node, actionContext) {
+function buildTestGates(session, node, actionContext, policySpec) {
   const required = isTestGateRequired(node, actionContext);
   if (!required) {
     return {
@@ -254,7 +275,7 @@ function buildTestGates(session, node, actionContext) {
       reasons: [],
     };
   }
-  const red = validateRedGate(node, actionContext);
+  const red = validateRedGate(node, actionContext, policySpec);
   const green = validateGreenGate(actionContext);
   const behavior = validateBehaviorGate(node, actionContext);
   const coverage = validateCoverageGate(node, session, actionContext);
@@ -517,7 +538,7 @@ function evaluatePolicy(input) {
   const specs = input.specs || {};
   const node = getActiveNode(session, taskGraph) || (Array.isArray(taskGraph.nodes) ? taskGraph.nodes[0] : null);
   const approval = buildApprovalVerdict(specs, actionContext);
-  const testGates = buildTestGates(session, node, actionContext);
+  const testGates = buildTestGates(session, node, actionContext, specs.policySpec || {});
   const retry = buildRetryVerdict(node, actionContext);
   const timeout = buildTimeoutVerdict(node, actionContext);
   const completion = buildCompletionVerdict(session, taskGraph, node, actionContext, testGates);

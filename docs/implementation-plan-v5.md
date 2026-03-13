@@ -17,25 +17,24 @@ Machine specs already present:
 - `workflow/persona-bindings.yaml`
 - `workflow/file-classes.yaml`
 - `workflow/approval-matrix.yaml`
+- `workflow/skills.spec.yaml`
+- `workflow/hook-contract.schema.yaml`
+- `workflow/validate-manifest.yaml`
+- `workflow/output-templates.spec.yaml`
+- `workflow/hooks.spec.yaml`
 - `docs/architecture-v4.md`
 - `docs/architecture-v5-proposal.md`
 
-Known gaps for V5:
+Execution status (as-is in this repo):
 
-- No Skills Registry (`workflow/skills.spec.yaml` missing).
-- No Hook IPC contract schema (`workflow/hook-contract.schema.yaml` missing).
-- Specs lack manifest-driven freeze gates (no `workflow/validate-manifest.yaml`).
-- No output template registry (`workflow/output-templates.spec.yaml` missing).
-- No output validation + persistence (`validate-output` + output.log missing).
-- Hook event coverage and stdout JSON contract are not enforced.
-- Policy mode mappings (plan/autoEdit/yolo) are not compiled.
-- Skill change detection / hot reload pipeline is missing.
-- Hook event matrix and capability-gap report not implemented.
-- Two-stage review enforcement not wired to policy kernel verdicts.
-- Output templates spec + output log validator not implemented.
-- Hooks still contain business logic and direct state reads.
-- `journal.jsonl` appends are not concurrency safe (`read → concat → atomicWrite`).
-- Adapter compiler does not yet emit routing/skill/policy in separate passes.
+- P1-P5 主要节点已落地（详见 `.ai/workflow/task-graph.yaml`）。
+- 本计划保留为执行记录与回溯参照，新增工作请以现行 specs 与 scripts 为准。
+
+Known gaps for V5 (remaining):
+
+- Hook contract 版本强校验仍需补齐（初始化阶段未强制拒绝版本不匹配）。
+- generated/seeded 边界的强制校验与回归用例仍需补强。
+- spec freeze gate 的强制流程化约束仍依赖人工触发校验。
 
 ---
 

@@ -562,18 +562,21 @@ L0 MUST implement at least:
 - write scope
 - TDD gate status
 - debug gate status
+- approval queue budget
 
 [RULE]
 `pre-bash` MUST classify commands into:
 - safe
 - verify
 - destructive
-- git-mutating
-- networked
+- git_mutating (alias: git-mutating)
+- network_sensitive (alias: networked)
 - privileged
+- schema_mutation
+- data_mutation
 
 [RULE]
-Destructive or git-mutating commands MUST require human approval.
+Destructive, git_mutating, network_sensitive, privileged, schema_mutation, or data_mutation commands MUST require human approval.
 
 [RULE]
 `post-write` MUST append journal events and invalidate stale code understanding artifacts when required.

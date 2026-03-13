@@ -11,18 +11,18 @@
 
 以下文件是机器事实源：
 
-- [runtime schema](../workflow/runtime.schema.yaml)
-- [router spec](../workflow/router.spec.yaml)
-- [policy spec](../workflow/policy.spec.yaml)
-- [capabilities](../workflow/capabilities.yaml)
-- [persona bindings](../workflow/persona-bindings.yaml)
-- [file classes](../workflow/file-classes.yaml)
-- [approval matrix](../workflow/approval-matrix.yaml)
-- [hooks spec](../workflow/hooks.spec.yaml)
-- [skills spec](../workflow/skills.spec.yaml)
-- [hook contract schema](../workflow/hook-contract.schema.yaml)
-- [validate manifest](../workflow/validate-manifest.yaml)
-- [output templates spec](../workflow/output-templates.spec.yaml)
+- [runtime schema](../../../workflow/runtime.schema.yaml)
+- [router spec](../../../workflow/router.spec.yaml)
+- [policy spec](../../../workflow/policy.spec.yaml)
+- [capabilities](../../../workflow/capabilities.yaml)
+- [persona bindings](../../../workflow/persona-bindings.yaml)
+- [file classes](../../../workflow/file-classes.yaml)
+- [approval matrix](../../../workflow/approval-matrix.yaml)
+- [hooks spec](../../../workflow/hooks.spec.yaml)
+- [skills spec](../../../workflow/skills.spec.yaml)
+- [hook contract schema](../../../workflow/hook-contract.schema.yaml)
+- [validate manifest](../../../workflow/validate-manifest.yaml)
+- [output templates spec](../../../workflow/output-templates.spec.yaml)
 
 这些文件定义：
 
@@ -50,23 +50,23 @@
 
 对外分发时，需要同步以下入口：
 
-- [Claude 入口](../CLAUDE.md)
-- [Codex 入口](../AGENTS.md)
-- [Gemini 入口](../GEMINI.md)
-- [Claude settings](../.claude/settings.json)
-- [Codex config](../.codex/config.toml)
-- [Gemini settings](../.gemini/settings.json)
-- [skill metadata](../.codex/skill-metadata.json)
+- [Claude 入口](../../../CLAUDE.md)
+- [Codex 入口](../../../AGENTS.md)
+- [Gemini 入口](../../../GEMINI.md)
+- [Claude settings](../../../.claude/settings.json)
+- [Codex config](../../../.codex/config.toml)
+- [Gemini settings](../../../.gemini/settings.json)
+- [skill metadata](../../../.codex/skill-metadata.json)
 
 对应 adapter 编译入口：
 
-- [claude adapter](../scripts/adapters/claude-code.cjs)
-- [codex adapter](../scripts/adapters/codex.cjs)
-- [gemini adapter](../scripts/adapters/gemini-cli.cjs)
+- [claude adapter](../../../scripts/adapters/claude-code.cjs)
+- [codex adapter](../../../scripts/adapters/codex.cjs)
+- [gemini adapter](../../../scripts/adapters/gemini-cli.cjs)
 
 ## 版本与同步
 
-发布与同步边界以 [`../sync-manifest.json`](../sync-manifest.json) 为准。
+发布与同步边界以 [`../sync-manifest.json`](../../../sync-manifest.json) 为准。
 版本关系说明见 [版本化策略](./versioning-policy.md)。
 
 同步时至少确认：
@@ -80,9 +80,9 @@
 
 建议按以下顺序理解系统：
 
-1. [V4 架构方案](./architecture-v4.md)
-2. [runtime schema](../workflow/runtime.schema.yaml)
-3. [router spec](../workflow/router.spec.yaml)
-4. [policy spec](../workflow/policy.spec.yaml)
+1. [V4 架构方案](../../architecture-v4.md)
+2. [runtime schema](../../../workflow/runtime.schema.yaml)
+3. [router spec](../../../workflow/router.spec.yaml)
+4. [policy spec](../../../workflow/policy.spec.yaml)
 5. [版本化策略](./versioning-policy.md)
 6. [运行手册](./operations-runbook.md)

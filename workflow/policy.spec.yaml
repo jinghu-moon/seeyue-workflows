@@ -206,6 +206,7 @@ test_policy:
     optional_fields:
     - stderr_pattern
     - error_type
+    - allowed_exit_codes
     write_block_behavior:
       pre_write_must_block_on_invalid_red: true
       environment_failure_must_not_count_as_red: true

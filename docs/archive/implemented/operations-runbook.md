@@ -1,4 +1,4 @@
-﻿# 运行手册
+# 运行手册
 
 ## 目标
 
@@ -13,19 +13,19 @@
 
 ### 最小巡检命令
 
-- [`../scripts/runtime/validate-specs.cjs`](../scripts/runtime/validate-specs.cjs)
-- [`../tests/hooks/sy-hooks-smoke.cjs`](../tests/hooks/sy-hooks-smoke.cjs)
-- [`../tests/runtime/run-engine-kernel.cjs`](../tests/runtime/run-engine-kernel.cjs)
-- [`../tests/runtime/run-transition-fixtures.cjs`](../tests/runtime/run-transition-fixtures.cjs)
-- [`../tests/runtime/run-coverage-adapter-fixtures.cjs`](../tests/runtime/run-coverage-adapter-fixtures.cjs)
-- [`../tests/runtime/run-report-builder-fixtures.cjs`](../tests/runtime/run-report-builder-fixtures.cjs)
-- [`../tests/output/run-output-template-fixtures.cjs`](../tests/output/run-output-template-fixtures.cjs)
-- [`../tests/output/run-output-log-fixtures.cjs`](../tests/output/run-output-log-fixtures.cjs)
-- [`../tests/output/run-output-contract-fixtures.cjs`](../tests/output/run-output-contract-fixtures.cjs)
-- [`../tests/runtime/run-context-fixtures.cjs`](../tests/runtime/run-context-fixtures.cjs)
-- [`../tests/runtime/run-recovery-fixtures.cjs`](../tests/runtime/run-recovery-fixtures.cjs)
-- [`../tests/runtime/run-bootstrap-fixtures.cjs`](../tests/runtime/run-bootstrap-fixtures.cjs)
-- [`../tests/e2e/run-engine-conformance.cjs`](../tests/e2e/run-engine-conformance.cjs)
+- [`../scripts/runtime/validate-specs.cjs`](../../../scripts/runtime/validate-specs.cjs)
+- [`../tests/hooks/sy-hooks-smoke.cjs`](../../../tests/hooks/sy-hooks-smoke.cjs)
+- [`../tests/runtime/run-engine-kernel.cjs`](../../../tests/runtime/run-engine-kernel.cjs)
+- [`../tests/runtime/run-transition-fixtures.cjs`](../../../tests/runtime/run-transition-fixtures.cjs)
+- [`../tests/runtime/run-coverage-adapter-fixtures.cjs`](../../../tests/runtime/run-coverage-adapter-fixtures.cjs)
+- [`../tests/runtime/run-report-builder-fixtures.cjs`](../../../tests/runtime/run-report-builder-fixtures.cjs)
+- [`../tests/output/run-output-template-fixtures.cjs`](../../../tests/output/run-output-template-fixtures.cjs)
+- [`../tests/output/run-output-log-fixtures.cjs`](../../../tests/output/run-output-log-fixtures.cjs)
+- [`../tests/output/run-output-contract-fixtures.cjs`](../../../tests/output/run-output-contract-fixtures.cjs)
+- [`../tests/runtime/run-context-fixtures.cjs`](../../../tests/runtime/run-context-fixtures.cjs)
+- [`../tests/runtime/run-recovery-fixtures.cjs`](../../../tests/runtime/run-recovery-fixtures.cjs)
+- [`../tests/runtime/run-bootstrap-fixtures.cjs`](../../../tests/runtime/run-bootstrap-fixtures.cjs)
+- [`../tests/e2e/run-engine-conformance.cjs`](../../../tests/e2e/run-engine-conformance.cjs)
 
 建议顺序：
 
@@ -130,7 +130,7 @@ npm run runtime:new-run -- --task-id "P4" --task-title "Start next verified run"
 
 ### Gemini 恢复桥
 
-Gemini CLI 可通过 [`../scripts/runtime/recovery-bridge.cjs`](../scripts/runtime/recovery-bridge.cjs) 回填 checkpoint。
+Gemini CLI 可通过 [`../scripts/runtime/recovery-bridge.cjs`](../../../scripts/runtime/recovery-bridge.cjs) 回填 checkpoint。
 
 命令：
 
@@ -146,7 +146,7 @@ node scripts/runtime/recovery-bridge.cjs --root "." --gemini-checkpoint "<checkp
 
 ### 上下文恢复
 
-使用 [`../scripts/runtime/context-manager.cjs`](../scripts/runtime/context-manager.cjs) 管理 capsule 与 handoff：
+使用 [`../scripts/runtime/context-manager.cjs`](../../../scripts/runtime/context-manager.cjs) 管理 capsule 与 handoff：
 
 - 生成 capsule
 - 更新 `resume_frontier`
@@ -172,26 +172,26 @@ node tests/runtime/run-context-fixtures.cjs
 
 相关实现：
 
-- [journal runtime](../scripts/runtime/journal.cjs)
-- [checkpoint runtime](../scripts/runtime/checkpoints.cjs)
-- [context manager](../scripts/runtime/context-manager.cjs)
-- [engine kernel](../scripts/runtime/engine-kernel.cjs)
+- [journal runtime](../../../scripts/runtime/journal.cjs)
+- [checkpoint runtime](../../../scripts/runtime/checkpoints.cjs)
+- [context manager](../../../scripts/runtime/context-manager.cjs)
+- [engine kernel](../../../scripts/runtime/engine-kernel.cjs)
 
 ### 关键拦截点
 
 日常审计时，重点核对以下拦截器：
 
-- [`../scripts/hooks/sy-pretool-write.cjs`](../scripts/hooks/sy-pretool-write.cjs)
-- [`../scripts/hooks/sy-pretool-bash.cjs`](../scripts/hooks/sy-pretool-bash.cjs)
-- [`../scripts/hooks/sy-stop.cjs`](../scripts/hooks/sy-stop.cjs)
-- [`../scripts/runtime/policy.cjs`](../scripts/runtime/policy.cjs)
+- [`../scripts/hooks/sy-pretool-write.cjs`](../../../scripts/hooks/sy-pretool-write.cjs)
+- [`../scripts/hooks/sy-pretool-bash.cjs`](../../../scripts/hooks/sy-pretool-bash.cjs)
+- [`../scripts/hooks/sy-stop.cjs`](../../../scripts/hooks/sy-stop.cjs)
+- [`../scripts/runtime/policy.cjs`](../../../scripts/runtime/policy.cjs)
 
 ## 变更与发布
 
 发生规范或 runtime 变更时，建议按以下顺序推进：
 
 1. 修改 `workflow/*.yaml`
-2. 运行 [`../scripts/runtime/validate-specs.cjs`](../scripts/runtime/validate-specs.cjs)
+2. 运行 [`../scripts/runtime/validate-specs.cjs`](../../../scripts/runtime/validate-specs.cjs)
 3. 更新 `scripts/runtime/*`
 4. 更新 `scripts/hooks/*` 与 `scripts/adapters/*`
 5. 跑回归
@@ -215,23 +215,23 @@ node tests/runtime/run-context-fixtures.cjs
 
 参考回归：
 
-- [`../tests/runtime/run-recovery-fixtures.cjs`](../tests/runtime/run-recovery-fixtures.cjs)
-- [`../tests/runtime/run-context-fixtures.cjs`](../tests/runtime/run-context-fixtures.cjs)
+- [`../tests/runtime/run-recovery-fixtures.cjs`](../../../tests/runtime/run-recovery-fixtures.cjs)
+- [`../tests/runtime/run-context-fixtures.cjs`](../../../tests/runtime/run-context-fixtures.cjs)
 
 ### 2. TDD 红门误拦截
 
 优先检查：
 
-- [`../workflow/policy.spec.yaml`](../workflow/policy.spec.yaml)
-- [`../scripts/hooks/sy-pretool-write.cjs`](../scripts/hooks/sy-pretool-write.cjs)
+- [`../workflow/policy.spec.yaml`](../../../workflow/policy.spec.yaml)
+- [`../scripts/hooks/sy-pretool-write.cjs`](../../../scripts/hooks/sy-pretool-write.cjs)
 - `journal.jsonl` 中是否已经记录 `red_recorded`
 
 ### 3. 多引擎输出不一致
 
 优先检查：
 
-- [`../tests/e2e/run-engine-conformance.cjs`](../tests/e2e/run-engine-conformance.cjs)
-- [`../tests/adapters/run-adapter-snapshots.cjs`](../tests/adapters/run-adapter-snapshots.cjs)
+- [`../tests/e2e/run-engine-conformance.cjs`](../../../tests/e2e/run-engine-conformance.cjs)
+- [`../tests/adapters/run-adapter-snapshots.cjs`](../../../tests/adapters/run-adapter-snapshots.cjs)
 - [版本化策略](./versioning-policy.md)
 
 如果 conformance 失败，先回到 source of truth 与 adapter compiler，再重新生成 vendor 输出。
