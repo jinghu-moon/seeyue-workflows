@@ -358,13 +358,19 @@ Each verified node MUST produce a capsule under `.ai/workflow/capsules/`.
 
 [RULE]
 A capsule MUST contain:
-- node identity
-- goal summary
-- touched files
-- interface changes
-- RED/GREEN/VERIFY evidence summary
-- active risks
-- next handoff notes
+- `capsule_id`
+- `persona`
+- `task_id`
+- `input_summary`
+- `constraints`
+- `evidence_refs`
+- `output_summary`
+- `verdict`
+- `context_budget_used`
+- `created_at`
+
+[RULE]
+Optional enrichments such as touched files, interface changes, and active risks MAY be embedded inside `input_summary` or `output_summary` until the capsule schema expands.
 
 [RULE]
 Personas MUST consume capsules by default instead of full transcript replay.
@@ -444,6 +450,9 @@ The minimum event set SHOULD include:
 - `session_stopped`
 - `session_resumed`
 - `validation_failed`
+
+[RULE]
+`node_bypassed` is RESERVED in Router V1. The journal schema MUST accept it, but Router V1 does not emit it unless conditional bypass reporting is explicitly enabled.
 
 [RULE]
 If a tool starts but no terminal event exists after interruption, recovery MUST synthesize an `aborted` terminal interpretation before resuming.
