@@ -456,16 +456,20 @@ Every autonomous run MUST define loop budgets before entering `execute`.
 [RULE]
 Loop budgets MUST include:
 - `max_nodes`
-- `max_minutes`
 - `max_failures`
 - `max_pending_approvals`
-- `max_context_utilization`
+
+[RULE]
+Context budgets MUST include:
+- `strategy`
+- `capsule_refresh_threshold`
+- `summary_required_after_turns`
 
 [RULE]
 The runtime SHOULD track `pending_count` and MUST stop autonomous progression when `pending_count > max_pending_approvals`.
 
 [RULE]
-The runtime MAY include optional budgets such as `max_cost` and `max_rework_cycles`.
+The runtime MAY include optional budgets such as `max_minutes`, `max_cost`, and `max_rework_cycles`.
 
 [RULE]
 Autonomous progression MUST stop when any mandatory budget is exceeded.
@@ -520,16 +524,23 @@ The runtime MUST use three context tiers:
 - Cold Context
 
 [RULE]
-Hot Context MUST contain only the active node capsule, current constraints, current diff summary, and latest evidence.
+Hot Context MUST contain the active capsule id, evidence refs, and recommended_next.
 
 [RULE]
-Warm Context SHOULD contain design summary, plan slice, active risks, and latest verdicts.
+Warm Context SHOULD contain task_id, verdict, and constraints.
 
 [RULE]
-Cold Context MUST contain full history, full journal, full index, old checkpoints, and old reports.
+Cold Context MUST contain journal_ref, checkpoints_dir, and capsules_dir.
 
 [RULE]
-When `context_utilization >= 0.80`, the runtime MUST compact before continuing autonomous execution.
+Compaction MUST be evaluated by context-manager using:
+- `context_utilization >= 0.80`
+- `turns_since_summary >= session.context_budget.summary_required_after_turns`
+- `turns_since_capsule >= session.context_budget.capsule_refresh_threshold`
+- explicit `force`
+
+[RULE]
+The runtime SHOULD invoke compaction checks before long autonomous continuation; compaction is explicit (not implicit) and requires a context-manager call.
 
 [RULE]
 Compaction MUST generate or refresh a capsule and MUST reduce prompt load to the minimum data needed for the next step.
@@ -563,6 +574,9 @@ L0 MUST implement at least:
 - TDD gate status
 - debug gate status
 - approval queue budget
+
+[RULE]
+Runtime state validation (phase/node/scope/TDD) applies only when runtime state is ready and the target is production code. For non-production writes, `pre-write` SHOULD still enforce protected-file, approval, secret, and debug gates.
 
 [RULE]
 `pre-bash` MUST classify commands into:
