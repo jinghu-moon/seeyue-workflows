@@ -1,7 +1,7 @@
 schema_kind: hook_contract_schema
 schema_version: 1
 schema_dialect: seeyue_workflow_schema/v1
-status: draft
+status: frozen
 owner: seeyue-workflows
 meta:
   purpose: Define V5 hook IPC envelopes, verdicts, and journal event contracts.

@@ -42,6 +42,13 @@ function parseArgs(argv) {
   return parsed;
 }
 
+function copyWorkflowFiles(rootDir) {
+  const sourceDir = path.join(projectRoot, "workflow");
+  const targetDir = path.join(rootDir, "workflow");
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.cpSync(sourceDir, targetDir, { recursive: true });
+}
+
 function writeLegacyFlatSession(rootDir) {
   const sessionPath = path.join(rootDir, ".ai", "workflow", "session.yaml");
   fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
@@ -84,6 +91,7 @@ function parseHookOutput(stdout) {
 }
 
 function buildStructuredRuntime(rootDir, overrides = {}) {
+  copyWorkflowFiles(rootDir);
   const session = makeBaseSession();
   const taskGraph = makeBaseTaskGraph();
   const sprintStatus = makeBaseSprintStatus();
@@ -458,12 +466,27 @@ function runApprovalRequestZhCnV2() {
 
 function runSessionStartNonblocking() {
   const rootDir = makeTempRoot("sy-hooks-v4-sessionstart-");
+  copyWorkflowFiles(rootDir);
   const result = runHook(rootDir, sessionStartHook, {
     cwd: rootDir,
   });
   const output = parseHookOutput(result.stdout);
   assert(result.code === 0, `expected SessionStart exit 0 but got exit=${result.code}`);
   assert(output.verdict === "allow" || output.verdict === "force_continue", `expected non-blocking verdict but got ${JSON.stringify(output)}`);
+}
+
+function runHookContractVersionMismatch() {
+  const rootDir = makeTempRoot("sy-hooks-v4-contract-mismatch-");
+  copyWorkflowFiles(rootDir);
+  const contractPath = path.join(rootDir, "workflow", "hook-contract.schema.yaml");
+  const mutated = fs.readFileSync(contractPath, "utf8").replace("schema_version: 1", "schema_version: 99");
+  fs.writeFileSync(contractPath, mutated, "utf8");
+
+  const result = runHook(rootDir, sessionStartHook, {
+    cwd: rootDir,
+  });
+  assert(result.code === 2, `expected contract mismatch to block but got exit=${result.code}`);
+  assert(/hook contract|schema_version|版本/i.test(result.stderr), `expected contract mismatch message but got ${JSON.stringify(result.stderr)}`);
 }
 
 function runStopManualRestoreRequiresHuman() {
@@ -943,6 +966,7 @@ const CASES = {
   "approval-request-zh-cn": runApprovalRequestZhCnV2,
   "budget-exhausted": runBudgetExhausted,
   "invalid-red-allows-write": runInvalidRedAllowsWrite,
+  "hook-contract-version-mismatch": runHookContractVersionMismatch,
   "legacy-flat-session-only": runLegacyFlatSessionOnly,
   "missing-journal-event-after-write": runMissingJournalEventAfterWrite,
   "prebash-approval-gate": runPrebashApprovalGate,

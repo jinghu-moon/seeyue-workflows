@@ -13,7 +13,7 @@ meta:
   - engine_adapters
   source_documents:
   - docs/architecture-v4.md
-  - docs/router-spec-draft.md
+  - docs/archive/outdated/router-spec-draft.md
 inputs:
   required_state:
   - .ai/workflow/session.yaml
@@ -345,6 +345,7 @@ event_emission:
   - node_completed
   - node_failed
   - node_timed_out
+  - node_bypassed
   - review_verdict_recorded
   - session_stopped
   - session_resumed
@@ -369,7 +370,6 @@ alignment_notes:
   - keep journal payload.route_decision and payload.route_basis aligned with router outputs
   - keep approval grant_scope separate from approval_mode
   not_in_router_v1:
-  - node_bypassed event emission for conditional nodes
   - full node action/input/output schema
   - advanced retry/backoff policy tuning
   - advanced timeout/deadline/SLA orchestration

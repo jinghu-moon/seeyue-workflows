@@ -59,14 +59,14 @@ specs:
     - workflow/hook-contract.schema.yaml
   workflow/hook-contract.schema.yaml:
     schema_kind: hook_contract_schema
-    status: draft
+    status: frozen
     schema_version: 1
     freeze_gate: P3-N1
     cross_refs:
     - workflow/output-templates.spec.yaml
   workflow/skills.spec.yaml:
     schema_kind: skills_spec
-    status: draft
+    status: frozen
     schema_version: 1
     freeze_gate: P4-N1
     cross_refs:

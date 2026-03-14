@@ -78,4 +78,6 @@ decision = "ask_user"
 priority = 800
 modes = ["default", "autoEdit"]
 # SY:GENERATED:END
-
+# SY:SEEDED:BEGIN
+# Add project-specific overrides below.
+# SY:SEEDED:END

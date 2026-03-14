@@ -825,7 +825,9 @@ function validateWorkflowSpecs(options = {}) {
 
   validateEnvelope(specs, manifestEntries, issues, freezeGate);
 
-  if (validateScope === "targeted" && requestedSpecs.length > 0) {
+  if (validateScope === "envelope") {
+    // Envelope-only validation (schema metadata + freeze gate), no deep spec checks.
+  } else if (validateScope === "targeted" && requestedSpecs.length > 0) {
     const targetSet = new Set(requestedSpecs.map(normalizeSpecPath));
     for (const [specPath, spec] of specs.entries()) {
       if (!targetSet.has(specPath)) {

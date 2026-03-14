@@ -52,7 +52,7 @@
 - R3：已落地（`next_capability` 已在路由输出与实现中使用）
 - R4：已落地（`ready_set_ordering` + 实现中基于 `priority` 排序与稳定 tie-breaker）
 - R5：已落地（`condition` 已入 schema，路由实现支持最小表达式）
-- R6：部分落地（`phase_completed` 已发出，`node_bypassed` 仍未在路由输出中触发）
+- R6：已落地（`phase_completed` 与 `node_bypassed` 已在路由输出中触发，并进入 journal）
 - C1：已落地（`workflow/capabilities.yaml` + `spec-validator` 校验）
 - C2：已落地（能力层已与具体 tool schema 解耦）
 - E1：未落地（尚无 `execution.spec` 或 node inputs/actions/outputs schema）

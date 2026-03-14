@@ -8,6 +8,7 @@ const { appendEvent } = require("./journal.cjs");
 const { getNodeById } = require("./runtime-state.cjs");
 const { runEngineKernel } = require("./engine-kernel.cjs");
 const {
+  listCapsules,
   readSession,
   readSprintStatus,
   readTaskGraph,
@@ -53,6 +54,15 @@ function resolveActiveReviewNode(session, taskGraph, nodeId) {
   return node;
 }
 
+function requireReviewHandoffCapsule(rootDir, persona) {
+  const capsules = listCapsules(rootDir);
+  const latest = capsules.find((entry) => entry.persona === persona);
+  const constraints = Array.isArray(latest?.constraints) ? latest.constraints : [];
+  if (!latest || !constraints.includes("review_isolation")) {
+    throw new Error(`REVIEW_HANDOFF_REQUIRED missing review handoff capsule for ${persona || "unknown"}`);
+  }
+}
+
 function resolveReviewVerdict(rootDir, options = {}) {
   const decision = String(options.decision || "").trim().toLowerCase();
   if (!ALLOWED_DECISIONS.has(decision)) {
@@ -79,6 +89,7 @@ function resolveReviewVerdict(rootDir, options = {}) {
   if (activePersona !== persona) {
     throw new Error(`review persona mismatch: expected ${activePersona || "none"} but got ${persona}`);
   }
+  requireReviewHandoffCapsule(rootDir, persona);
 
   const reviewField = reviewFieldForPersona(persona);
   const currentVerdict = String(targetNode?.review_state?.[reviewField] || "pending").trim();

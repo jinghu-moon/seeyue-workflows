@@ -7,6 +7,60 @@ const { getActivePhase, getActiveNode } = require("./runtime-state.cjs");
 const { deriveRuntimeSignals } = require("./scheduler.cjs");
 const { loadWorkflowSpecs } = require("./workflow-specs.cjs");
 
+const ISSUE_SEVERITY = {
+  session_missing: "fail",
+  task_graph_missing: "fail",
+  sprint_status_missing: "fail",
+  active_phase_missing: "fail",
+  active_node_missing: "fail",
+  approval_queue_exceeded: "rework",
+  multi_active_phase_not_supported: "rework",
+  multi_active_node_not_supported: "rework",
+  parallel_group_not_supported_v1: "rework",
+};
+
+function issueSeverity(issue) {
+  return ISSUE_SEVERITY[issue] || "fail";
+}
+
+function buildValidatorVerdict(issues) {
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return {
+      verdict: "PASS",
+      issues: [],
+      issue_summary: [],
+    };
+  }
+  const issueSummary = issues.map((issue) => ({ code: issue, severity: issueSeverity(issue) }));
+  const severities = issueSummary.map((entry) => entry.severity);
+  if (severities.includes("fail")) {
+    return {
+      verdict: "FAIL",
+      issues,
+      issue_summary: issueSummary,
+    };
+  }
+  if (severities.includes("rework")) {
+    return {
+      verdict: "REWORK",
+      issues,
+      issue_summary: issueSummary,
+    };
+  }
+  if (severities.includes("concerns")) {
+    return {
+      verdict: "CONCERNS",
+      issues,
+      issue_summary: issueSummary,
+    };
+  }
+  return {
+    verdict: "FAIL",
+    issues,
+    issue_summary: issueSummary,
+  };
+}
+
 function validateRuntimeState(session, taskGraph, sprintStatus) {
   const issues = [];
   if (!session || typeof session !== "object") {
@@ -47,10 +101,7 @@ function validateRuntimeState(session, taskGraph, sprintStatus) {
       issues.push("parallel_group_not_supported_v1");
     }
   }
-  return {
-    valid: issues.length === 0,
-    issues,
-  };
+  return buildValidatorVerdict(issues);
 }
 
 function buildNodeSummary(taskGraph) {

@@ -151,7 +151,7 @@ const cases = {
         repair_count: 1,
       },
       decision: {
-        validator_verdict: { valid: true },
+        validator_verdict: { verdict: "PASS" },
         policy_verdict: { completion: { node_complete_ready: true } },
       },
       verification: {
@@ -197,4 +197,3 @@ function main() {
 }
 
 main();
-

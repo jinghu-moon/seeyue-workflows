@@ -34,7 +34,15 @@ function buildResult(base) {
     block_reason: base.block_reason || null,
     route_basis: base.route_basis,
     emit_events: base.emit_events || [],
+    bypassed_nodes: base.bypassed_nodes || [],
   };
+}
+
+function validatorBlocks(validatorVerdict) {
+  if (!validatorVerdict || typeof validatorVerdict !== "object") {
+    return false;
+  }
+  return ["REWORK", "FAIL"].includes(String(validatorVerdict.verdict));
 }
 
 function requestApprovalNext(target, reason, policyVerdict) {
@@ -145,24 +153,44 @@ function phaseDependencySatisfied(taskGraph, dependencyId, currentPhaseId, curre
   return areDependenciesCompleted(taskGraph, [dependencyId]);
 }
 
-function readyNodes(taskGraph, activePhaseId, context) {
-  return listPhaseNodes(taskGraph, activePhaseId)
+function collectReadyNodes(taskGraph, activePhaseId, context, routeBasis) {
+  const candidates = listPhaseNodes(taskGraph, activePhaseId)
     .filter((node) => node.status === "ready")
-    .filter((node) => areDependenciesCompleted(taskGraph, node.depends_on))
-    .filter((node) => !node.condition || evaluateStateExpression(node.condition.expression, context))
-    .sort((left, right) => {
-      if (priorityRank(left.priority) !== priorityRank(right.priority)) {
-        return priorityRank(left.priority) - priorityRank(right.priority);
-      }
-      return left.id.localeCompare(right.id);
-    });
+    .filter((node) => areDependenciesCompleted(taskGraph, node.depends_on));
+  const readyNodes = [];
+  const bypassedNodes = [];
+
+  for (const node of candidates) {
+    if (!node.condition) {
+      readyNodes.push(node);
+      continue;
+    }
+    const conditionPassed = evaluateStateExpression(node.condition.expression, context);
+    if (routeBasis) {
+      routeBasis.node_checks.push(`condition:${node.id}=${conditionPassed ? "true" : "false"}`);
+    }
+    if (!conditionPassed) {
+      bypassedNodes.push(node.id);
+      continue;
+    }
+    readyNodes.push(node);
+  }
+
+  readyNodes.sort((left, right) => {
+    if (priorityRank(left.priority) !== priorityRank(right.priority)) {
+      return priorityRank(left.priority) - priorityRank(right.priority);
+    }
+    return left.id.localeCompare(right.id);
+  });
+
+  return { readyNodes, bypassedNodes };
 }
 
 function evaluateRouter(input) {
   const session = input.session || {};
   const taskGraph = input.taskGraph || {};
   const sprintStatus = input.sprintStatus || {};
-  const validatorVerdict = input.validatorVerdict || { valid: true, issues: [] };
+  const validatorVerdict = input.validatorVerdict || { verdict: "PASS", issues: [] };
   const policyVerdict = input.policyVerdict || { route_effect: "allow", approval: { required: false } };
   const routeBasis = buildRouteBasis();
   const activePhase = getActivePhase(session, taskGraph);
@@ -174,7 +202,7 @@ function evaluateRouter(input) {
   routeBasis.session_fields.push(`phase.current=${phaseId}`);
   routeBasis.session_fields.push(`node.active_id=${session?.node?.active_id || "none"}`);
 
-  if (!validatorVerdict.valid) {
+  if (validatorBlocks(validatorVerdict)) {
     routeBasis.blockers.push("invalid_state");
     return buildResult({
       route_verdict: "block",
@@ -430,10 +458,18 @@ function evaluateRouter(input) {
     });
   }
 
-  const candidateNodes = readyNodes(taskGraph, phaseId, context);
+  const { readyNodes: candidateNodes, bypassedNodes } = collectReadyNodes(taskGraph, phaseId, context, routeBasis);
   if (candidateNodes.length > 0) {
     const candidate = candidateNodes[0];
     routeBasis.sorting_decision.push(`selected=${candidate.id}`);
+    const emitEvents = [];
+    if (activeReviewNodeCompleted) {
+      emitEvents.push("node_completed");
+    }
+    if (bypassedNodes.length > 0) {
+      emitEvents.push("node_bypassed");
+    }
+    emitEvents.push("node_started");
     return buildResult({
       route_verdict: "advance",
       active_phase: phaseId,
@@ -442,7 +478,8 @@ function evaluateRouter(input) {
       next_capability: candidate.capability || "code_edit",
       recommended_next: [startNodeNext(candidate.id, "start highest priority ready node")],
       route_basis: routeBasis,
-      emit_events: activeReviewNodeCompleted ? ["node_completed", "node_started"] : ["node_started"],
+      emit_events: emitEvents,
+      bypassed_nodes: bypassedNodes,
     });
   }
 
@@ -454,6 +491,8 @@ function evaluateRouter(input) {
     next_capability: activeNode?.capability || "human_approval",
     recommended_next: [humanNext(phaseId || "runtime", "no executable next node")],
     route_basis: routeBasis,
+    emit_events: bypassedNodes.length > 0 ? ["node_bypassed"] : [],
+    bypassed_nodes: bypassedNodes,
   });
 }
 

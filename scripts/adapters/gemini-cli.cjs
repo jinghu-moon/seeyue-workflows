@@ -8,6 +8,8 @@ const { compileAdapterBundle } = require("./compile-adapter.cjs");
 const {
   attachGeneratedMetadata,
   buildGeneratedMetadata,
+  detectSeededFormat,
+  mergeSeededSections,
   wrapGeneratedSection,
 } = require("./adapter-utils.cjs");
 const { loadWorkflowSpecs } = require("../runtime/workflow-specs.cjs");
@@ -552,7 +554,13 @@ function writeGeminiArtifacts(options = {}) {
   for (const [relativePath, content] of Object.entries(rendered.files)) {
     const targetPath = path.join(outputRootDir, relativePath);
     ensureDir(path.dirname(targetPath));
-    fs.writeFileSync(targetPath, content, "utf8");
+    let nextContent = content;
+    const seededFormat = detectSeededFormat(relativePath);
+    if (seededFormat) {
+      const existing = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, "utf8") : null;
+      nextContent = mergeSeededSections(existing, content, seededFormat);
+    }
+    fs.writeFileSync(targetPath, nextContent, "utf8");
     writtenFiles.push(normalizePath(path.relative(outputRootDir, targetPath)));
   }
 

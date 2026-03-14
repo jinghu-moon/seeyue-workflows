@@ -28,7 +28,9 @@ const { buildResumeFrontier, ensurePreDestructiveCheckpoint } = require("./check
 const { buildShortApprovalRequest, buildShortRestoreRequest } = require("./human-output.cjs");
 const { appendOutputLogs } = require("./output-log.cjs");
 const { validateOutputEntries } = require("./validate-output.cjs");
+const { validateWorkflowSpecs } = require("./spec-validator.cjs");
 const { loadWorkflowSpecs } = require("./workflow-specs.cjs");
+const { loadYamlFile } = require("./yaml-loader.cjs");
 const {
   getActiveNode,
   getActivePhase,
@@ -45,6 +47,18 @@ const V4_RED_READY_STATES = new Set(["red_verified", "green_pending", "green_ver
 const STOP_LOCK_PATH = path.join(os.tmpdir(), ".sy_stop_hook_active");
 
 let cachedSpecs = null;
+let cachedHookContract = null;
+let cachedHookContractRoot = null;
+let cachedHookGate = null;
+let cachedHookGateRoot = null;
+
+const HOOK_CONTRACT_SCHEMA_KIND = "hook_contract_schema";
+const HOOK_CONTRACT_SCHEMA_VERSION = 1;
+const HOOK_CLIENT_FREEZE_GATE = "P3-N1";
+const HOOK_CLIENT_REQUIRED_SPECS = [
+  "workflow/hooks.spec.yaml",
+  "workflow/hook-contract.schema.yaml",
+];
 
 const MEDIUM_CONFIDENCE = [
   { name: "long alphanumeric assignment", regex: /(api[_-]?key|secret|token|password)\s*[:=]\s*["'`]?([A-Za-z0-9+/]{32,})["'`]?/i },
@@ -444,6 +458,113 @@ function getWorkflowSpecs() {
     }
   }
   return cachedSpecs;
+}
+
+function loadHookContractSpec(rootDir) {
+  if (cachedHookContract && cachedHookContractRoot === rootDir) {
+    return cachedHookContract;
+  }
+  const specPath = path.join(rootDir, "workflow", "hook-contract.schema.yaml");
+  const spec = loadYamlFile(specPath);
+  cachedHookContract = spec;
+  cachedHookContractRoot = rootDir;
+  return spec;
+}
+
+function validateHookContractVersion(rootDir) {
+  let spec;
+  try {
+    spec = loadHookContractSpec(rootDir);
+  } catch (error) {
+    return {
+      ok: false,
+      code: "HOOK_CONTRACT_MISSING",
+      message: String(error?.message || error || "hook contract missing"),
+    };
+  }
+  if (!spec || typeof spec !== "object") {
+    return {
+      ok: false,
+      code: "HOOK_CONTRACT_INVALID",
+      message: "hook contract spec is not an object",
+    };
+  }
+  const schemaKind = String(spec.schema_kind || "").trim();
+  if (schemaKind !== HOOK_CONTRACT_SCHEMA_KIND) {
+    return {
+      ok: false,
+      code: "HOOK_CONTRACT_SCHEMA_KIND_MISMATCH",
+      message: `expected schema_kind=${HOOK_CONTRACT_SCHEMA_KIND}`,
+      actual: schemaKind,
+    };
+  }
+  const schemaVersion = Number(spec.schema_version);
+  if (!Number.isFinite(schemaVersion)) {
+    return {
+      ok: false,
+      code: "HOOK_CONTRACT_SCHEMA_VERSION_INVALID",
+      message: "schema_version must be a number",
+    };
+  }
+  if (schemaVersion !== HOOK_CONTRACT_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      code: "HOOK_CONTRACT_SCHEMA_VERSION_MISMATCH",
+      message: `expected schema_version=${HOOK_CONTRACT_SCHEMA_VERSION}`,
+      actual: schemaVersion,
+    };
+  }
+  return { ok: true };
+}
+
+function validateHookClientFreezeGate(rootDir) {
+  if (cachedHookGate && cachedHookGateRoot === rootDir) {
+    return cachedHookGate;
+  }
+  const result = validateWorkflowSpecs({
+    rootDir,
+    specPaths: HOOK_CLIENT_REQUIRED_SPECS,
+    validateScope: "envelope",
+    freezeGate: HOOK_CLIENT_FREEZE_GATE,
+  });
+  const issues = Array.isArray(result.issues) ? result.issues : [];
+  const ok = issues.length === 0;
+  cachedHookGate = { ok, issues };
+  cachedHookGateRoot = rootDir;
+  return cachedHookGate;
+}
+
+function guardHookClientContracts(payload) {
+  const cwd = resolveCwd(payload);
+  const rootDir = resolveProjectRoot(cwd);
+  const contractCheck = validateHookContractVersion(rootDir);
+  if (!contractCheck.ok) {
+    const details = [
+      `错误码: ${contractCheck.code}`,
+      contractCheck.message ? `原因: ${contractCheck.message}` : null,
+      `期望 schema_version: ${HOOK_CONTRACT_SCHEMA_VERSION}`,
+      contractCheck.actual !== undefined ? `实际 schema_version: ${contractCheck.actual}` : null,
+      `来源: workflow/hook-contract.schema.yaml`,
+    ].filter(Boolean);
+    return buildBlockResult(
+      "sy-hook-contract",
+      "Hook 合约校验失败，Hook Client 已拒绝启动",
+      details,
+    );
+  }
+  const gateCheck = validateHookClientFreezeGate(rootDir);
+  if (!gateCheck.ok) {
+    const issues = gateCheck.issues.map((issue) => `${issue.code} ${issue.specPath} ${issue.message}`);
+    return buildBlockResult(
+      "sy-hook-freeze-gate",
+      "Hook Client 依赖规范未冻结，禁止进入执行阶段",
+      [
+        `freeze_gate: ${HOOK_CLIENT_FREEZE_GATE}`,
+        ...issues,
+      ],
+    );
+  }
+  return null;
 }
 
 function normalizeTargetPath(cwd, filePath) {
@@ -2527,6 +2648,10 @@ function runStopGates(cwd, policy, cfg) {
 }
 
 function dispatchHookEvent(event, payload) {
+  const contractGuard = guardHookClientContracts(payload);
+  if (contractGuard) {
+    return contractGuard;
+  }
   const normalized = String(event || "").trim();
   if (normalized === "SessionStart") {
     return handleSessionStart(payload);

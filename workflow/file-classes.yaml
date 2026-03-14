@@ -71,7 +71,7 @@ classes:
     patterns:
       - workflow/**/*.yaml
       - docs/architecture-v4.md
-      - docs/test-gate-spec-v2.md
+      - docs/archive/outdated/test-gate-spec-v2.md
       - .agents/skills/sy-constraints/**/*
 match_precedence:
   - secret_material

@@ -9,6 +9,7 @@ const {
   assertSubset,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
+const { buildReviewHandoffCapsule, createCapsule } = require("../../scripts/runtime/context-manager.cjs");
 const {
   readJournalEvents,
   readSession,
@@ -38,7 +39,57 @@ function writeReadyReport(rootDir) {
   }, null, 2));
 }
 
+function seedReviewHandoff(rootDir, options = {}) {
+  const sourcePersona = options.sourcePersona || "author";
+  const sourceCapsule = createCapsule(rootDir, {
+    persona: sourcePersona,
+    inputSummary: `${sourcePersona} implementation summary`,
+    outputSummary: `${sourcePersona} handoff ready`,
+    verdict: "pending",
+  });
+  return buildReviewHandoffCapsule(rootDir, { sourceCapsule, targetPersona: options.targetPersona });
+}
+
 const cases = {
+  "review-decision-requires-handoff-capsule": () => {
+    const rootDir = makeTempRoot("review-resolve-missing-handoff-");
+    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    writeRuntimeState(rootDir, {
+      session: {
+        phase: { current: "P2", status: "review" },
+        node: { active_id: "P2-N1", state: "verified", owner_persona: "spec_reviewer" },
+      },
+      nodes: {
+        "P2-N1": {
+          status: "review",
+          tdd_required: false,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pending", quality_review: "pending" },
+          evidence_refs: [".ai/analysis/ai.report.json"],
+        },
+      },
+    });
+    writeReadyReport(rootDir);
+
+    let failed = false;
+    try {
+      applyReviewDecision(rootDir, {
+        decision: "pass",
+        persona: "spec_reviewer",
+        actor: "spec_reviewer",
+        reason: "spec accepted",
+      });
+    } catch (error) {
+      failed = true;
+      if (!/REVIEW_HANDOFF_REQUIRED/i.test(String(error.message || ""))) {
+        throw new Error(`expected REVIEW_HANDOFF_REQUIRED but got ${JSON.stringify(error.message)}`);
+      }
+    }
+
+    if (!failed) {
+      throw new Error("expected review decision to fail without review handoff capsule");
+    }
+  },
   "record-spec-review-pass-refreshes-quality-review-handoff": () => {
     const rootDir = makeTempRoot("review-resolve-spec-pass-");
     fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
@@ -58,6 +109,7 @@ const cases = {
       },
     });
     writeReadyReport(rootDir);
+    seedReviewHandoff(rootDir, { sourcePersona: "author" });
 
     const result = applyReviewDecision(rootDir, {
       decision: "pass",
@@ -118,6 +170,7 @@ const cases = {
       },
     });
     writeReadyReport(rootDir);
+    seedReviewHandoff(rootDir, { sourcePersona: "spec_reviewer" });
 
     const result = applyReviewDecision(rootDir, {
       decision: "rework",

@@ -7,7 +7,7 @@ const path = require("node:path");
 const { renderClaudeCodeArtifacts } = require("./claude-code.cjs");
 const { renderCodexArtifacts } = require("./codex.cjs");
 const { renderGeminiArtifacts } = require("./gemini-cli.cjs");
-const { stripSeededSections } = require("./adapter-utils.cjs");
+const { hasSeededMarkers, stripSeededSections } = require("./adapter-utils.cjs");
 
 const VOLATILE_KEYS = new Set(["generated_at", "updated_at"]);
 
@@ -43,6 +43,13 @@ function ensureGeneratedMarkers(text, format) {
   return /<!--\s*SY:GENERATED:BEGIN/.test(text) && /<!--\s*SY:GENERATED:END\s*-->/.test(text);
 }
 
+function ensureSeededMarkers(text, format) {
+  if (format !== "toml" && format !== "markdown") {
+    return true;
+  }
+  return hasSeededMarkers(text, format);
+}
+
 function normalizeText(text) {
   return stripSeededSections(text).trimEnd();
 }
@@ -61,6 +68,12 @@ function compareText(expected, actual, format) {
   }
   if (!ensureGeneratedMarkers(expected || "", format)) {
     return { ok: false, reason: "EXPECTED_MARKER_MISSING" };
+  }
+  if (!ensureSeededMarkers(actual || "", format)) {
+    return { ok: false, reason: "SEEDED_MARKER_MISSING" };
+  }
+  if (!ensureSeededMarkers(expected || "", format)) {
+    return { ok: false, reason: "EXPECTED_SEEDED_MARKER_MISSING" };
   }
   const normalizedExpected = normalizeText(expected);
   const normalizedActual = normalizeText(actual);

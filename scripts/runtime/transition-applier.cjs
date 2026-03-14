@@ -284,6 +284,14 @@ function markNodeFailed(taskGraph, nodeId) {
   }));
 }
 
+function markNodeBypassed(taskGraph, nodeId) {
+  updateNodeStatus(taskGraph, nodeId, (draft) => ({
+    ...draft,
+    status: "completed",
+    tdd_state: "not_applicable",
+  }));
+}
+
 function computeNextAssets(rootDir, mode, decision, options = {}) {
   const currentSession = readSession(rootDir);
   const currentTaskGraph = readTaskGraph(rootDir);
@@ -303,6 +311,7 @@ function computeNextAssets(rootDir, mode, decision, options = {}) {
   const allowVerifyTransition = mode !== "verify" || options?.allowVerifyTransition === true || terminalHandoff;
   const deferResumeForBackoff = decision?.route_verdict === "hold" && decision?.block_reason === "retry_backoff_pending";
   const emittedEvents = new Set(Array.isArray(decision.emit_events) ? decision.emit_events : []);
+  const bypassedNodes = Array.isArray(decision?.bypassed_nodes) ? decision.bypassed_nodes : [];
   let approvalState = null;
 
   if (mode === "verify" && (!allowVerifyTransition || !shouldPersistVerifyTransition(currentActiveNode, decision))) {
@@ -328,6 +337,12 @@ function computeNextAssets(rootDir, mode, decision, options = {}) {
   if (emittedEvents.has("node_completed") && currentActiveNode?.id) {
     markNodeCompleted(taskGraph, currentActiveNode.id);
     incrementBudgetCounter(session, "consumed_nodes");
+  }
+
+  if (emittedEvents.has("node_bypassed") && bypassedNodes.length > 0) {
+    for (const nodeId of bypassedNodes) {
+      markNodeBypassed(taskGraph, nodeId);
+    }
   }
 
   if (emittedEvents.has("node_failed") && currentActiveNode?.id) {
@@ -455,6 +470,7 @@ function buildJournalInputs(rootDir, mode, decision, sessionOverride, actionCont
   const eventInputs = [];
   const currentPhase = session?.phase?.current || "none";
   const currentNodeId = session?.node?.active_id || "none";
+  const bypassedNodes = Array.isArray(decision?.bypassed_nodes) ? decision.bypassed_nodes : [];
 
   if (mode === "run" && existingEvents.length === 0) {
     eventInputs.push({
@@ -473,6 +489,28 @@ function buildJournalInputs(rootDir, mode, decision, sessionOverride, actionCont
   for (const eventName of decision.emit_events || []) {
     let phase = payload.active_phase || currentPhase;
     let nodeId = payload.active_node || currentNodeId;
+
+    if (eventName === "node_bypassed" && bypassedNodes.length > 0) {
+      for (const bypassedNodeId of bypassedNodes) {
+        const eventPayload = {
+          source: "transition_applier",
+          route_decision: payload,
+        };
+        const transitionContext = buildTransitionContext(eventName, decision, actionContext);
+        if (transitionContext) {
+          eventPayload.transition_context = transitionContext;
+        }
+        eventInputs.push({
+          runId: session?.run_id,
+          event: eventName,
+          phase: currentPhase,
+          nodeId: bypassedNodeId,
+          actor: "runtime",
+          payload: eventPayload,
+        });
+      }
+      continue;
+    }
 
     if (["node_completed", "node_failed", "node_timed_out", "node_bypassed", "review_verdict_recorded"].includes(eventName)) {
       nodeId = currentNodeId;

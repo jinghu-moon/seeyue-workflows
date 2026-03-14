@@ -213,7 +213,7 @@ function buildFixtureState(fixture = {}) {
     journal: structuredClone(fixture.journal || []),
     now: fixture.now || null,
     actionContext: structuredClone(fixture.actionContext || {}),
-    validatorVerdict: deepMerge({ valid: true, issues: [] }, fixture.validatorVerdict || {}),
+    validatorVerdict: deepMerge({ verdict: "PASS", issues: [] }, fixture.validatorVerdict || {}),
     policyVerdict: deepMerge(
       {
         route_effect: "allow",

@@ -72,3 +72,6 @@
 - `disable-model-invocation: true` marks manual-only skills or commands.
 - Honor `allowed-tools` as the maximum tool scope for a skill.
 <!-- SY:GENERATED:END -->
+<!-- SY:SEEDED:BEGIN -->
+<!-- Add project-specific overrides below. -->
+<!-- SY:SEEDED:END -->

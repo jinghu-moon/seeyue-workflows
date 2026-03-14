@@ -13,7 +13,7 @@ meta:
   - router_engine
   source_documents:
   - docs/architecture-v4.md
-  - docs/test-gate-spec-v2.md
+  - docs/archive/outdated/test-gate-spec-v2.md
   - docs/architecture-v5-proposal.md
 inputs:
   required_specs:

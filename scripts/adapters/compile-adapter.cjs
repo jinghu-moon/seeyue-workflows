@@ -7,6 +7,12 @@ const path = require("node:path");
 const { validateWorkflowSpecs } = require("../runtime/spec-validator.cjs");
 const { loadWorkflowSpecs } = require("../runtime/workflow-specs.cjs");
 
+const ADAPTER_FREEZE_GATE = "P4-N1";
+const ADAPTER_REQUIRED_SPECS = [
+  "workflow/skills.spec.yaml",
+  "workflow/output-templates.spec.yaml",
+];
+
 const ENGINE_PROFILES = {
   claude_code: {
     instruction_file: "CLAUDE.md",
@@ -106,6 +112,17 @@ function ensureValidSpecs(rootDir) {
   if (!validation.ok) {
     const summary = validation.issues.map((issue) => `${issue.code}:${issue.specPath}:${issue.message}`).join(" | ");
     throw new Error(`COMPILER_SPEC_VALIDATION_FAIL ${summary}`);
+  }
+
+  const freezeValidation = validateWorkflowSpecs({
+    rootDir,
+    specPaths: ADAPTER_REQUIRED_SPECS,
+    validateScope: "envelope",
+    freezeGate: ADAPTER_FREEZE_GATE,
+  });
+  if (freezeValidation.issues.length > 0) {
+    const summary = freezeValidation.issues.map((issue) => `${issue.code}:${issue.specPath}:${issue.message}`).join(" | ");
+    throw new Error(`COMPILER_SPEC_FREEZE_GATE_FAIL ${summary}`);
   }
 }
 

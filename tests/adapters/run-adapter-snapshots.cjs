@@ -27,6 +27,16 @@ function assert(condition, message) {
   }
 }
 
+function assertSeededMarkers(text, fileLabel) {
+  assert(/SY:SEEDED:BEGIN/.test(text), `expected seeded begin marker in ${fileLabel}`);
+  assert(/SY:SEEDED:END/.test(text), `expected seeded end marker in ${fileLabel}`);
+}
+
+function injectSeededLine(text, format, line) {
+  const marker = format === "toml" ? "# SY:SEEDED:BEGIN" : "<!-- SY:SEEDED:BEGIN -->";
+  return String(text || "").replace(marker, `${marker}\n${line}`);
+}
+
 function assertHumanFacingRuntimeContracts(text, fileLabel) {
   assert(/approval requests MUST use runtime-approved zh-CN short actionable copy/i.test(text), `expected zh-CN approval contract in ${fileLabel}`);
   assert(/manual restore blockers MUST use runtime-approved zh-CN short actionable copy/i.test(text), `expected zh-CN restore blocker contract in ${fileLabel}`);
@@ -203,6 +213,7 @@ function runClaudeCodeSnapshot() {
   assert(/Router Summary/i.test(claudeText), "expected router summary in CLAUDE.md");
   assert(/Approval Summary/i.test(claudeText), "expected approval summary in CLAUDE.md");
   assertHumanFacingRuntimeContracts(claudeText, "CLAUDE.md");
+  assertSeededMarkers(claudeText, "CLAUDE.md");
 
   assertClaudeSettingsShape(settings);
 }
@@ -254,6 +265,8 @@ function runCodexSnapshot() {
   assert(/Skills/i.test(agentsText), "expected skills section in AGENTS.md");
   assert(/Approval And Sandbox/i.test(agentsText), "expected approval and sandbox section in AGENTS.md");
   assertHumanFacingRuntimeContracts(agentsText, "AGENTS.md");
+  assertSeededMarkers(agentsText, "AGENTS.md");
+  assertSeededMarkers(configText, ".codex/config.toml");
 
   assert(/approval_policy = "on-request"/.test(configText), "expected on-request approval policy in config.toml");
   assert(/sandbox_mode = "workspace-write"/.test(configText), "expected workspace-write sandbox in config.toml");
@@ -320,6 +333,8 @@ function runGeminiSnapshot() {
   assert(/restore/i.test(memoryText), "expected checkpoint restore note in GEMINI.md");
   assert(/English/i.test(memoryText) && /zh-CN/i.test(memoryText), "expected English and zh-CN language policy in GEMINI.md");
   assertHumanFacingRuntimeContracts(memoryText, "GEMINI.md");
+  assertSeededMarkers(memoryText, "GEMINI.md");
+  assertSeededMarkers(policyText, ".gemini/policies/seeyue-workflows.toml");
   assert(/SY:GENERATED:BEGIN/.test(policyText), "expected generated marker in gemini policy");
   assert(/\[\[rule\]\]/.test(policyText), "expected policy rules in gemini policy");
   assert(/decision\s*=\s*\"allow\"/.test(policyText), "expected allow decision in gemini policy");
@@ -381,6 +396,28 @@ function runSkillsManifestSnapshot(engine) {
   assert(result.written_files.includes(".ai/workflow/skills-manifest.json"), "expected skills-manifest.json in written_files");
 }
 
+function runSeededPreservation() {
+  const outputRootDir = makeTempRoot("adapter-seeded-preserve-");
+  writeCodexArtifacts({ rootDir: projectRoot, outputRootDir });
+
+  const agentsPath = path.join(outputRootDir, "AGENTS.md");
+  const configPath = path.join(outputRootDir, ".codex", "config.toml");
+  const seededMarkdown = "<!-- custom-seeded-note -->";
+  const seededToml = "# custom-seeded-note";
+
+  const updatedAgents = injectSeededLine(fs.readFileSync(agentsPath, "utf8"), "markdown", seededMarkdown);
+  const updatedConfig = injectSeededLine(fs.readFileSync(configPath, "utf8"), "toml", seededToml);
+  fs.writeFileSync(agentsPath, updatedAgents, "utf8");
+  fs.writeFileSync(configPath, updatedConfig, "utf8");
+
+  writeCodexArtifacts({ rootDir: projectRoot, outputRootDir });
+
+  const agentsText = fs.readFileSync(agentsPath, "utf8");
+  const configText = fs.readFileSync(configPath, "utf8");
+  assert(agentsText.includes(seededMarkdown), "expected seeded markdown content to persist");
+  assert(configText.includes(seededToml), "expected seeded toml content to persist");
+}
+
 const ENGINE_CASES = {
   claude_code: {
     passSignal: "CLAUDE_CODE_ADAPTER_PASS",
@@ -395,6 +432,7 @@ const ENGINE_CASES = {
     defaultRunner: runCodexSnapshot,
     cases: {
       "missing-skill-metadata": runCodexMissingSkillMetadata,
+      "seeded-preserve": runSeededPreservation,
       "skills-manifest": () => runSkillsManifestSnapshot("codex"),
     },
   },

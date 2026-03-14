@@ -9,6 +9,7 @@ const {
   assertSubset,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
+const { buildReviewHandoffCapsule, createCapsule } = require("../../scripts/runtime/context-manager.cjs");
 const {
   appendJournalEvents,
   readJournalEvents,
@@ -62,6 +63,17 @@ function writeReadyReport(rootDir) {
   }, null, 2));
 }
 
+function seedReviewHandoff(rootDir, options = {}) {
+  const sourcePersona = options.sourcePersona || "author";
+  const sourceCapsule = createCapsule(rootDir, {
+    persona: sourcePersona,
+    inputSummary: `${sourcePersona} implementation summary`,
+    outputSummary: `${sourcePersona} handoff ready`,
+    verdict: "pending",
+  });
+  return buildReviewHandoffCapsule(rootDir, { sourceCapsule, targetPersona: options.targetPersona });
+}
+
 const cases = {
   "run-starts-route-cycle": () => {
     const rootDir = makeTempRoot("controller-run-");
@@ -105,6 +117,54 @@ const cases = {
     }
     if (!journal.some((item) => item.event === "node_started")) {
       throw new Error("expected node_started event");
+    }
+  },
+  "run-emits-node-bypassed-for-conditional-ready-node": () => {
+    const rootDir = makeTempRoot("controller-run-bypass-");
+    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    writeRuntimeState(rootDir, {
+      session: {
+        phase: { current: "P2", status: "in_progress" },
+        node: { active_id: "none", state: "idle", owner_persona: "planner" },
+      },
+      nodes: {
+        "P2-N1": {
+          status: "ready",
+          tdd_required: false,
+          tdd_state: "not_applicable",
+          condition: { mode: "state_expression", expression: "session.phase.current == P1" },
+        },
+        "P2-N2": {
+          status: "ready",
+          tdd_required: false,
+          tdd_state: "not_applicable",
+          priority: "high",
+        },
+      },
+    });
+
+    const result = parseJsonOutput(runController(rootDir, "run"));
+    assertSubset(result, {
+      mode: "run",
+      decision: {
+        route_verdict: "advance",
+        active_node: "P2-N2",
+        recommended_next: [{ type: "start_node", target: "P2-N2" }],
+      },
+    });
+
+    const taskGraph = readTaskGraph(rootDir);
+    const journal = readJournalEvents(rootDir);
+    const bypassedNode = taskGraph.nodes.find((item) => item.id === "P2-N1");
+    if (!bypassedNode || bypassedNode.status !== "completed") {
+      throw new Error("expected P2-N1 to be marked completed after bypass");
+    }
+    if (!journal.some((item) => item.event === "node_bypassed" && item.node_id === "P2-N1")) {
+      throw new Error("expected node_bypassed event for P2-N1");
+    }
+    const startedNode = taskGraph.nodes.find((item) => item.id === "P2-N2");
+    if (!startedNode || startedNode.status !== "in_progress") {
+      throw new Error("expected P2-N2 to become in_progress");
     }
   },
   "run-auto-loop-enters-next-phase-and-starts-first-node": () => {
@@ -254,6 +314,269 @@ const cases = {
     const session = readSession(rootDir);
     assertSubset(session, {
       phase: { current: "P3", status: "in_progress" },
+      node: { active_id: "none", owner_persona: "planner" },
+    });
+  },
+  "run-auto-loop-max-hops-multi-phase-advance": () => {
+    const rootDir = makeTempRoot("controller-run-max-hops-multi-phase-");
+    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    writeRuntimeState(rootDir, {
+      session: {
+        phase: { current: "P1", status: "completed" },
+        node: { active_id: "none", state: "idle", owner_persona: "planner" },
+      },
+      phases: {
+        "P1": { status: "completed" },
+        "P2": { status: "pending" },
+        "P3": { status: "pending" },
+      },
+      nodes: {
+        "P2-N1": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+        "P2-N2": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+        "P2-N3": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+      },
+      sprint_status: {
+        active_phase: "P1",
+      },
+    });
+    const taskGraph = readTaskGraph(rootDir);
+    taskGraph.phases.push({
+      id: "P4",
+      title: "P4",
+      status: "pending",
+      depends_on: ["P3"],
+      entry_condition: ["P3 completed"],
+      exit_gate: { cmd: "node tests/runtime/run-controller-fixtures.cjs", pass_signal: "CONTROLLER_FIXTURES_PASS", coverage_min: "80%" },
+      rollback_boundary: { revert_nodes: ["P4-N1"], restore_point: "P3 stable" },
+    });
+    taskGraph.nodes.push({
+      id: "P3-N1",
+      phase_id: "P3",
+      title: "P3-N1",
+      target: "scripts/P3-N1.cjs",
+      action: "Implement P3-N1",
+      why: "P3 is pre-completed for loop stress",
+      depends_on: [],
+      verify: { cmd: "node verify P3-N1", pass_signal: "P3-N1_PASS" },
+      risk_level: "medium",
+      tdd_required: false,
+      status: "completed",
+      tdd_state: "not_applicable",
+      owner_persona: "author",
+      review_state: { spec_review: "pass", quality_review: "pass" },
+      evidence_refs: [],
+      output_refs: [],
+      approval_ref: null,
+      capability: "code_edit",
+      priority: "high",
+      parallel_group: null,
+      condition: null,
+      retry_policy: null,
+      timeout_policy: null,
+      test_contract: null,
+    });
+    taskGraph.nodes.push({
+      id: "P4-N1",
+      phase_id: "P4",
+      title: "P4-N1",
+      target: "scripts/P4-N1.cjs",
+      action: "Implement P4-N1",
+      why: "Provide a ready node after multi-phase advance",
+      depends_on: [],
+      verify: { cmd: "node verify P4-N1", pass_signal: "P4-N1_PASS" },
+      risk_level: "medium",
+      tdd_required: false,
+      status: "ready",
+      tdd_state: "not_applicable",
+      owner_persona: "author",
+      review_state: { spec_review: "pending", quality_review: "pending" },
+      evidence_refs: [],
+      output_refs: [],
+      approval_ref: null,
+      capability: "code_edit",
+      priority: "high",
+      parallel_group: null,
+      condition: null,
+      retry_policy: null,
+      timeout_policy: null,
+      test_contract: null,
+    });
+    writeTaskGraph(rootDir, taskGraph);
+
+    const result = parseJsonOutput(runController(rootDir, "run", ["--auto-loop", "--max-hops", "2"]));
+    assertSubset(result, {
+      mode: "run",
+      loop_summary: {
+        enabled: true,
+        hops_executed: 2,
+        stop_reason: "max_hops_reached",
+      },
+    });
+
+    const session = readSession(rootDir);
+    assertSubset(session, {
+      phase: { current: "P4", status: "in_progress" },
+      node: { active_id: "none", owner_persona: "planner" },
+    });
+  },
+  "run-auto-loop-stops-at-max-hops-long": () => {
+    const rootDir = makeTempRoot("controller-run-long-hops-");
+    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    writeRuntimeState(rootDir, {
+      session: {
+        phase: { current: "P1", status: "completed" },
+        node: { active_id: "none", state: "idle", owner_persona: "planner" },
+      },
+      phases: {
+        "P1": { status: "completed" },
+        "P2": { status: "pending" },
+        "P3": { status: "pending" },
+      },
+      nodes: {
+        "P2-N1": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+        "P2-N2": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+        "P2-N3": {
+          status: "completed",
+          tdd_required: false,
+          test_contract: null,
+          tdd_state: "not_applicable",
+          review_state: { spec_review: "pass", quality_review: "pass" },
+        },
+      },
+      sprint_status: {
+        active_phase: "P1",
+      },
+    });
+
+    const makeCompletedNode = (id, phaseId) => ({
+      id,
+      phase_id: phaseId,
+      title: id,
+      target: `scripts/${id}.cjs`,
+      action: `Implement ${id}`,
+      why: "Pre-completed for long loop coverage",
+      depends_on: [],
+      verify: { cmd: `node verify ${id}`, pass_signal: `${id}_PASS` },
+      risk_level: "medium",
+      tdd_required: false,
+      status: "completed",
+      tdd_state: "not_applicable",
+      owner_persona: "author",
+      review_state: { spec_review: "pass", quality_review: "pass" },
+      evidence_refs: [],
+      output_refs: [],
+      approval_ref: null,
+      capability: "code_edit",
+      priority: "high",
+      parallel_group: null,
+      condition: null,
+      retry_policy: null,
+      timeout_policy: null,
+      test_contract: null,
+    });
+
+    const taskGraph = readTaskGraph(rootDir);
+    taskGraph.phases = taskGraph.phases.map((phase) => {
+      if (phase.id === "P1") {
+        return { ...phase, status: "completed", depends_on: [] };
+      }
+      if (phase.id === "P2") {
+        return { ...phase, status: "pending", depends_on: ["P1"] };
+      }
+      if (phase.id === "P3") {
+        return { ...phase, status: "pending", depends_on: ["P2"] };
+      }
+      return phase;
+    });
+    taskGraph.phases.push(
+      {
+        id: "P4",
+        title: "P4",
+        status: "pending",
+        depends_on: ["P3"],
+        entry_condition: ["P3 completed"],
+        exit_gate: { cmd: "node tests/runtime/run-controller-fixtures.cjs", pass_signal: "CONTROLLER_FIXTURES_PASS", coverage_min: "80%" },
+        rollback_boundary: { revert_nodes: ["P4-N1"], restore_point: "P3 stable" },
+      },
+      {
+        id: "P5",
+        title: "P5",
+        status: "pending",
+        depends_on: ["P4"],
+        entry_condition: ["P4 completed"],
+        exit_gate: { cmd: "node tests/runtime/run-controller-fixtures.cjs", pass_signal: "CONTROLLER_FIXTURES_PASS", coverage_min: "80%" },
+        rollback_boundary: { revert_nodes: ["P5-N1"], restore_point: "P4 stable" },
+      },
+      {
+        id: "P6",
+        title: "P6",
+        status: "pending",
+        depends_on: ["P5"],
+        entry_condition: ["P5 completed"],
+        exit_gate: { cmd: "node tests/runtime/run-controller-fixtures.cjs", pass_signal: "CONTROLLER_FIXTURES_PASS", coverage_min: "80%" },
+        rollback_boundary: { revert_nodes: ["P6-N1"], restore_point: "P5 stable" },
+      },
+      {
+        id: "P7",
+        title: "P7",
+        status: "pending",
+        depends_on: ["P6"],
+        entry_condition: ["P6 completed"],
+        exit_gate: { cmd: "node tests/runtime/run-controller-fixtures.cjs", pass_signal: "CONTROLLER_FIXTURES_PASS", coverage_min: "80%" },
+        rollback_boundary: { revert_nodes: ["P7-N1"], restore_point: "P6 stable" },
+      },
+    );
+    taskGraph.nodes.push(
+      makeCompletedNode("P3-N1", "P3"),
+      makeCompletedNode("P4-N1", "P4"),
+      makeCompletedNode("P5-N1", "P5"),
+      makeCompletedNode("P6-N1", "P6"),
+    );
+    writeTaskGraph(rootDir, taskGraph);
+
+    const result = parseJsonOutput(runController(rootDir, "run", ["--auto-loop", "--max-hops", "5"]));
+    assertSubset(result, {
+      mode: "run",
+      loop_summary: {
+        enabled: true,
+        hops_executed: 5,
+        stop_reason: "max_hops_reached",
+      },
+    });
+
+    const session = readSession(rootDir);
+    assertSubset(session, {
+      phase: { current: "P7", status: "in_progress" },
       node: { active_id: "none", owner_persona: "planner" },
     });
   },
@@ -851,6 +1174,7 @@ const cases = {
       },
     });
     writeReadyReport(rootDir);
+    seedReviewHandoff(rootDir, { sourcePersona: "author", targetPersona: "spec_reviewer" });
 
     const result = parseJsonOutput(runController(rootDir, null, [
       "--review-decision", "pass",
@@ -912,6 +1236,7 @@ const cases = {
       },
     });
     writeReadyReport(rootDir);
+    seedReviewHandoff(rootDir, { sourcePersona: "spec_reviewer", targetPersona: "quality_reviewer" });
 
     const result = parseJsonOutput(runController(rootDir, null, [
       "--review-decision", "pass",

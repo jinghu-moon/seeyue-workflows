@@ -26,10 +26,10 @@
 
 ## 规范草案
 
-- [router 中文草案](./router-spec-draft.md)
+- [router 中文草案](./archive/outdated/router-spec-draft.md)
 - [router 后续清单](./router-follow-up-checklist.md)
-- [测试门规范草案 v2](./test-gate-spec-v2.md)
-- [session schema 说明](./session-schema.md)
+- [测试门规范草案 v2](./archive/outdated/test-gate-spec-v2.md)
+- [session schema 说明](./archive/outdated/session-schema.md)
 
 ## 机器事实源
 

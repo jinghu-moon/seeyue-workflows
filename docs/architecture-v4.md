@@ -452,7 +452,7 @@ The minimum event set SHOULD include:
 - `validation_failed`
 
 [RULE]
-`node_bypassed` is RESERVED in Router V1. The journal schema MUST accept it, but Router V1 does not emit it unless conditional bypass reporting is explicitly enabled.
+`node_bypassed` is RESERVED in Router V1. The journal schema MUST accept it. In this repo, conditional bypass reporting is enabled, so Router V1 emits `node_bypassed` when ready nodes are skipped by condition.
 
 [RULE]
 If a tool starts but no terminal event exists after interruption, recovery MUST synthesize an `aborted` terminal interpretation before resuming.
@@ -670,16 +670,13 @@ It MUST verify state integrity, report freshness, phase legality, node legality,
 
 [RULE]
 L3 MUST produce a four-level verdict:
-- `PASS`
-- `CONCERNS`
-- `REWORK`
-- `FAIL`
+- `PASS` — no blocking issues
+- `CONCERNS` — non-blocking issues, routing may proceed
+- `REWORK` — blocking issues that must be corrected before advance
+- `FAIL` — blocking issues requiring human intervention or repair
 
 [RULE]
-`PASS` allows progression.
-`CONCERNS` allows progression with explicit risk carry-forward.
-`REWORK` forces return to `review-feedback` or the current node.
-`FAIL` stops autonomous progression and requires human intervention.
+`REWORK` and `FAIL` MUST block routing with `block_reason=invalid_state`.
 
 ## 11. Persona Contracts
 

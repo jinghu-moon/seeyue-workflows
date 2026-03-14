@@ -30,11 +30,11 @@ Execution status (as-is in this repo):
 - P1-P5 主要节点已落地（详见 `.ai/workflow/task-graph.yaml`）。
 - 本计划保留为执行记录与回溯参照，新增工作请以现行 specs 与 scripts 为准。
 
-Known gaps for V5 (remaining):
+Known gaps for V5 (resolved in repo):
 
-- Hook contract 版本强校验仍需补齐（初始化阶段未强制拒绝版本不匹配）。
-- generated/seeded 边界的强制校验与回归用例仍需补强。
-- spec freeze gate 的强制流程化约束仍依赖人工触发校验。
+- Hook contract 版本强校验已补齐（Hook Client 启动前强制校验）。
+- generated/seeded 边界的强制校验与 seeded 保留已补齐（Adapter 验证 + seeded 合并）。
+- spec freeze gate 的强制流程化约束已补齐（Hook Client / Adapter 编译前强制校验）。
 
 ---
 
