@@ -343,6 +343,8 @@ Existing hooks MAY directly read runtime state only until Hook Client is stable.
 [RULE]
 Checkpoint A (Hook Client exists): direct reads are deprecated and must emit a warning. Checkpoint B (P3 exit): direct reads are prohibited and validator must fail.
 
+当前实现：Hook Client 已稳定且 hooks 脚本已切换为 thin hooks；尚未实现“直接读取运行态文件”的静态检测或 validator 失败机制。
+
 ---
 
 ## 13. Acceptance Criteria (V5)
@@ -382,6 +384,8 @@ Hook event matrix coverage (including BeforeToolSelection/AfterModel where avail
 
 [RULE]
 Skills manifest drift is detectable; stale artifacts must fail conformance until regenerated.
+
+当前实现：Stop `force_continue` 语义在 hooks 夹具中验证，但未区分引擎 conformance；policy 模式映射与 adapter 产物已有，但 conformance 仍以快照测试为主；skills manifest drift 暂未形成强制失败机制。
 
 ---
 
