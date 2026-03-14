@@ -93,7 +93,7 @@ Known gaps for V5 (remaining):
 - **target**: `scripts/runtime/store.cjs`
 - **action**: O_APPEND for POSIX, queue/mutex for Win32, enforce <4 KB per line.
 - **depends_on**: `[P1-N3]`
-- **verify.cmd**: `node tests/runtime/run-runtime-store.cjs --case concurrent-journal-append`
+- **verify.cmd**: `node tests/runtime/run-runtime-store.cjs --case journal-append-lock-stale-recovery`
 - **risk_level**: high
 
 ### P1-N5: Runtime store + checkpoint base
@@ -142,7 +142,7 @@ Known gaps for V5 (remaining):
 ### P2-N2: Policy Kernel
 - **title**: Unified gate evaluation (approval/test/coverage/timeout)
 - **target**: `scripts/runtime/policy.cjs`
-- **action**: Enforce loop budgets (max_nodes/minutes/failures/context), stop gate preconditions, TDD iron-law gate, and two-stage review ordering (spec → quality).
+- **action**: Enforce loop budgets (max_nodes/max_failures/max_pending_approvals), stop gate preconditions, TDD iron-law gate, and review gating.
 - **depends_on**: `[P1-N5]`
 - **verify.cmd**: `node tests/policy/run-policy-fixtures.cjs`
 - **risk_level**: critical
@@ -181,7 +181,7 @@ Known gaps for V5 (remaining):
 - **target**: `scripts/hooks/sy-pretool-write.cjs`, `scripts/hooks/sy-pretool-bash.cjs`, `scripts/hooks/sy-stop.cjs`
 - **action**: Remove direct runtime reads, call hook client, translate verdict, guarantee stdin single-read + stdout JSON-only, and Stop semantics.
 - **depends_on**: `[P3-N1]`
-- **verify.cmd**: `node tests/hooks/run-v4-fixtures.cjs --case prewrite-red-gate && node tests/hooks/run-v4-fixtures.cjs --case stop-force-continue`
+- **verify.cmd**: `node tests/hooks/run-v4-fixtures.cjs --case prewrite-red-gate && node tests/hooks/run-v4-fixtures.cjs --case stop-requires-resume-frontier`
 - **risk_level**: critical
 
 ### P3-N3: Post hooks refactor
