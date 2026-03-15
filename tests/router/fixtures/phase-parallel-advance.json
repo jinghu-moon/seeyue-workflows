@@ -1,0 +1,41 @@
+{
+  "description": "F2: parallel_enabled=true allows two phases to be in_progress simultaneously",
+  "session": {
+    "phase": {
+      "current": "P1",
+      "status": "in_progress",
+      "parallel_enabled": true,
+      "active_ids": ["P1"]
+    },
+    "node": { "active_id": "none", "state": "idle", "owner_persona": "planner" },
+    "loop_budget": {
+      "max_nodes": 20,
+      "consumed_nodes": 0,
+      "max_failures": 3,
+      "consumed_failures": 0
+    }
+  },
+  "phases": {
+    "P1": { "status": "in_progress", "depends_on": [] },
+    "P2": { "status": "pending", "depends_on": [] }
+  },
+  "nodes": {
+    "P1-N1": {
+      "id": "P1-N1",
+      "phase_id": "P1",
+      "status": "completed",
+      "priority": "high",
+      "depends_on": []
+    }
+  },
+  "policyVerdict": {
+    "completion": { "phase_complete_ready": true }
+  },
+  "expected": {
+    "route_verdict": "advance",
+    "recommended_next": [
+      { "type": "enter_phase", "target": "P2" }
+    ]
+  },
+  "note": "transition-applier should set session.phase.active_ids=[P1,P2] when parallel_enabled=true"
+}

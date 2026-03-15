@@ -379,29 +379,49 @@ function computeNextAssets(rootDir, mode, decision, options = {}) {
   }
 
   if (nextAction?.type === "enter_phase") {
-    if (currentPhaseId && currentPhaseId !== nextAction.target) {
-      updatePhaseStatus(taskGraph, currentPhaseId, "completed");
+    const parallelEnabled = session?.phase?.parallel_enabled === true;
+    if (parallelEnabled) {
+      // F2: Phase parallelism — maintain active_ids array, keep current phase in_progress
+      const activeIds = Array.isArray(session.phase.active_ids) ? [...session.phase.active_ids] : (currentPhaseId ? [currentPhaseId] : []);
+      if (!activeIds.includes(nextAction.target)) {
+        activeIds.push(nextAction.target);
+      }
+      updatePhaseStatus(taskGraph, nextAction.target, "in_progress");
+      session.phase.active_ids = activeIds;
+      session.phase.current = nextAction.target;
+      session.phase.status = "in_progress";
+    } else {
+      // Default single-phase path (backward-compatible)
+      if (currentPhaseId && currentPhaseId !== nextAction.target) {
+        updatePhaseStatus(taskGraph, currentPhaseId, "completed");
+      }
+      updatePhaseStatus(taskGraph, nextAction.target, "in_progress");
+      session.phase.current = nextAction.target;
+      session.phase.status = "in_progress";
     }
-    updatePhaseStatus(taskGraph, nextAction.target, "in_progress");
-    session.phase.current = nextAction.target;
-    session.phase.status = "in_progress";
     session.node.active_id = "none";
     session.node.owner_persona = decision.next_persona || "planner";
     session.node.state = "idle";
   }
 
   if (nextAction?.type === "start_node") {
+    // F1: Multi-node scheduling — apply all start_node actions from recommended_next
+    const startActions = Array.isArray(decision.recommended_next)
+      ? decision.recommended_next.filter((a) => a?.type === "start_node")
+      : [nextAction];
     updatePhaseStatus(taskGraph, session.phase.current, "in_progress");
-    updateNodeStatus(taskGraph, nextAction.target, (draft) => ({
-      ...draft,
-      status: "in_progress",
-      owner_persona: decision.next_persona || draft.owner_persona,
-    }));
-    const node = getNodeById(taskGraph, nextAction.target);
+    for (const action of startActions) {
+      updateNodeStatus(taskGraph, action.target, (draft) => ({
+        ...draft,
+        status: "in_progress",
+        owner_persona: decision.next_persona || draft.owner_persona,
+      }));
+    }
+    const primaryNode = getNodeById(taskGraph, nextAction.target);
     session.phase.status = "in_progress";
     session.node.active_id = nextAction.target;
-    session.node.owner_persona = decision.next_persona || node?.owner_persona || session.node.owner_persona;
-    session.node.state = deriveNodeState(node);
+    session.node.owner_persona = decision.next_persona || primaryNode?.owner_persona || session.node.owner_persona;
+    session.node.state = deriveNodeState(primaryNode);
   }
 
   if ((nextAction?.type === "resume_node" || nextAction?.type === "retry_node") && !deferResumeForBackoff) {

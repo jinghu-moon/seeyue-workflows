@@ -1,0 +1,25 @@
+{
+  "description": "Gemini tier model: admin tier overrides workspace tier settings",
+  "actionContext": {
+    "targetPath": "src/config.ts",
+    "commandClass": "safe",
+    "changeClass": "utility",
+    "engine": "gemini_cli",
+    "gemini_tier": "admin"
+  },
+  "policySpec": {
+    "gemini_tier_model": {
+      "tiers": ["admin", "workspace", "extension"],
+      "precedence": "admin > workspace > extension",
+      "admin": { "scope": "global", "override_lower": true },
+      "workspace": { "scope": "project", "override_lower": true },
+      "extension": { "scope": "skill_or_tool", "override_lower": false }
+    }
+  },
+  "expected": {
+    "gemini_tier": {
+      "tier": "admin",
+      "config": { "scope": "global", "override_lower": true }
+    }
+  }
+}

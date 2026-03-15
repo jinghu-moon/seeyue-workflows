@@ -19,6 +19,7 @@ const DEFAULT_SPEC_PATHS = [
   "workflow/runtime.schema.yaml",
   "workflow/router.spec.yaml",
   "workflow/policy.spec.yaml",
+  "workflow/execution.spec.yaml",
 ];
 
 const EXPECTED_SCHEMA_KIND = {
@@ -34,6 +35,7 @@ const EXPECTED_SCHEMA_KIND = {
   "workflow/runtime.schema.yaml": "runtime_schema",
   "workflow/router.spec.yaml": "router_spec",
   "workflow/policy.spec.yaml": "policy_spec",
+  "workflow/execution.spec.yaml": "execution_spec",
 };
 
 const SPEC_STATUSES = new Set(["draft", "frozen"]);
@@ -696,6 +698,73 @@ function validateSkillsSpec(skillsSpec, rootDir, capabilityIds, outputTemplateId
   return skillIds;
 }
 
+function validateExecutionSpec(spec, specPath, issues) {
+  if (!spec || !isObject(spec)) {
+    return;
+  }
+  const actionTypes = spec.node_action_schema?.action_types;
+  if (!Array.isArray(actionTypes) || actionTypes.length === 0) {
+    pushIssue(issues, "INVALID_EXECUTION_ACTION_TYPES", specPath, "node_action_schema.action_types MUST be a non-empty array.");
+  }
+  const split3 = spec.execute_3split;
+  if (!isObject(split3)) {
+    pushIssue(issues, "MISSING_EXECUTE_3SPLIT", specPath, "execute_3split is required.");
+  } else {
+    const phases = split3.phases;
+    const EXPECTED_PHASES = ["red", "implementation", "verify"];
+    if (!Array.isArray(phases) || EXPECTED_PHASES.some((p, i) => phases[i] !== p)) {
+      pushIssue(issues, "INVALID_EXECUTE_3SPLIT_PHASES", specPath, `execute_3split.phases MUST be [${EXPECTED_PHASES.join(", ")}] in order.`);
+    }
+  }
+  const constraints = spec.persona_action_constraints;
+  if (!isObject(constraints)) {
+    pushIssue(issues, "MISSING_PERSONA_ACTION_CONSTRAINTS", specPath, "persona_action_constraints is required.");
+  } else {
+    for (const [personaId, entry] of Object.entries(constraints)) {
+      if (!isObject(entry)) {
+        pushIssue(issues, "INVALID_PERSONA_CONSTRAINT_ENTRY", specPath, `persona_action_constraints.${personaId} MUST be a mapping.`);
+        continue;
+      }
+      if (typeof entry.may_write !== "boolean") {
+        pushIssue(issues, "MISSING_PERSONA_MAY_WRITE", specPath, `persona_action_constraints.${personaId} MUST define may_write as boolean.`);
+      }
+      if (typeof entry.may_run !== "boolean") {
+        pushIssue(issues, "MISSING_PERSONA_MAY_RUN", specPath, `persona_action_constraints.${personaId} MUST define may_run as boolean.`);
+      }
+    }
+  }
+}
+
+function validateSkillTiers(spec, specPath, issues) {
+  if (!spec || !isObject(spec)) {
+    return;
+  }
+  const skillTiers = spec.skill_tiers;
+  if (!isObject(skillTiers)) {
+    pushIssue(issues, "MISSING_SKILL_TIERS", specPath, "skill_tiers MUST be defined with core and auxiliary entries.", "warning");
+    return;
+  }
+  for (const tier of ["core", "auxiliary"]) {
+    if (!isObject(skillTiers[tier])) {
+      pushIssue(issues, "MISSING_SKILL_TIER_ENTRY", specPath, `skill_tiers.${tier} MUST be defined.`, "warning");
+    }
+  }
+  const registry = spec.skills;
+  if (!isObject(registry)) {
+    return;
+  }
+  for (const [skillId, entry] of Object.entries(registry)) {
+    if (!isObject(entry)) {
+      continue;
+    }
+    if (!entry.tier) {
+      pushIssue(issues, "MISSING_SKILL_TIER", specPath, `skill ${skillId} does not define a tier field.`, "warning");
+    } else if (!["core", "auxiliary"].includes(entry.tier)) {
+      pushIssue(issues, "INVALID_SKILL_TIER", specPath, `skill ${skillId} tier must be core or auxiliary, got ${entry.tier}.`);
+    }
+  }
+}
+
 function validateCrossReferences(specs, capabilityIds, personaIds, fileClassIds, approvalMatrix, issues) {
   const capabilitySet = new Set(capabilityIds);
   const personaSet = new Set(personaIds);
@@ -875,6 +944,8 @@ function validateWorkflowSpecs(options = {}) {
     validateHookContractSpec(specs.get("workflow/hook-contract.schema.yaml"), issues);
     const outputTemplateIds = validateOutputTemplatesSpec(specs.get("workflow/output-templates.spec.yaml"), issues);
     validateSkillsSpec(specs.get("workflow/skills.spec.yaml"), rootDir, capabilityIds, outputTemplateIds, issues);
+    validateSkillTiers(specs.get("workflow/skills.spec.yaml"), "workflow/skills.spec.yaml", issues);
+    validateExecutionSpec(specs.get("workflow/execution.spec.yaml"), "workflow/execution.spec.yaml", issues);
     validateCrossReferences(specs, capabilityIds, personaIds, fileClassIds, approvalMatrix, issues);
   }
 

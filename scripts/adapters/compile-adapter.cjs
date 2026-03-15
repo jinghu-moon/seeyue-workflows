@@ -380,6 +380,35 @@ function buildSkillPass(bundleBase, specs, engine) {
   };
 }
 
+function renderTemplateForEngine(template, variables, engineProfile) {
+  const engine = engineProfile?.engine || "claude_code";
+  const rendered = String(template || "").replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    return Object.prototype.hasOwnProperty.call(variables, key) ? String(variables[key]) : `{{${key}}}`;
+  });
+  if (engine === "codex") {
+    // Plain text: strip markdown bold/headers and emoji
+    return rendered
+      .replace(/[#*`]/g, "")
+      .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+      .trim();
+  }
+  if (engine === "gemini_cli") {
+    // Gemini supports ANSI color hints and structured JSON mixed output
+    return rendered;
+  }
+  // claude_code: keep full markdown
+  return rendered;
+}
+
+function buildOutputRenderingHints(engine) {
+  const profile = {
+    claude_code: { format: "markdown", ansi: false, emoji: true, json_mixed: false },
+    codex: { format: "plain_text", ansi: false, emoji: false, json_mixed: false },
+    gemini_cli: { format: "markdown", ansi: true, emoji: true, json_mixed: true },
+  };
+  return profile[engine] || profile["claude_code"];
+}
+
 function buildPolicyPass(bundleBase, specs, engine) {
   return {
     schema_kind: "adapter_policy_pass",
@@ -392,6 +421,7 @@ function buildPolicyPass(bundleBase, specs, engine) {
     file_class_contract: bundleBase.file_class_contract,
     hook_contract: bundleBase.hook_contract,
     capability_gap_report: bundleBase.capability_gap_report,
+    output_rendering_hints: buildOutputRenderingHints(engine),
   };
 }
 

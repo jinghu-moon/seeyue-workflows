@@ -1,0 +1,23 @@
+{
+  "description": "Persona isolation: spec_reviewer write blocked — hook-client gate (documents expected hook behavior; policy layer itself returns allow)",
+  "actionContext": {
+    "targetPath": "src/feature.ts",
+    "commandClass": "safe",
+    "changeClass": "utility",
+    "isWrite": true
+  },
+  "session": {
+    "node": {
+      "active_id": "P2-N1",
+      "owner_persona": "spec_reviewer",
+      "state": "review"
+    }
+  },
+  "expected": {
+    "route_effect": "allow",
+    "approval": {
+      "required": false
+    }
+  },
+  "note": "evaluatePolicy does not enforce persona isolation — that is enforced by hook-client checkPersonaWritePermission(). This fixture confirms policy layer passes through; hook-client layer blocks separately."
+}

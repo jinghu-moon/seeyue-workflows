@@ -118,6 +118,14 @@ global_blockers:
 phase_routing:
   execution_mode: single_active_phase
   parallel_phases_supported: false
+  phase_parallelism:
+    status: beta
+    enabled_by: session.phase.parallel_enabled
+    requires:
+    - phases have no dependency between them
+    - approval budgets are independent
+    - rollback boundaries are non-overlapping
+    conflict_resolution: block_on_shared_file_target
   states:
   - pending
   - in_progress
@@ -156,9 +164,9 @@ node_routing:
   execution_mode: single_active_node
   parallel_nodes_supported: false
   parallel_group_policy:
-    phase_1_status: reserved
-    runtime_behavior: non_null_parallel_group_is_invalid_state
-    scheduler_behavior: MUST ignore parallel expansion and block via invalid_state instead
+    phase_1_status: supported
+    runtime_behavior: non_null_parallel_group_is_invalid_state_when_max_concurrent_nodes_is_1
+    scheduler_behavior: MUST ignore parallel expansion and block via invalid_state when max_concurrent_nodes == 1
   node_required_runtime_fields:
   - id
   - phase_id
@@ -247,9 +255,20 @@ node_routing:
   ready_set_ordering:
     primary: node.priority
     secondary: topological_order_within_phase
-    tertiary: context_proximity
+    tertiary: numeric_route_score
     tie_breaker: stable_node_id
-    numeric_route_score_supported: false
+    numeric_route_score_supported: true
+    numeric_route_score_spec:
+      status: secondary_sort
+      range: [0.0, 1.0]
+      composition:
+        priority_rank:
+          weight: 0.6
+        dependency_depth:
+          weight: 0.2
+        recency_bonus:
+          weight: 0.2
+      use_as: tiebreaker_after_priority
   conditional_nodes:
     supported: true
     mode: minimal_declarative
@@ -373,7 +392,13 @@ alignment_notes:
   - full node action/input/output schema
   - advanced retry/backoff policy tuning
   - advanced timeout/deadline/SLA orchestration
-  - numeric route score
-  - non-null parallel_group scheduling
-  - true multi-active-node scheduling
-  - parallel phase execution
+multi_node_scheduling:
+  status: beta
+  max_concurrent_nodes: 3
+  enabled_by: session.loop_budget.max_concurrent_nodes
+  requires:
+  - nodes have no shared file targets
+  - nodes have no dependency between them
+  - budget allows concurrent consumption
+  budget_model: per_node_consumption
+  backward_compatible: max_concurrent_nodes defaults to 1

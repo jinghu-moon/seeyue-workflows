@@ -22,6 +22,16 @@ registry:
   change_detection:
     strategy: registry_hash
     manifest_file: .ai/workflow/skills-manifest.json
+skill_tiers:
+  core:
+    description: Required for workflow execution
+    enforcement: strict
+    load_mode: always
+  auxiliary:
+    description: Optional enhancement skills
+    enforcement: soft
+    load_mode: on_demand
+tier_enforcement: strict
 defaults:
   phases:
   - plan
@@ -45,6 +55,7 @@ skills:
     title: Change Log Management
     summary: Record, merge, and review structured changelog entries.
     category: workflow
+    tier: auxiliary
     entry: .agents/skills/sy-changelog/SKILL.md
     capabilities:
     - code_edit
@@ -61,6 +72,7 @@ skills:
     title: Code Insight
     summary: Build codebase understanding artifacts before planning or execution.
     category: analysis
+    tier: auxiliary
     entry: .agents/skills/sy-code-insight/SKILL.md
     capabilities:
     - analysis
@@ -74,6 +86,7 @@ skills:
     title: Constraint Baseline
     summary: Apply baseline workflow constraints before any phase work.
     category: constraint
+    tier: core
     entry: .agents/skills/sy-constraints/SKILL.md
     capabilities:
     - analysis
@@ -90,6 +103,7 @@ skills:
     - execute
     - review
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/debug:
@@ -102,6 +116,7 @@ skills:
     phases:
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/execution:
@@ -114,6 +129,7 @@ skills:
     phases:
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/language:
@@ -124,6 +140,7 @@ skills:
     capabilities:
     - analysis
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/phase:
@@ -137,6 +154,7 @@ skills:
     - plan
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/research:
@@ -149,6 +167,7 @@ skills:
     phases:
     - plan
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/review:
@@ -161,6 +180,7 @@ skills:
     phases:
     - review
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/safety:
@@ -174,6 +194,7 @@ skills:
     - plan
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/testing:
@@ -186,6 +207,7 @@ skills:
     phases:
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/truth:
@@ -196,6 +218,7 @@ skills:
     capabilities:
     - analysis
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/verify:
@@ -208,6 +231,7 @@ skills:
     phases:
     - review
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-constraints/workspace:
@@ -221,12 +245,14 @@ skills:
     - plan
     - execute
     parent_skill: sy-constraints
+    tier: core
     policy:
       disable_model_invocation: true
   sy-debug:
     title: Debug Workflow
     summary: Run structured debugging to identify root causes.
     category: debug
+    tier: auxiliary
     entry: .agents/skills/sy-debug/SKILL.md
     capabilities:
     - analysis
@@ -240,6 +266,7 @@ skills:
     title: Design Workflow
     summary: Produce technical design artifacts from discovery outputs.
     category: planning
+    tier: auxiliary
     entry: .agents/skills/sy-design/SKILL.md
     capabilities:
     - planning
@@ -253,6 +280,7 @@ skills:
     title: Legacy Workflow Bridge
     summary: Route legacy development workflow requests to modern phases.
     category: workflow
+    tier: auxiliary
     entry: .agents/skills/sy-development-workflow/SKILL.md
     capabilities:
     - analysis
@@ -267,6 +295,7 @@ skills:
     title: Doc Synchronization
     summary: Synchronize module-level README and AI docs.
     category: documentation
+    tier: auxiliary
     entry: .agents/skills/sy-doc-sync/SKILL.md
     capabilities:
     - code_edit
@@ -282,6 +311,7 @@ skills:
     title: Execute Plans
     summary: Execute approved plans node-by-node with checkpointing.
     category: execution
+    tier: core
     entry: .agents/skills/sy-executing-plans/SKILL.md
     capabilities:
     - code_edit
@@ -295,6 +325,7 @@ skills:
     title: Commit Assistance
     summary: Generate commit or release messages on request.
     category: release
+    tier: auxiliary
     entry: .agents/skills/sy-git-commit/SKILL.md
     capabilities:
     - analysis
@@ -308,6 +339,7 @@ skills:
     title: Ideation Workflow
     summary: Explore ambiguous requirements before design.
     category: planning
+    tier: auxiliary
     entry: .agents/skills/sy-ideation/SKILL.md
     capabilities:
     - planning
@@ -321,6 +353,7 @@ skills:
     title: Review Feedback Processing
     summary: Process reviewer feedback item-by-item with evidence checks.
     category: review
+    tier: auxiliary
     entry: .agents/skills/sy-receiving-code-review/SKILL.md
     capabilities:
     - quality_review
@@ -336,6 +369,7 @@ skills:
     title: Code Review Request
     summary: Produce structured review verdicts with evidence.
     category: review
+    tier: auxiliary
     entry: .agents/skills/sy-requesting-code-review/SKILL.md
     capabilities:
     - quality_review
@@ -351,6 +385,7 @@ skills:
     title: Verification Gate
     summary: Enforce verification before completion claims.
     category: review
+    tier: core
     entry: .agents/skills/sy-verification-before-completion/SKILL.md
     capabilities:
     - quality_review
@@ -366,6 +401,7 @@ skills:
     title: Workflow Router
     summary: Route requests into the V5 phased workflow.
     category: workflow
+    tier: core
     entry: .agents/skills/sy-workflow/SKILL.md
     capabilities:
     - planning
@@ -379,6 +415,7 @@ skills:
     title: Workflow Constraint Loader
     summary: Load minimal constraints for workflow execution.
     category: constraint
+    tier: core
     entry: .agents/skills/sy-workflow-constraints/SKILL.md
     capabilities:
     - analysis
@@ -396,6 +433,7 @@ skills:
     title: Worktree Preparation
     summary: Prepare isolated worktrees and baseline checks.
     category: workflow
+    tier: auxiliary
     entry: .agents/skills/sy-worktree/SKILL.md
     capabilities:
     - analysis
@@ -410,6 +448,7 @@ skills:
     title: Plan Authoring
     summary: Convert approved design into executable steps.
     category: planning
+    tier: auxiliary
     entry: .agents/skills/sy-writing-plans/SKILL.md
     capabilities:
     - planning

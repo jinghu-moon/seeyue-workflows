@@ -153,6 +153,41 @@ function phaseDependencySatisfied(taskGraph, dependencyId, currentPhaseId, curre
   return areDependenciesCompleted(taskGraph, [dependencyId]);
 }
 
+function computeRouteScore(node, taskGraph) {
+  // F3: Numeric route score — weighted composite for secondary sort tiebreaker
+  // Weights: priority_rank 0.6, dependency_depth 0.2, recency_bonus 0.2
+  const rank = priorityRank(node.priority); // 0=critical,1=high,2=medium,3=low
+  const maxRank = 3;
+  const priorityWeight = ((maxRank - rank) / maxRank) * 0.6;
+  const depDepth = Array.isArray(node.depends_on) ? node.depends_on.length : 0;
+  const depWeight = (1 / (1 + depDepth)) * 0.2;
+  const recencyBonus = 0.2; // static placeholder; future: derive from journal
+  return priorityWeight + depWeight + recencyBonus;
+}
+
+function selectConcurrentNodes(candidateNodes, maxConcurrent, taskGraph) {
+  // F1: Select up to maxConcurrent nodes with no shared file targets and no mutual dependencies
+  const selected = [];
+  const usedTargets = new Set();
+  const selectedIds = new Set();
+
+  for (const node of candidateNodes) {
+    if (selected.length >= maxConcurrent) break;
+    const target = node.target || null;
+    // Check shared file target conflict
+    if (target && usedTargets.has(target)) continue;
+    // Check mutual dependency conflict
+    const hasMutualDep = selected.some((s) =>
+      (node.depends_on || []).includes(s.id) || (s.depends_on || []).includes(node.id)
+    );
+    if (hasMutualDep) continue;
+    if (target) usedTargets.add(target);
+    selectedIds.add(node.id);
+    selected.push(node);
+  }
+  return selected;
+}
+
 function collectReadyNodes(taskGraph, activePhaseId, context, routeBasis) {
   const candidates = listPhaseNodes(taskGraph, activePhaseId)
     .filter((node) => node.status === "ready")
@@ -177,9 +212,13 @@ function collectReadyNodes(taskGraph, activePhaseId, context, routeBasis) {
   }
 
   readyNodes.sort((left, right) => {
-    if (priorityRank(left.priority) !== priorityRank(right.priority)) {
-      return priorityRank(left.priority) - priorityRank(right.priority);
-    }
+    // Primary: priority rank
+    const rankDiff = priorityRank(left.priority) - priorityRank(right.priority);
+    if (rankDiff !== 0) return rankDiff;
+    // Secondary: numeric route score (F3) — higher score first
+    const scoreDiff = computeRouteScore(right, taskGraph) - computeRouteScore(left, taskGraph);
+    if (scoreDiff !== 0) return scoreDiff;
+    // Tertiary: stable node id tie-breaker
     return left.id.localeCompare(right.id);
   });
 
@@ -460,8 +499,8 @@ function evaluateRouter(input) {
 
   const { readyNodes: candidateNodes, bypassedNodes } = collectReadyNodes(taskGraph, phaseId, context, routeBasis);
   if (candidateNodes.length > 0) {
-    const candidate = candidateNodes[0];
-    routeBasis.sorting_decision.push(`selected=${candidate.id}`);
+    // F1: Multi-node scheduling — max_concurrent_nodes defaults to 1 (backward-compatible)
+    const maxConcurrent = Number(session?.loop_budget?.max_concurrent_nodes || 1);
     const emitEvents = [];
     if (activeReviewNodeCompleted) {
       emitEvents.push("node_completed");
@@ -470,13 +509,48 @@ function evaluateRouter(input) {
       emitEvents.push("node_bypassed");
     }
     emitEvents.push("node_started");
+
+    if (maxConcurrent <= 1) {
+      // Single-node path (default)
+      const candidate = candidateNodes[0];
+      routeBasis.sorting_decision.push(`selected=${candidate.id}`);
+      return buildResult({
+        route_verdict: "advance",
+        active_phase: phaseId,
+        active_node: candidate.id,
+        next_persona: "author",
+        next_capability: candidate.capability || "code_edit",
+        recommended_next: [startNodeNext(candidate.id, "start highest priority ready node")],
+        route_basis: routeBasis,
+        emit_events: emitEvents,
+        bypassed_nodes: bypassedNodes,
+      });
+    }
+
+    // Multi-node path: select up to maxConcurrent nodes with no shared targets and no mutual deps
+    const selected = selectConcurrentNodes(candidateNodes, maxConcurrent, taskGraph);
+    if (selected.length === 0) {
+      // Conflict detected — block via invalid_state per spec
+      routeBasis.blockers.push("invalid_state");
+      return buildResult({
+        route_verdict: "block",
+        active_phase: phaseId,
+        active_node: activeNode?.id || session?.node?.active_id || "none",
+        next_persona: "human",
+        next_capability: "human_approval",
+        recommended_next: [humanNext(phaseId || "runtime", "parallel node conflict: shared file targets")],
+        block_reason: "invalid_state",
+        route_basis: routeBasis,
+      });
+    }
+    selected.forEach((n) => routeBasis.sorting_decision.push(`selected=${n.id}`));
     return buildResult({
       route_verdict: "advance",
       active_phase: phaseId,
-      active_node: candidate.id,
+      active_node: selected[0].id,
       next_persona: "author",
-      next_capability: candidate.capability || "code_edit",
-      recommended_next: [startNodeNext(candidate.id, "start highest priority ready node")],
+      next_capability: selected[0].capability || "code_edit",
+      recommended_next: selected.map((n) => startNodeNext(n.id, "start concurrent ready node")),
       route_basis: routeBasis,
       emit_events: emitEvents,
       bypassed_nodes: bypassedNodes,

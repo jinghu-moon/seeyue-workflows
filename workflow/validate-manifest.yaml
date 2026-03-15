@@ -97,6 +97,14 @@ specs:
     schema_version: 1
     freeze_gate: P2-N1
     cross_refs: []
+  workflow/execution.spec.yaml:
+    schema_kind: execution_spec
+    status: draft
+    schema_version: 1
+    freeze_gate: P2-N3
+    cross_refs:
+    - workflow/persona-bindings.yaml
+    - workflow/policy.spec.yaml
   workflow/approval-matrix.yaml:
     schema_kind: approval_matrix
     status: draft

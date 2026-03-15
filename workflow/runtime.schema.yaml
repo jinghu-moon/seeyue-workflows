@@ -124,6 +124,16 @@ session:
           - blocked
           - review
           - completed
+        parallel_enabled:
+          type: boolean
+          default: false
+          description: When true, multiple phases may be in_progress simultaneously.
+        active_ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Active phase IDs in parallel mode. Replaces current when parallel_enabled is true.
     node:
       type: object
       additional_properties: false
@@ -180,6 +190,12 @@ session:
         consumed_failures:
           type: integer
           minimum: 0
+        max_concurrent_nodes:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 1
+          description: Maximum nodes that may be in_progress simultaneously. Defaults to 1 (single-node mode).
     context_budget:
       type: object
       additional_properties: false

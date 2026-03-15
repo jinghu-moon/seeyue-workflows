@@ -1,0 +1,89 @@
+schema_kind: execution_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define node action schema, execute 3-split contract, and persona action constraints.
+  authority: machine_source_of_truth
+  primary_consumers:
+  - policy_engine
+  - hook-client
+  - validators
+  - router_engine
+  source_documents:
+  - docs/architecture-v4.md
+  - docs/architecture-v5-proposal.md
+  rules:
+  - node_action_schema.action_types MUST be a non-empty array.
+  - execute_3split.phases MUST contain [red, implementation, verify] in order.
+  - persona_action_constraints MUST define may_write and may_run for every persona.
+node_action_schema:
+  action_types:
+  - read
+  - write
+  - command
+  - review
+  - analysis
+  - approval
+  inputs:
+    source_enum:
+    - runtime_state
+    - prior_node_output
+    - human_input
+    - tool_output
+  outputs:
+    destination_enum:
+    - runtime_state
+    - evidence_refs
+    - output_refs
+    - journal
+execute_3split:
+  phases:
+  - red
+  - implementation
+  - verify
+  red:
+    gate: red_verified
+    forbidden: production_write
+    description: Write a failing test that captures the missing behavior.
+  implementation:
+    gate: green_verified
+    requires: red_verified
+    description: Write the minimum production code to pass the red test.
+  verify:
+    gate: verified
+    requires: green_verified
+    description: Confirm all acceptance criteria pass; no regressions.
+persona_action_constraints:
+  author:
+    may_write: true
+    may_run: true
+    forbidden_actions:
+    - review_verdict
+  spec_reviewer:
+    may_write: false
+    may_run: true
+    forbidden_actions:
+    - file_write
+  quality_reviewer:
+    may_write: false
+    may_run: true
+    forbidden_actions:
+    - file_write
+  reader:
+    may_write: false
+    may_run: true
+    forbidden_actions: []
+  auditor:
+    may_write: false
+    may_run: true
+    forbidden_actions: []
+  planner:
+    may_write: false
+    may_run: false
+    forbidden_actions: []
+  human:
+    may_write: false
+    may_run: false
+    forbidden_actions: []

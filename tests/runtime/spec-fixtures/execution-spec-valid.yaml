@@ -1,0 +1,66 @@
+schema_kind: execution_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+node_action_schema:
+  action_types:
+    - read
+    - write
+    - command
+    - review
+    - analysis
+    - approval
+  inputs:
+    source_enum:
+      - runtime_state
+      - prior_node_output
+      - human_input
+      - tool_output
+  outputs:
+    destination_enum:
+      - runtime_state
+      - evidence_refs
+      - output_refs
+      - journal
+execute_3split:
+  phases:
+    - red
+    - implementation
+    - verify
+  red:
+    gate: red_verified
+    forbidden: production_write
+  implementation:
+    gate: green_verified
+    requires: red_verified
+  verify:
+    gate: verified
+    requires: green_verified
+persona_action_constraints:
+  author:
+    may_write: true
+    may_run: true
+    forbidden_actions:
+      - review_verdict
+  spec_reviewer:
+    may_write: false
+    may_run: true
+    forbidden_actions:
+      - file_write
+  quality_reviewer:
+    may_write: false
+    may_run: true
+    forbidden_actions:
+      - file_write
+  reader:
+    may_write: false
+    may_run: true
+  auditor:
+    may_write: false
+    may_run: true
+  planner:
+    may_write: false
+    may_run: false
+  human:
+    may_write: false
+    may_run: false

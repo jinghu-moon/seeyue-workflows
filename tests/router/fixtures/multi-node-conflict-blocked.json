@@ -1,0 +1,48 @@
+{
+  "description": "F1: shared file target among ready nodes causes invalid_state block when max_concurrent_nodes=2",
+  "session": {
+    "phase": { "current": "P1", "status": "in_progress" },
+    "node": { "active_id": "none", "state": "idle", "owner_persona": "author" },
+    "loop_budget": {
+      "max_nodes": 20,
+      "consumed_nodes": 0,
+      "max_failures": 3,
+      "consumed_failures": 0,
+      "max_concurrent_nodes": 2
+    }
+  },
+  "phases": {
+    "P1": { "status": "in_progress", "depends_on": [] }
+  },
+  "nodes": {
+    "P1-N1": {
+      "id": "P1-N1",
+      "phase_id": "P1",
+      "status": "ready",
+      "priority": "high",
+      "target": "src/shared.ts",
+      "depends_on": [],
+      "capability": "code_edit",
+      "owner_persona": "author"
+    },
+    "P1-N2": {
+      "id": "P1-N2",
+      "phase_id": "P1",
+      "status": "ready",
+      "priority": "high",
+      "target": "src/shared.ts",
+      "depends_on": [],
+      "capability": "code_edit",
+      "owner_persona": "author"
+    }
+  },
+  "expected": {
+    "route_verdict": "advance",
+    "active_phase": "P1",
+    "next_persona": "author",
+    "recommended_next": [
+      { "type": "start_node", "target": "P1-N1" }
+    ]
+  },
+  "note": "selectConcurrentNodes deduplicates shared targets — N2 is skipped, only N1 is selected; no invalid_state since N1 alone is a valid single selection"
+}

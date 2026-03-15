@@ -109,12 +109,29 @@ approval_policy:
       manual_required: plan
       never_auto: yolo
       notify_only: default
-  policy_tiers:
-    notify_only:
-      description: low-risk changes with verification and audit trail
-      requires_human_notification: true
-    approval_required:
-      description: requires explicit human approval before action
+      policy_tier_model: gemini_tier_model
+      tier_resolution: first_match_wins
+policy_tiers:
+  notify_only:
+    description: low-risk changes with verification and audit trail
+    requires_human_notification: true
+  approval_required:
+    description: requires explicit human approval before action
+gemini_tier_model:
+  tiers:
+  - admin
+  - workspace
+  - extension
+  precedence: admin > workspace > extension
+  admin:
+    scope: global
+    override_lower: true
+  workspace:
+    scope: project
+    override_lower: true
+  extension:
+    scope: skill_or_tool
+    override_lower: false
 test_policy:
   applies_to:
     default_task_modes:

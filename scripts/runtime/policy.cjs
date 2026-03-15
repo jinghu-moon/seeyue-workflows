@@ -531,6 +531,19 @@ function buildCompletionVerdict(session, taskGraph, node, actionContext, testGat
   };
 }
 
+function resolveGeminiPolicyTier(policySpec, actionContext) {
+  const tierModel = policySpec?.gemini_tier_model;
+  if (!tierModel) return null;
+  const tiers = Array.isArray(tierModel.tiers) ? tierModel.tiers : ["admin", "workspace", "extension"];
+  const requestedTier = actionContext?.gemini_tier;
+  for (const tier of tiers) {
+    if (requestedTier === tier) {
+      return { tier, config: tierModel[tier] || {} };
+    }
+  }
+  return { tier: "extension", config: tierModel.extension || {} };
+}
+
 function evaluatePolicy(input) {
   const session = input.session || {};
   const taskGraph = input.taskGraph || {};
@@ -542,6 +555,12 @@ function evaluatePolicy(input) {
   const retry = buildRetryVerdict(node, actionContext);
   const timeout = buildTimeoutVerdict(node, actionContext);
   const completion = buildCompletionVerdict(session, taskGraph, node, actionContext, testGates);
+
+  // Gemini tier model resolution (Batch 2.3)
+  const engineMode = actionContext.engine || session.engine || null;
+  const geminiTier = engineMode === "gemini_cli"
+    ? resolveGeminiPolicyTier(specs.policySpec || {}, actionContext)
+    : null;
 
   let routeEffect = "allow";
   let primaryReason = approval.notify_only ? "notify_only" : null;
@@ -570,6 +589,7 @@ function evaluatePolicy(input) {
     timeout,
     completion,
     target_ref: actionContext.targetPath || node?.target || node?.id || null,
+    gemini_tier: geminiTier,
   };
 }
 
@@ -577,4 +597,5 @@ module.exports = {
   classifyFilePath,
   evaluatePolicy,
   normalizeCommandClass,
+  resolveGeminiPolicyTier,
 };

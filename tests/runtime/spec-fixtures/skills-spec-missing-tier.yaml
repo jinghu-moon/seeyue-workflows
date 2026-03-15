@@ -1,0 +1,40 @@
+schema_kind: skills_spec
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+# skill_tiers block present but individual skills missing 'tier' field — expect WARNING
+skill_tiers:
+  core:
+    description: Required for workflow execution
+    enforcement: strict
+    load_mode: always
+  auxiliary:
+    description: Optional enhancement skills
+    enforcement: soft
+    load_mode: on_demand
+tier_enforcement: strict
+defaults:
+  phases:
+    - plan
+    - execute
+    - review
+  triggers:
+    mode: explicit
+    keywords: []
+skills:
+  sy-workflow:
+    title: Workflow Router
+    summary: Route requests into the phased workflow.
+    category: workflow
+    entry: .agents/skills/sy-workflow/SKILL.md
+    capabilities:
+      - planning
+    # tier field intentionally omitted — expect WARNING
+  sy-constraints:
+    title: Constraint Baseline
+    summary: Apply baseline workflow constraints.
+    category: constraint
+    entry: .agents/skills/sy-constraints/SKILL.md
+    capabilities:
+      - analysis
+    # tier field intentionally omitted — expect WARNING

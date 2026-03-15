@@ -115,3 +115,24 @@ isolation_rules:
   - Spec reviewer MUST NOT be the same invocation as author.
   - Quality reviewer MUST NOT be the same invocation as author.
   - Quality reviewer MUST NOT reuse spec review claims without fresh evidence.
+isolation_enforcement:
+  mode: strict
+  hook_check: pre_write
+  violation_action: block
+  rules:
+    - id: no_reviewer_write
+      personas:
+      - spec_reviewer
+      - quality_reviewer
+      - reader
+      - auditor
+      - planner
+      - human
+      forbidden: file_write
+      block_message: "Persona {persona} may not write files"
+    - id: no_reviewer_command_mutate
+      personas:
+      - spec_reviewer
+      - quality_reviewer
+      forbidden: destructive_command
+      block_message: "Reviewer persona may not run destructive commands"

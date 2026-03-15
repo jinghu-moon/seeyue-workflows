@@ -612,6 +612,43 @@ function deriveChangeClass(fileClass) {
   return "feature";
 }
 
+function checkPersonaWritePermission(snapshot, specs) {
+  const persona = snapshot?.session?.node?.owner_persona;
+  if (!persona) {
+    return null;
+  }
+  const personaBindings = specs?.personaBindings?.personas || {};
+  const personaDef = personaBindings[persona];
+  if (!personaDef) {
+    return null; // unknown persona — do not block
+  }
+  if (personaDef.may_write_files === false) {
+    return { blocked: true, reason: `Persona ${persona} may not write files` };
+  }
+  return null;
+}
+
+function checkPersonaCommandPermission(snapshot, commandClass, specs) {
+  const persona = snapshot?.session?.node?.owner_persona;
+  if (!persona) {
+    return null;
+  }
+  const personaBindings = specs?.personaBindings?.personas || {};
+  const personaDef = personaBindings[persona];
+  if (!personaDef) {
+    return null;
+  }
+  if (personaDef.may_run_commands === false) {
+    return { blocked: true, reason: `Persona ${persona} may not run commands` };
+  }
+  const reviewerPersonas = new Set(["spec_reviewer", "quality_reviewer"]);
+  const destructiveClasses = new Set(["destructive", "privileged", "git_mutating"]);
+  if (reviewerPersonas.has(persona) && destructiveClasses.has(commandClass)) {
+    return { blocked: true, reason: `Persona ${persona} may not run ${commandClass} commands` };
+  }
+  return null;
+}
+
 function hasApprovedWriteGrant(snapshot, targetPath, fileClass) {
   const grants = Array.isArray(snapshot?.session?.approvals?.grants) ? snapshot.session.approvals.grants : [];
   return grants.some((grant) => {
@@ -755,6 +792,19 @@ function handlePretoolWrite(payload) {
 
   const state = loadWorkflowState(cwd, policy);
   const policyContext = filePath ? buildPolicyContext(state, cwd, filePath) : null;
+
+  // Persona write permission check (isolation_enforcement)
+  if (state.runtimeReady && state.snapshot) {
+    const personaWriteBlock = checkPersonaWritePermission(state.snapshot, getWorkflowSpecs());
+    if (personaWriteBlock?.blocked) {
+      return buildBlockResult(
+        "sy-pretool-write/gate1-persona",
+        personaWriteBlock.reason,
+        ["当前 persona 无文件写入权限，请切换到 author persona 后再继续。"],
+      );
+    }
+  }
+
   const targetPath = policyContext?.targetPath || filePath;
   const fileClass = policyContext?.fileClass || null;
   const isRuntimeStateFile = Boolean(targetPath && String(targetPath).startsWith(".ai/"));
@@ -2067,6 +2117,18 @@ function handlePretoolBash(payload) {
   const specs = getWorkflowSpecs();
   const approvalGranted = Boolean(commitAuthorized || pushAuthorized || hasApprovedCommandGrant(state.snapshot, command, commandClass));
   const tddExceptionActive = Boolean(state.runtimeReady && normalizeTddException(state.snapshot?.activeNode?.tdd_exception));
+
+  // Persona command permission check (Batch 2.2)
+  if (state.runtimeReady && state.snapshot) {
+    const personaCmdBlock = checkPersonaCommandPermission(state.snapshot, commandClass, specs);
+    if (personaCmdBlock?.blocked) {
+      return buildBlockResult(
+        "sy-pretool-bash/gate-persona",
+        personaCmdBlock.reason,
+        [`command: ${command}`, `persona: ${personaCmdBlock.persona}`, "see: workflow/persona-bindings.yaml"],
+      );
+    }
+  }
 
   const verdict = evaluatePolicy({
     session: state.snapshot?.session || {},
