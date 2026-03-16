@@ -102,18 +102,23 @@ pub fn run_pretool_write(params: PreToolWriteParams, app: &AppState) -> HookResu
 /// Execute sy_posttool_write: record write evidence to journal.
 pub fn run_posttool_write(params: PostToolWriteParams, app: &AppState) -> HookResult {
     let session = state::load_session(&app.workflow_dir);
+    let run_id  = session.run_id.as_deref().unwrap_or("").to_string();
+    let phase   = session.phase.id.as_deref().or(session.phase.name.as_deref()).unwrap_or("none").to_string();
+    let node_id = session.node.id.as_deref().or(session.node.name.as_deref()).unwrap_or("none").to_string();
 
-    let event = journal::JournalEvent::new("write_recorded", "hook")
-        .with_run_id(session.run_id.as_deref().unwrap_or("unknown"))
-        .with_phase(session.phase.id.as_deref().unwrap_or("unknown"))
-        .with_node_id(session.node.id.as_deref().unwrap_or("unknown"))
-        .with_payload(serde_json::json!({
-            "path": params.path,
-            "tool": params.tool.unwrap_or_else(|| "unknown".to_string()),
-            "lines_changed": params.lines_changed,
-        }));
-
-    if let Err(e) = journal::append_event(&app.workflow_dir, event) {
+    if let Err(e) = journal::record_write_evidence(journal::WriteEvidenceParams {
+        workflow_dir:     &app.workflow_dir,
+        run_id:           &run_id,
+        phase:            &phase,
+        node_id:          &node_id,
+        tool:             params.tool.as_deref().unwrap_or("unknown"),
+        path:             &params.path,
+        lines_changed:    params.lines_changed.map(|v| v as i64),
+        outcome:          "success",
+        checkpoint_label: None,
+        syntax_valid:     None,
+        scope_drift:      false,
+    }) {
         return HookResult::allow(format!("Write recorded (journal warning: {})", e));
     }
 

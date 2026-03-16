@@ -101,6 +101,55 @@ pub fn append_event(workflow_dir: &Path, event: JournalEvent) -> Result<(), Stri
     Ok(())
 }
 
+// ─── Shared write evidence helper ───────────────────────────────────────────
+
+/// Unified write evidence parameters (protocol §8 of 10-three-layer-protocol.md).
+pub struct WriteEvidenceParams<'a> {
+    pub workflow_dir: &'a Path,
+    pub run_id:       &'a str,
+    pub phase:        &'a str,
+    pub node_id:      &'a str,
+    pub tool:         &'a str,
+    /// Workspace-relative file path, forward-slash normalised.
+    pub path:         &'a str,
+    pub lines_changed:     Option<i64>,
+    pub outcome:           &'a str,   // "success" | "failure" | "aborted"
+    pub checkpoint_label:  Option<&'a str>,
+    pub syntax_valid:      Option<bool>,
+    pub scope_drift:       bool,
+}
+
+/// Record a `write_recorded` journal event with the canonical evidence schema.
+///
+/// Called from both the hook router (`PostToolUse:Write|Edit`) and the
+/// `sy_posttool_write` MCP tool — single source of truth for the payload shape.
+pub fn record_write_evidence(p: WriteEvidenceParams<'_>) -> Result<(), String> {
+    if p.run_id.is_empty() || p.path.is_empty() {
+        return Ok(()); // nothing to record
+    }
+    let mut payload = serde_json::json!({
+        "tool":        p.tool,
+        "path":        p.path.replace('\\', "/"),
+        "outcome":     p.outcome,
+        "scope_drift": p.scope_drift,
+    });
+    if let Some(lc) = p.lines_changed {
+        payload["lines_changed"] = serde_json::json!(lc);
+    }
+    if let Some(label) = p.checkpoint_label {
+        payload["checkpoint_label"] = serde_json::json!(label);
+    }
+    if let Some(sv) = p.syntax_valid {
+        payload["syntax_valid"] = serde_json::json!(sv);
+    }
+    let evt = JournalEvent::new("write_recorded", "hook")
+        .with_run_id(p.run_id)
+        .with_phase(p.phase)
+        .with_node_id(if p.node_id.is_empty() { "none" } else { p.node_id })
+        .with_payload(payload);
+    append_event(p.workflow_dir, evt)
+}
+
 /// Read the last N lines from journal.jsonl.
 #[allow(dead_code)]
 pub fn read_recent(workflow_dir: &Path, max_lines: usize) -> Result<String, String> {

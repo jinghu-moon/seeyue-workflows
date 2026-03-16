@@ -14,7 +14,7 @@ use serde_json::json;
 use crate::hooks::protocol::{HookInput, emit_allow, emit_result};
 use crate::hooks::{posttool_bash, prompt_refresh, session_start};
 use crate::policy::evaluator::PolicyEngine;
-use crate::workflow::journal::{self, JournalEvent};
+use crate::workflow::journal;
 use crate::workflow::state::SessionState;
 
 /// Dispatch a hook event to the appropriate handler.
@@ -118,41 +118,27 @@ fn handle_posttool_write(
     }));
 
     // Record journal event if run_id exists
-    let run_id = session.run_id.as_deref().unwrap_or("").to_string();
-    let node_id = session
-        .node
-        .id
-        .as_deref()
-        .or(session.node.name.as_deref())
-        .unwrap_or("")
-        .to_string();
-    let phase_id = session
-        .phase
-        .id
-        .as_deref()
-        .or(session.phase.name.as_deref())
-        .unwrap_or("none")
-        .to_string();
-
-    // Check scope drift
+    let run_id  = session.run_id.as_deref().unwrap_or("").to_string();
+    let node_id  = session.node.id.as_deref()
+        .or(session.node.name.as_deref()).unwrap_or("").to_string();
+    let phase_id = session.phase.id.as_deref()
+        .or(session.phase.name.as_deref()).unwrap_or("none").to_string();
     let scope_drift = check_scope_drift(session, &file_path, &cwd);
 
-    if !run_id.is_empty() && !file_path.is_empty() {
-        let evt = JournalEvent::new("write_recorded", "hook")
-            .with_run_id(&run_id)
-            .with_phase(&phase_id)
-            .with_node_id(if node_id.is_empty() {
-                "none"
-            } else {
-                &node_id
-            })
-            .with_payload(json!({
-                "tool": tool_name,
-                "file": file_path.replace('\\', "/"),
-                "scope_drift": scope_drift,
-            }));
-        let _ = journal::append_event(workflow_dir, evt);
-    }
+    // Use shared helper — single source of truth for write_recorded schema.
+    let _ = journal::record_write_evidence(journal::WriteEvidenceParams {
+        workflow_dir,
+        run_id:           &run_id,
+        phase:            &phase_id,
+        node_id:          &node_id,
+        tool:             &tool_name,
+        path:             &file_path,
+        lines_changed:    None,
+        outcome:          "success",
+        checkpoint_label: None,
+        syntax_valid:     None,
+        scope_drift,
+    });
 
     emit_allow("allow_posttool_write")
 }

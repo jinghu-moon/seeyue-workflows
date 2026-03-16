@@ -17,6 +17,7 @@ use crate::error::ToolError;
 pub struct FileNode {
     pub path:     String,           // relative to base_path
     pub content:  Option<String>,   // file content; None = create empty file
+    #[allow(dead_code)]
     pub template: Option<String>,   // template name (future use, currently unused)
 }
 
