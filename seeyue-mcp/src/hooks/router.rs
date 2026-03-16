@@ -1,0 +1,210 @@
+// src/hooks/router.rs
+//
+// Hook event router: dispatches hook_event to the appropriate handler.
+//
+// PreToolUse:Bash, PreToolUse:Write|Edit, PostToolUse:Write|Edit, and Stop
+// are handled inline (they directly call P1 PolicyEngine methods).
+// SessionStart, UserPromptSubmit, and PostToolUse:Bash have dedicated modules.
+
+use std::fs;
+use std::path::Path;
+
+use serde_json::json;
+
+use crate::hooks::protocol::{HookInput, emit_allow, emit_result};
+use crate::hooks::{posttool_bash, prompt_refresh, session_start};
+use crate::policy::evaluator::PolicyEngine;
+use crate::workflow::journal::{self, JournalEvent};
+use crate::workflow::state::SessionState;
+
+/// Dispatch a hook event to the appropriate handler.
+///
+/// This is the main entry point called by `sy-hook.rs` after setup.
+pub fn dispatch(
+    hook_event: &str,
+    input: &HookInput,
+    engine: &PolicyEngine,
+    session: &SessionState,
+    workflow_dir: &Path,
+) -> ! {
+    match hook_event {
+        "SessionStart" => {
+            session_start::handle(input, workflow_dir, session);
+        }
+
+        "UserPromptSubmit" => {
+            prompt_refresh::handle(input, workflow_dir, session);
+        }
+
+        // ── PreToolUse:Bash ─────────────────────────────────────────────
+        "PreToolUse:Bash" => {
+            let cmd = input
+                .tool_input_str("command")
+                .or_else(|| input.tool_input_str("cmd"))
+                .unwrap_or_default();
+
+            if cmd.trim().is_empty() {
+                emit_allow("empty_command");
+            }
+
+            let result = engine.check_bash(&cmd, session);
+            emit_result(result, None);
+        }
+
+        // ── PreToolUse:Write|Edit ───────────────────────────────────────
+        "PreToolUse:Write" | "PreToolUse:Edit" | "PreToolUse:Write|Edit" => {
+            let path = input
+                .tool_input_str("file_path")
+                .or_else(|| input.tool_input_str("path"))
+                .unwrap_or_default();
+
+            if path.trim().is_empty() {
+                emit_allow("empty_file_path");
+            }
+
+            let result = engine.check_write(&path, session);
+            emit_result(result, None);
+        }
+
+        // ── PostToolUse:Write|Edit ──────────────────────────────────────
+        "PostToolUse:Write" | "PostToolUse:Edit" | "PostToolUse:Write|Edit" => {
+            handle_posttool_write(input, workflow_dir, session);
+        }
+
+        // ── PostToolUse:Bash ────────────────────────────────────────────
+        "PostToolUse:Bash" => {
+            posttool_bash::handle(input, workflow_dir, session);
+        }
+
+        // ── Stop ────────────────────────────────────────────────────────
+        "Stop" => {
+            let result = engine.check_stop(session);
+            emit_result(result, None);
+        }
+
+        // ── Unknown event → fail-open ───────────────────────────────────
+        _ => {
+            emit_allow(&format!("unknown_hook_event: {}", hook_event));
+        }
+    }
+}
+
+// ─── PostToolUse:Write|Edit (inline handler) ────────────────────────────────
+
+/// Handle PostToolUse:Write|Edit: record audit trail and journal event.
+fn handle_posttool_write(
+    input: &HookInput,
+    workflow_dir: &Path,
+    session: &SessionState,
+) -> ! {
+    let cwd = input.resolve_cwd();
+    let file_path = input
+        .tool_input_str("file_path")
+        .or_else(|| input.tool_input_str("path"))
+        .unwrap_or_default();
+    let tool_name = input
+        .tool_name
+        .as_deref()
+        .unwrap_or("Write")
+        .to_string();
+
+    // Append audit entry
+    let audit_path = Path::new(&cwd).join(".ai/workflow/audit.jsonl");
+    append_audit(&audit_path, &json!({
+        "ts": chrono::Utc::now().to_rfc3339(),
+        "event": "PostToolUse",
+        "tool": tool_name,
+        "file": file_path,
+    }));
+
+    // Record journal event if run_id exists
+    let run_id = session.run_id.as_deref().unwrap_or("").to_string();
+    let node_id = session
+        .node
+        .id
+        .as_deref()
+        .or(session.node.name.as_deref())
+        .unwrap_or("")
+        .to_string();
+    let phase_id = session
+        .phase
+        .id
+        .as_deref()
+        .or(session.phase.name.as_deref())
+        .unwrap_or("none")
+        .to_string();
+
+    // Check scope drift
+    let scope_drift = check_scope_drift(session, &file_path, &cwd);
+
+    if !run_id.is_empty() && !file_path.is_empty() {
+        let evt = JournalEvent::new("write_recorded", "hook")
+            .with_run_id(&run_id)
+            .with_phase(&phase_id)
+            .with_node_id(if node_id.is_empty() {
+                "none"
+            } else {
+                &node_id
+            })
+            .with_payload(json!({
+                "tool": tool_name,
+                "file": file_path.replace('\\', "/"),
+                "scope_drift": scope_drift,
+            }));
+        let _ = journal::append_event(workflow_dir, evt);
+    }
+
+    emit_allow("allow_posttool_write")
+}
+
+/// Check if file is outside the node's target scope.
+fn check_scope_drift(session: &SessionState, file_path: &str, _cwd: &str) -> bool {
+    // Skip evidence files
+    let is_evidence = file_path.ends_with(".md")
+        || file_path.ends_with(".jsonl")
+        || file_path.ends_with(".json")
+        || file_path.ends_with(".yaml")
+        || file_path.ends_with(".yml")
+        || file_path.ends_with(".txt")
+        || file_path.ends_with(".log");
+
+    if is_evidence || file_path.is_empty() {
+        return false;
+    }
+
+    // Check phase is execute
+    let phase = session.phase.name.as_deref().or(session.phase.id.as_deref());
+    if phase != Some("execute") {
+        return false;
+    }
+
+    // Check target
+    if let Some(targets) = &session.node.target {
+        let normalized = file_path.replace('\\', "/");
+        let in_scope = targets.iter().any(|t| {
+            let t_norm = t.replace('\\', "/");
+            normalized.starts_with(&t_norm) || t_norm.contains('*')
+        });
+        return !in_scope;
+    }
+
+    false
+}
+
+/// Append a JSON line to an audit log file.
+fn append_audit(path: &Path, entry: &serde_json::Value) {
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(mut line) = serde_json::to_string(entry) {
+        line.push('\n');
+        let _ = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .and_then(|mut f| {
+                use std::io::Write;
+                f.write_all(line.as_bytes())
+            });
+    }
+}

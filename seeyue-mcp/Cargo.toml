@@ -65,6 +65,10 @@ windows-sys = { version = "0.52", features = [
 tempfile = "3"
 tokio    = { version = "1", features = ["full", "test-util"] }
 
+[[bin]]
+name = "sy-hook"
+path = "src/bin/sy-hook.rs"
+
 [profile.release]
 opt-level     = 3
 lto           = "thin"

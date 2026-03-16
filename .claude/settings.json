@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-session-start.cjs",
-            "timeout": 8
+            "command": "seeyue-mcp/target/release/sy-hook.exe SessionStart",
+            "timeout": 5
           }
         ],
         "description": "SY bootstrap: inject first-turn workflow + constraint routing context"
@@ -19,8 +19,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-prompt-refresh.cjs",
-            "timeout": 6
+            "command": "seeyue-mcp/target/release/sy-hook.exe UserPromptSubmit",
+            "timeout": 3
           }
         ],
         "description": "SY refresh: lightweight constraint anchor for long-session drift"
@@ -32,13 +32,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-pretool-bash.cjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/hooks/sy-pretool-bash-budget.cjs",
-            "timeout": 8
+            "command": "seeyue-mcp/target/release/sy-hook.exe PreToolUse:Bash",
+            "timeout": 5
           }
         ],
         "description": "SY guard: command class approval + destructive guard + loop budgets"
@@ -48,13 +43,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-pretool-write.cjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/hooks/sy-pretool-write-session.cjs",
-            "timeout": 8
+            "command": "seeyue-mcp/target/release/sy-hook.exe PreToolUse:Write|Edit",
+            "timeout": 5
           }
         ],
         "description": "SY guard: pre-write policy gates + session state integrity"
@@ -66,8 +56,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-posttool-write.cjs",
-            "timeout": 8
+            "command": "seeyue-mcp/target/release/sy-hook.exe PostToolUse:Write|Edit",
+            "timeout": 5
           }
         ],
         "description": "SY post-write: audit log, index invalidation, and scope drift warning"
@@ -77,8 +67,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-posttool-bash-verify.cjs",
-            "timeout": 8
+            "command": "seeyue-mcp/target/release/sy-hook.exe PostToolUse:Bash",
+            "timeout": 5
           }
         ],
         "description": "SY post-bash: capture verification + TDD red/green evidence"
@@ -90,8 +80,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/sy-stop.cjs",
-            "timeout": 10
+            "command": "seeyue-mcp/target/release/sy-hook.exe Stop",
+            "timeout": 5
           }
         ],
         "description": "SY gate: block incomplete checkpoints before response stop"
@@ -100,10 +90,12 @@
   },
   "_sy_generated": {
     "generator": "seeyue-compile-adapter",
-    "version": 1,
+    "version": 2,
     "engine": "claude_code",
     "pass": "policy",
-    "registry_revision": "2026-03-11",
-    "spec_hash": "616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b"
+    "registry_revision": "2026-03-16",
+    "spec_hash": "616d60fe5a1f409646f9c0319c70fb30f40b3b7bf6b9006dc97f004dbaae498b",
+    "hook_binary": "sy-hook.exe",
+    "migration_note": "P2: Node.js hooks → Rust binary. Set SY_HOOK_DRY_RUN=1 for observation mode."
   }
 }
