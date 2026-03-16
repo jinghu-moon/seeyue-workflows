@@ -62,12 +62,33 @@ pub struct NodeState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LoopBudget {
+    // Legacy fields (kept for backward compatibility with existing session.yaml files)
     #[serde(default)]
     pub max: Option<u32>,
     #[serde(default)]
     pub used: Option<u32>,
     #[serde(default)]
     pub exhausted: Option<bool>,
+
+    // V4 six-metric budget (architecture-v4.md §6.1)
+    #[serde(default)]
+    pub max_nodes: Option<u32>,
+    #[serde(default)]
+    pub consumed_nodes: Option<u32>,
+    #[serde(default)]
+    pub max_failures: Option<u32>,
+    #[serde(default)]
+    pub consumed_failures: Option<u32>,
+    #[serde(default)]
+    pub max_pending_approvals: Option<u32>,
+    #[serde(default)]
+    pub max_context_utilization: Option<f32>,
+    #[serde(default)]
+    pub current_context_utilization: Option<f32>,
+    #[serde(default)]
+    pub max_rework_cycles: Option<u32>,
+    #[serde(default)]
+    pub consumed_rework_cycles: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -121,17 +142,82 @@ pub fn save_session(workflow_dir: &Path, state: &SessionState) -> Result<(), Str
 
 // ─── Query helpers ───────────────────────────────────────────────────────────
 
-/// Check loop budget. Returns `Some(reason)` if budget is exhausted.
+/// Check loop budget against all six V4 metrics.
+/// Returns `Some(BudgetExceeded { metric, consumed, max })` if any limit is breached.
+/// Legacy `max/used/exhausted` fields are checked for backward compatibility.
 pub fn check_loop_budget(session: &SessionState) -> Option<String> {
-    if session.loop_budget.exhausted == Some(true) {
-        return Some("Loop budget exhausted".to_string());
+    let b = &session.loop_budget;
+
+    // Legacy exhausted flag
+    if b.exhausted == Some(true) {
+        return Some("budget_exceeded: nodes (legacy exhausted flag)".to_string());
     }
 
-    if let (Some(max), Some(used)) = (session.loop_budget.max, session.loop_budget.used) {
+    // Legacy max/used
+    if let (Some(max), Some(used)) = (b.max, b.used) {
         if used >= max {
             return Some(format!(
-                "Loop budget exhausted: {}/{} iterations used",
+                "budget_exceeded: nodes ({}/{} iterations used)",
                 used, max
+            ));
+        }
+    }
+
+    // V4: max_nodes
+    if let (Some(max), Some(consumed)) = (b.max_nodes, b.consumed_nodes) {
+        if consumed >= max {
+            return Some(format!(
+                "budget_exceeded: nodes ({}/{} nodes consumed)",
+                consumed, max
+            ));
+        }
+    }
+
+    // V4: max_failures
+    if let (Some(max), Some(consumed)) = (b.max_failures, b.consumed_failures) {
+        if consumed >= max {
+            return Some(format!(
+                "budget_exceeded: failures ({}/{} failures)",
+                consumed, max
+            ));
+        }
+    }
+
+    // V4: max_pending_approvals — check against current pending count
+    if let Some(max) = b.max_pending_approvals {
+        let pending = session
+            .approvals
+            .pending
+            .as_ref()
+            .map(|v| v.len() as u32)
+            .unwrap_or(0);
+        if pending >= max {
+            return Some(format!(
+                "budget_exceeded: approvals ({}/{} pending approvals)",
+                pending, max
+            ));
+        }
+    }
+
+    // V4: max_context_utilization
+    if let (Some(max), Some(current)) =
+        (b.max_context_utilization, b.current_context_utilization)
+    {
+        if current >= max {
+            return Some(format!(
+                "budget_exceeded: context ({:.0}%/{:.0}% context utilized)",
+                current * 100.0,
+                max * 100.0
+            ));
+        }
+    }
+
+    // V4: max_rework_cycles
+    if let (Some(max), Some(consumed)) = (b.max_rework_cycles, b.consumed_rework_cycles) {
+        if consumed >= max {
+            return Some(format!(
+                "budget_exceeded: rework ({}/{} rework cycles)",
+                consumed, max
             ));
         }
     }

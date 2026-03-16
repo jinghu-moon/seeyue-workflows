@@ -118,6 +118,26 @@ impl CheckpointStore {
         Ok(restored)
     }
 
+    /// Read the snapshot content for a specific file by tool_call_id.
+    /// Returns the stored bytes, or an error if not found.
+    pub fn read_snapshot(&self, tool_call_id: &str, file_path: &std::path::Path) -> Result<Vec<u8>, ToolError> {
+        let conn = self.0.lock().unwrap();
+        let path_str = file_path.display().to_string();
+        let result: Option<Option<Vec<u8>>> = conn.query_row(
+            "SELECT content FROM snapshots WHERE tool_call_id = ?1 AND file_path = ?2 LIMIT 1",
+            rusqlite::params![tool_call_id, path_str],
+            |row| row.get(0),
+        ).ok();
+        match result {
+            Some(Some(bytes)) => Ok(bytes),
+            Some(None) => Ok(Vec::new()), // file did not exist at snapshot time
+            None => Err(ToolError::FileNotFound {
+                file_path: path_str,
+                hint: format!("No snapshot found for tool_call_id={}", tool_call_id),
+            }),
+        }
+    }
+
     /// 清理全部快照（SessionEnd 时调用，后台异步执行）
     pub fn cleanup(&self) {
         let conn = self.0.lock().unwrap();

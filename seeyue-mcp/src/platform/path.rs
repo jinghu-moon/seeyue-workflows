@@ -24,18 +24,10 @@ pub fn resolve(workspace: &Path, input: &str) -> Result<PathBuf, ToolError> {
     let collapsed = collapse_dotdot(&joined);
 
     // Step 3: 路径逃逸检查（防止 ../../etc/passwd 之类）
-    // 用字符串前缀比较，不调用 canonicalize（允许新文件路径）
-    let ws_str  = workspace.to_string_lossy().to_lowercase();
-    let req_str = collapsed.to_string_lossy().to_lowercase();
-
-    // 确保 collapsed 以 workspace 开头
-    let ws_prefix = if ws_str.ends_with(['/', '\\']) {
-        ws_str.to_string()
-    } else {
-        format!("{ws_str}{}", std::path::MAIN_SEPARATOR)
-    };
-
-    if !req_str.starts_with(&ws_prefix) && req_str != ws_str {
+    // 使用 Path::starts_with() 进行组件级比较，天然处理正/反斜杠混用
+    // workspace 同样经过 collapse_dotdot 以确保规范化
+    let ws_collapsed = collapse_dotdot(workspace);
+    if !collapsed.starts_with(&ws_collapsed) {
         return Err(ToolError::PathEscape {
             file_path: input.to_string(),
             hint: "Path resolves outside workspace root.".into(),
@@ -105,5 +97,20 @@ mod tests {
         let ws = PathBuf::from(r"C:\workspace");
         let p  = resolve(&ws, r"src\auth\jwt.rs").unwrap();
         assert!(p.to_string_lossy().contains("jwt.rs"));
+    }
+
+    #[test]
+    fn resolve_forward_slash_workspace() {
+        // workspace 以正斜杠传入（env var 常见格式），路径仍应解析成功
+        let ws = PathBuf::from("C:/workspace");
+        let p  = resolve(&ws, "src/main.rs").unwrap();
+        assert!(p.to_string_lossy().contains("main.rs"));
+    }
+
+    #[test]
+    fn reject_escape_with_forward_slash_workspace() {
+        let ws = PathBuf::from("C:/workspace");
+        let r  = resolve(&ws, "../../etc/passwd");
+        assert!(r.is_err());
     }
 }

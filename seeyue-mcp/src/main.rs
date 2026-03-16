@@ -256,6 +256,141 @@ struct GitDiffFileParams {
     staged: Option<bool>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+struct SessionStartParams {
+    #[serde(default)]
+    skip_recovery: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct RunCommandParams {
+    #[schemars(description = "Shell command to execute")]
+    command: String,
+    #[schemars(description = "Timeout in milliseconds (default: 30000, max: 300000)")]
+    timeout_ms: Option<u64>,
+    #[schemars(description = "Working directory relative to workspace (default: workspace root)")]
+    working_dir: Option<String>,
+    #[schemars(description = "Extra environment variables to inject")]
+    env: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct RunTestParams {
+    #[schemars(description = "Test name filter (optional)")]
+    filter: Option<String>,
+    #[schemars(description = "Language hint: rust|jest|vitest|typescript|python (default: auto-detect)")]
+    language: Option<String>,
+    #[schemars(description = "Timeout in milliseconds (default: 60000, max: 300000)")]
+    timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct LintFileParams {
+    #[schemars(description = "File path relative to workspace root")]
+    path: String,
+    #[schemars(description = "Linter override: clippy|eslint|ruff (default: auto-detect from extension)")]
+    linter: Option<String>,
+    #[schemars(description = "Apply auto-fix where possible (default: false)")]
+    fix: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+struct SessionSummaryParams {}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct DiffSinceCheckpointParams {
+    #[schemars(description = "Checkpoint label to diff against (default: most recent)")]
+    label: Option<String>,
+    #[schemars(description = "Filter to specific file paths (substring match)")]
+    paths: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct DependencyGraphParams {
+    #[schemars(description = "File path relative to workspace root (starting point)")]
+    path: String,
+    #[schemars(description = "Traversal depth (default: 2, max: 5)")]
+    depth: Option<usize>,
+    #[schemars(description = "Direction: imports | imported_by | both (default: imports)")]
+    direction: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct SymbolRenamePreviewParams {
+    #[schemars(description = "File path relative to workspace root")]
+    path: String,
+    #[schemars(description = "1-based line number of the symbol")]
+    line: usize,
+    #[schemars(description = "1-based column number of the symbol")]
+    column: usize,
+    #[schemars(description = "New name to preview the rename with")]
+    new_name: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct MultiFileEditItem {
+    #[schemars(description = "String to find (exact match)")]
+    old_string: String,
+    #[schemars(description = "Replacement string")]
+    new_string: String,
+    #[schemars(description = "Replace all occurrences (default false)")]
+    replace_all: Option<bool>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct MultiFileEditSet {
+    #[schemars(description = "File path relative to workspace root")]
+    file_path: String,
+    #[schemars(description = "List of edits to apply to this file")]
+    edits: Vec<MultiFileEditItem>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct MultiFileEditParams {
+    #[schemars(description = "List of file edit sets (max 20 files)")]
+    edits: Vec<MultiFileEditSet>,
+    #[schemars(description = "Run tree-sitter syntax check after edits (default true)")]
+    verify_syntax: Option<bool>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct FileNodeParams {
+    #[schemars(description = "Path relative to base_path (use trailing / for directories)")]
+    path: String,
+    #[schemars(description = "File content (None = empty file)")]
+    content: Option<String>,
+    #[schemars(description = "Template name (reserved for future use)")]
+    template: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct CreateFileTreeParams {
+    #[schemars(description = "Base directory relative to workspace root")]
+    base_path: String,
+    #[schemars(description = "List of file/directory nodes to create")]
+    tree: Vec<FileNodeParams>,
+    #[schemars(description = "Overwrite existing files (default false = skip)")]
+    overwrite: Option<bool>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct PackageInfoParams {
+    #[schemars(description = "Package name (e.g. serde, react, numpy)")]
+    name: String,
+    #[schemars(description = "Registry: crates | npm | pypi (auto-detected if omitted)")]
+    registry: Option<String>,
+    #[schemars(description = "Specific version to query (default: latest)")]
+    version: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct TypeCheckParams {
+    #[schemars(description = "File or directory path relative to workspace root")]
+    path: String,
+    #[schemars(description = "Language: typescript | python (auto-detected if omitted)")]
+    language: Option<String>,
+}
+
 // ─── tool_router impl ────────────────────────────────────────────────────────
 
 #[tool_router]
@@ -482,6 +617,24 @@ impl SeeyueMcpServer {
         Parameters(p): Parameters<tools::hooks::AdvanceNodeParams>,
     ) -> Result<CallToolResult, ErrorData> {
         let result = tools::hooks::run_advance_node(p, &self.state);
+        Ok(to_text(serde_json::to_string_pretty(&result).unwrap()))
+    }
+
+    #[tool(description = "\
+        [Hook] Bootstrap session and run crash-recovery journal replay. \
+        Scans journal.jsonl for orphan tool_request events (request with no completion), \
+        appends aborted events, and determines safe TDD resume point. \
+        Returns session summary including run_id, phase, tdd_state, and recovery_status.")]
+    async fn sy_session_start(
+        &self,
+        Parameters(p): Parameters<SessionStartParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::hooks::run_session_start(
+            tools::hooks::SessionStartParams {
+                skip_recovery: p.skip_recovery,
+            },
+            &self.state,
+        );
         Ok(to_text(serde_json::to_string_pretty(&result).unwrap()))
     }
 
@@ -712,17 +865,288 @@ impl SeeyueMcpServer {
     }
 
     #[tool(description = "\
-        Return a structured diff for a single file against a git base ref. \
-        Use staged=true to compare the index version instead of working tree.")]
+        Show the diff of a specific file between a git ref and working tree (or staged). \
+        base defaults to HEAD. staged=true compares index vs HEAD. \
+        Returns unified diff text plus metadata.")]
     async fn git_diff_file(
         &self,
         Parameters(p): Parameters<GitDiffFileParams>,
     ) -> Result<CallToolResult, ErrorData> {
         tools::git_diff_file::run_git_diff_file(
             tools::git_diff_file::GitDiffFileParams {
-                path: p.path,
-                base: p.base,
+                path:   p.path,
+                base:   p.base,
                 staged: p.staged,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── P3 Execution Tools ────────────────────────────────────────────────
+
+    #[tool(description = "\
+        Execute a shell command in the workspace and return structured output. \
+        Requires sy_pretool_bash verdict before calling. \
+        working_dir must remain within workspace. \
+        stdout/stderr truncated at 10000 chars. \
+        Timeout enforced (default 30s, max 300s).")]
+    async fn run_command(
+        &self,
+        Parameters(p): Parameters<RunCommandParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::run_command::run_run_command(
+            tools::run_command::RunCommandParams {
+                command:     p.command,
+                timeout_ms:  p.timeout_ms,
+                working_dir: p.working_dir,
+                env:         p.env,
+            },
+            &self.state.workspace,
+        )
+        .await
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Run the project test suite and return structured pass/fail results. \
+        Auto-detects runner: cargo test (Rust), jest/vitest (Node), pytest (Python). \
+        Applies two-phase noise filtering to reduce output. \
+        Use filter param to run a subset of tests.")]
+    async fn run_test(
+        &self,
+        Parameters(p): Parameters<RunTestParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::run_test::run_run_test(
+            tools::run_test::RunTestParams {
+                filter:     p.filter,
+                language:   p.language,
+                timeout_ms: p.timeout_ms,
+            },
+            &self.state.workspace,
+        )
+        .await
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Run a linter on a file and return structured diagnostics. \
+        Auto-detects linter from file extension: clippy (.rs), eslint (.ts/.js), ruff (.py). \
+        Returns up to 50 diagnostics with severity, rule, line, and column.")]
+    async fn lint_file(
+        &self,
+        Parameters(p): Parameters<LintFileParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::lint_file::run_lint_file(
+            tools::lint_file::LintFileParams {
+                path:   p.path,
+                linter: p.linter,
+                fix:    p.fix,
+            },
+            &self.state.workspace,
+        )
+        .await
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── P3-C Session Awareness ───────────────────────────────────────────
+
+    #[tool(description = "\
+        Return a structured summary of the current workflow session. \
+        Includes active node, phase, loop budget consumption, checkpoint count, \
+        and pending approvals. Returns SESSION_NOT_FOUND if no session.yaml exists.")]
+    async fn session_summary(
+        &self,
+        Parameters(_): Parameters<SessionSummaryParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::session_summary::run_session_summary(
+            &self.state.workflow_dir,
+            &self.state.checkpoint,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Return a structured diff of workspace changes relative to the most recent checkpoint snapshot. \
+        Finer-grained than git_diff_file: includes uncommitted content. \
+        Returns NO_CHECKPOINT if no snapshots exist.")]
+    async fn diff_since_checkpoint(
+        &self,
+        Parameters(p): Parameters<DiffSinceCheckpointParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::diff_since_checkpoint::run_diff_since_checkpoint(
+            tools::diff_since_checkpoint::DiffSinceCheckpointParams {
+                label: p.label,
+                paths: p.paths,
+            },
+            &self.state.workspace,
+            &self.state.checkpoint,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── P3-D Multi-file Analysis ─────────────────────────────────────────
+
+    #[tool(description = "\
+        Return a file-level dependency graph starting from a given file. \
+        Uses static import analysis (no LSP required). \
+        Direction: imports (default) | imported_by | both. \
+        Max depth 5. Respects .gitignore-style exclusions (target/, node_modules/).")]
+    async fn dependency_graph(
+        &self,
+        Parameters(p): Parameters<DependencyGraphParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::dependency_graph::run_dependency_graph(
+            tools::dependency_graph::DependencyGraphParams {
+                path:      p.path,
+                depth:     p.depth,
+                direction: p.direction,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Preview a symbol rename across the entire project without writing any changes. \
+        Uses LSP references with grep fallback. \
+        Returns affected_files_count, per-file occurrence lines, and total_occurrences.")]
+    async fn symbol_rename_preview(
+        &self,
+        Parameters(p): Parameters<SymbolRenamePreviewParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::symbol_rename_preview::run_symbol_rename_preview(
+            tools::symbol_rename_preview::SymbolRenamePreviewParams {
+                path:     p.path,
+                line:     p.line,
+                column:   p.column,
+                new_name: p.new_name,
+            },
+            &self.state,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── P3-E Multi-file Edit ─────────────────────────────────────────────
+
+    #[tool(description = "\
+        Apply edits across multiple files atomically. \
+        Phase 1: validate ALL edits in memory (no writes). \
+        Phase 2: checkpoint all files. \
+        Phase 3: write all files. \
+        Any validation failure → zero files modified. Max 20 files per call.")]
+    async fn multi_file_edit(
+        &self,
+        Parameters(p): Parameters<MultiFileEditParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let cache  = self.state.cache.read().await;
+        tools::multi_file_edit::run_multi_file_edit(
+            tools::multi_file_edit::MultiFileEditParams {
+                edits: p.edits.into_iter().map(|fs| tools::multi_file_edit::FileEditSet {
+                    file_path: fs.file_path,
+                    edits: fs.edits.into_iter().map(|e| tools::multi_file_edit::FileEditItem {
+                        old_string:  e.old_string,
+                        new_string:  e.new_string,
+                        replace_all: e.replace_all,
+                    }).collect(),
+                }).collect(),
+                verify_syntax: p.verify_syntax,
+            },
+            &cache,
+            &self.state.checkpoint,
+            &self.state.backup,
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Scaffold batch file/directory creation. \
+        Parent directories are created automatically. \
+        overwrite=false (default): existing files are skipped and reported. \
+        Trailing slash in path = create directory.")]
+    async fn create_file_tree(
+        &self,
+        Parameters(p): Parameters<CreateFileTreeParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::create_file_tree::run_create_file_tree(
+            tools::create_file_tree::CreateFileTreeParams {
+                base_path: p.base_path,
+                tree: p.tree.into_iter().map(|n| tools::create_file_tree::FileNode {
+                    path:     n.path,
+                    content:  n.content,
+                    template: n.template,
+                }).collect(),
+                overwrite: p.overwrite,
+            },
+            &self.state.checkpoint,
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── P3-F External Dependency Query ───────────────────────────────────
+
+    #[tool(description = "\
+        Query package registries for latest version and metadata. \
+        Supports: crates.io (Rust), npm (Node.js), PyPI (Python). \
+        Registry is auto-detected from package name if omitted. \
+        Results are cached in-memory for 1 hour. \
+        Returns NETWORK_ERROR if registry is unreachable.")]
+    async fn package_info(
+        &self,
+        Parameters(p): Parameters<PackageInfoParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let params = tools::package_info::PackageInfoParams {
+            name:     p.name,
+            registry: p.registry,
+            version:  p.version,
+        };
+        // tokio::time::timeout wraps the async fetch — cancels at DNS level too
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(12),
+            tools::package_info::run_package_info(params),
+        ).await {
+            Ok(Ok(r))  => Ok(to_text(serde_json::to_string_pretty(&r).unwrap())),
+            Ok(Err(e)) => Err(to_mcp_err(e)),
+            Err(_)     => {
+                let r = tools::package_info::PackageInfoResult {
+                    status:      "NETWORK_ERROR".to_string(),
+                    registry:    "unknown".to_string(),
+                    name:        String::new(),
+                    version:     String::new(),
+                    description: None,
+                    homepage:    None,
+                    cached:      false,
+                };
+                Ok(to_text(serde_json::to_string_pretty(&r).unwrap()))
+            }
+        }
+    }
+
+    #[tool(description = "\
+        Run TypeScript (tsc --noEmit) or Python (mypy) type checking. \
+        More thorough than syntax checking — catches type mismatches. \
+        Returns TOOL_NOT_FOUND with install hint if checker is not installed. \
+        Language is auto-detected from file extension or tsconfig.json/pyproject.toml.")]
+    async fn type_check(
+        &self,
+        Parameters(p): Parameters<TypeCheckParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::type_check::run_type_check(
+            tools::type_check::TypeCheckParams {
+                path:     p.path,
+                language: p.language,
             },
             &self.state.workspace,
         )

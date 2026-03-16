@@ -78,6 +78,13 @@ pub struct AdvanceNodeParams {
     pub target: Option<Vec<String>>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct SessionStartParams {
+    #[serde(default)]
+    #[schemars(description = "Skip crash-recovery journal replay (default: false)")]
+    pub skip_recovery: Option<bool>,
+}
+
 // ─── Tool Implementations ────────────────────────────────────────────────────
 
 /// Execute sy_pretool_bash: classify command and check policy.
@@ -218,4 +225,108 @@ pub fn run_advance_node(params: AdvanceNodeParams, app: &AppState) -> HookResult
     let _ = journal::append_event(&app.workflow_dir, enter_event);
 
     HookResult::allow(format!("Advanced to node: {}", params.node_id))
+}
+
+/// Execute sy_session_start: bootstrap session + crash-recovery journal replay.
+///
+/// Recovery protocol (architecture-v4.md §8 P3-A):
+/// 1. Load session.yaml
+/// 2. Scan journal.jsonl for orphan tool_request events (request with no completion)
+/// 3. Append `aborted` event for each orphan
+/// 4. Determine safe resume point from TDD state machine
+/// 5. Return structured session summary + recovery status
+pub fn run_session_start(params: SessionStartParams, app: &AppState) -> serde_json::Value {
+    let session = state::load_session(&app.workflow_dir);
+    let skip = params.skip_recovery.unwrap_or(false);
+
+    let mut orphans_found = 0u32;
+    let mut recovery_status = "clean";
+    let mut resume_tdd_state: Option<String> = None;
+
+    if !skip {
+        // Scan journal for orphan events
+        let journal_path = app.workflow_dir.join("journal.jsonl");
+        if let Ok(content) = std::fs::read_to_string(&journal_path) {
+            let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+
+            // Track tool_request events that have no matching completion
+            let mut pending_requests: Vec<String> = Vec::new();
+            for line in &lines {
+                if let Ok(ev) = serde_json::from_str::<serde_json::Value>(line) {
+                    let event = ev.get("event").and_then(|v| v.as_str()).unwrap_or("");
+                    let trace = ev.get("trace_id").and_then(|v| v.as_str()).unwrap_or("");
+                    match event {
+                        "tool_request" => {
+                            if !trace.is_empty() {
+                                pending_requests.push(trace.to_string());
+                            }
+                        }
+                        "tool_completed" | "tool_failed" | "aborted" => {
+                            pending_requests.retain(|t| t != trace);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Write aborted events for all remaining orphans
+            for trace_id in &pending_requests {
+                orphans_found += 1;
+                let ev = journal::JournalEvent::new("aborted", "session_start")
+                    .with_run_id(session.run_id.as_deref().unwrap_or("unknown"))
+                    .with_payload(serde_json::json!({
+                        "reason": "orphan_on_session_start",
+                        "original_trace_id": trace_id,
+                    }));
+                let _ = journal::append_event(&app.workflow_dir, ev);
+            }
+
+            if orphans_found > 0 {
+                recovery_status = "recovered";
+            }
+        }
+
+        // Determine safe TDD resume point from current node state
+        let tdd_state = session.node.tdd_state.as_deref().unwrap_or("");
+        resume_tdd_state = Some(match tdd_state {
+            // Already have RED evidence — can proceed to GREEN
+            "red_verified" => "red_verified".to_string(),
+            // Already have GREEN evidence — can proceed to REFACTOR
+            "green_verified" => "green_verified".to_string(),
+            // In the middle of a step — restart that step
+            "red_pending" | "green_pending" | "refactor_pending" =>
+                tdd_state.to_string(),
+            // Unknown / no TDD — safe default
+            _ => "idle".to_string(),
+        });
+    }
+
+    // Record session_start event
+    let ev = journal::JournalEvent::new("session_started", "session_start")
+        .with_run_id(session.run_id.as_deref().unwrap_or("unknown"))
+        .with_phase(session.phase.id.as_deref().unwrap_or("unknown"))
+        .with_node_id(session.node.id.as_deref().unwrap_or("unknown"))
+        .with_payload(serde_json::json!({
+            "orphans_recovered": orphans_found,
+            "recovery_status": recovery_status,
+            "skip_recovery": skip,
+        }));
+    let _ = journal::append_event(&app.workflow_dir, ev);
+
+    // Check loop budget
+    let budget_status = state::check_loop_budget(&session);
+
+    serde_json::json!({
+        "run_id":             session.run_id,
+        "phase":              session.phase.id,
+        "node_id":            session.node.id,
+        "node_name":          session.node.name,
+        "tdd_state":          session.node.tdd_state,
+        "resume_tdd_state":   resume_tdd_state,
+        "recovery_status":    recovery_status,
+        "orphans_recovered":  orphans_found,
+        "budget_exceeded":    budget_status,
+        "recovery_required":  session.recovery.status.as_deref() == Some("restore_pending"),
+        "restore_reason":     session.recovery.restore_reason,
+    })
 }
