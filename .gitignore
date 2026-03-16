@@ -6,3 +6,15 @@ refer/
 .spec-workflow/
 .serena/
 .ai/
+seeyue-mcp/target/
+seeyue-workflows.rar
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+.agent-backups/
+.DS_Store
+Thumbs.db

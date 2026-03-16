@@ -1,0 +1,73 @@
+[package]
+name    = "seeyue-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# MCP SDK（v1.2.0，与 refer/rust-sdk-main 对齐）
+rmcp = { version = "1.2.0", path = "../refer/rust-sdk-main/crates/rmcp", features = ["server", "transport-io", "macros"] }
+
+# 编码检测（Firefox 同款）
+chardetng   = "0.1"
+encoding_rs = "0.8"
+
+# 错误处理
+thiserror = "2"
+anyhow    = "1"
+
+# 序列化
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 哈希（文件 hash 校验）
+sha2 = "0.10"
+hex  = "0.4"
+
+# Diff 生成（similar，与 MCP-DEMO 保持一致）
+similar = { version = "2", features = ["text", "inline"] }
+
+# 终端颜色（ANSI，Windows ENABLE_VIRTUAL_TERMINAL_PROCESSING）
+crossterm = "0.28"
+
+# Checkpoint 存储
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# 时间
+chrono = { version = "0.4", features = ["serde"] }
+
+# Unicode 规范化
+unicode-normalization = "0.1"
+
+# 路径规范化（Windows 长路径/UNC 处理）
+dunce = "1.0"
+
+# 系统目录（%LOCALAPPDATA% 等）
+dirs = "5"
+
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+
+# P1: Policy engine
+serde_yaml = "0.9"
+globset    = "0.4"
+regex      = "1"
+uuid       = { version = "1", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_System_Console",
+    "Win32_Globalization",
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio    = { version = "1", features = ["full", "test-util"] }
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = true
+panic         = "abort"

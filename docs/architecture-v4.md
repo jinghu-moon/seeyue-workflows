@@ -875,6 +875,48 @@ If an engine lacks a native hook surface for a specific rule, the adapter MUST e
 [RULE]
 The Claude Code adapter SHOULD target hook events, settings files, and `CLAUDE.md` routing behavior.
 
+#### 16.1.1 seeyue-mcp: Rust-Native MCP Decision Engine
+
+[RULE]
+`seeyue-mcp` is the reference implementation of the Claude Code adapter.
+It runs as an MCP server over stdio, with zero Node.js dependencies and zero IPC overhead.
+
+[RULE]
+`seeyue-mcp` MUST implement the following subsystems:
+
+| Subsystem | Module | Source of Truth |
+|-----------|--------|-----------------|
+| Command classifier | `policy/command.rs` | `workflow/hooks.spec.yaml` |
+| File classifier | `policy/file_class.rs` | `workflow/file-classes.yaml` |
+| Policy evaluator | `policy/evaluator.rs` | `workflow/policy.spec.yaml` + `workflow/approval-matrix.yaml` |
+| Workflow state | `workflow/state.rs` | `.ai/workflow/session.yaml` |
+| Journal | `workflow/journal.rs` | `.ai/workflow/journal.jsonl` |
+
+[RULE]
+`seeyue-mcp` MUST expose the following MCP tools for hook-equivalent decision making:
+
+| Tool | L0 Hook Equivalent | Behavior |
+|------|-------------------|----------|
+| `sy_pretool_bash` | `PreToolUse(Bash)` | classify command → approval matrix → loop budget → verdict |
+| `sy_pretool_write` | `PreToolUse(Write\|Edit)` | classify file → secret check → TDD gate → scope drift → verdict |
+| `sy_posttool_write` | `PostToolUse(Write\|Edit)` | record write evidence to journal |
+| `sy_stop` | `Stop` | loop budget + approval pending + restore pending → verdict |
+| `sy_create_checkpoint` | (checkpoint) | store checkpoint + journal event |
+| `sy_advance_node` | (node transition) | update session.yaml + journal events |
+
+[RULE]
+`seeyue-mcp` MUST expose workflow state as MCP Resources:
+
+| URI | Content |
+|-----|---------|
+| `workflow://session` | `.ai/workflow/session.yaml` |
+| `workflow://task-graph` | `.ai/workflow/task-graph.yaml` |
+| `workflow://journal` | `.ai/workflow/journal.jsonl` (last 200 lines) |
+
+[RULE]
+All decision operations (classify, evaluate, check) MUST complete in < 1ms p99 in release builds.
+The performance target has been validated: worst-case p99 = 375μs (check_bash with destructive command).
+
 ### 16.2 Codex Adapter
 
 [RULE]
@@ -894,10 +936,10 @@ The implementation order for V4 SHOULD be:
 2. define runtime schemas
 3. implement validators
 4. implement journal and recovery
-5. implement L0 policy kernel
-6. implement engine adapters
+5. implement L0 policy kernel ← **delivered: `seeyue-mcp` P1**
+6. implement engine adapters ← **in progress: Claude Code adapter via `seeyue-mcp`**
 7. implement persona capsules
-8. implement Unified TDD physical gates
+8. implement Unified TDD physical gates ← **delivered: TDD gate in `policy/evaluator.rs`**
 9. rewrite workflow skills against the new runtime
 10. add simulation and regression harnesses
 
