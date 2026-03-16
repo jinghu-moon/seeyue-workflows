@@ -17,6 +17,9 @@
 | [06-skills-as-prompts.md](./06-skills-as-prompts.md) | Skills 系统作为 MCP Prompts：映射原理、prompts/get 实现 | 技能开发者 |
 | [07-windows-native.md](./07-windows-native.md) | Windows 原生优化层：路径规范化、编码检测、IOCP | Windows 平台开发者 |
 | [08-implementation-plan.md](./08-implementation-plan.md) | 实施路线图与优先级：P0/P1/P2 交付计划 | 项目管理 |
+| [09-p3-implementation-plan.md](./09-p3-implementation-plan.md) | P3 实施计划：运行时反馈 + 深度分析 + 三层协作规范 | 项目管理 |
+| [10-three-layer-protocol.md](./10-three-layer-protocol.md) | 三层联动协议：MCP/Skills/Hooks 职责边界、证据链格式、Loop Budget、Crash Recovery | 架构师 / 后端开发者 |
+| [11-hook-slim-plan.md](./11-hook-slim-plan.md) | Hook 瘦身重构计划：四阶段迁移路线、验收标准、回滚策略 | 后端开发者 |
 
 ---
 

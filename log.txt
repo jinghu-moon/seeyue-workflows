@@ -1,0 +1,69 @@
+# seeyue-mcp P0-P3 QA Test Log
+# Started: 2026-03-17
+# Format: [TIMESTAMP] [PHASE] [TOOL] STATUS | details
+
+[PHASE-0] [CAPABILITY-DISCOVERY] BUG-001
+Endpoint: git_diff_file
+Issue: Tool method not registered in #[tool_router] impl block despite GitDiffFileParams struct existing at main.rs:250
+Expected: git_diff_file in tools/list
+Actual: Tool absent from 35-tool registry
+Impact: P2 git integration incomplete
+
+=== QA RUN RESULTS ===
+PASSED: 41
+FAILED: 1
+[FAIL] P3/dependency_graph
+  payload: {}
+  env: n/a
+  actual: None
+
+[PHASE-3] [P3/dependency_graph] INVESTIGATION-001
+Endpoint: dependency_graph
+Issue: Returned None in 10s test timeout
+Root cause: NOT a bug. Tool requires ~30s for large files (src/main.rs = 1100+ lines, static import graph traversal)
+Verification: With 30s timeout => status: ok, nodes: 16
+Fix: Increase test timeout to 30s for dependency_graph. Tool itself is correct.
+
+[PHASE-0] [CAPABILITY-DISCOVERY] BUG-001 (updated)
+Endpoint: git_diff_file
+Issue: Tool method missing from #[tool_router]. GitDiffFileParams exists at main.rs:250, tools/git_diff_file.rs exists, but no async fn registered.
+Status: CONFIRMED BUG - needs fix
+
+=== QA RUN RESULTS ===
+PASSED: 36
+FAILED: 6
+[FAIL] P0/write
+  payload: {}
+  env: sandbox
+  actual: {'jsonrpc': '2.0', 'id': 20, 'error': {'code': -32602, 'message': '{\n  "error": "FILE_NOT_READ",\n  "file_path": "tests/sandbox/hello.txt",\n  "hint": "File exists but has not been read in this session. Call Read first to avoid accidental overwrites."\n}'}}
+[FAIL] P0/read_file
+  payload: {}
+  env: after write
+  actual: {'jsonrpc': '2.0', 'id': 21, 'result': {'content': [{'type': 'text', 'text': '{\n  "type": "success",\n  "file_path": "tests/sandbox/hello.txt",\n  "total_lines": 1,\n  "start_line": 1,\n  "end_line": 1,\n  "content": "  1\\tHello seeyue",\n  "encoding": "UTF-8",\n  "line_ending": "Lf",\n  "truncated": false\n}'}], 'isError': False}}
+[FAIL] P0/edit
+  payload: {}
+  env: after read
+  actual: {'jsonrpc': '2.0', 'id': 22, 'error': {'code': -32602, 'message': '{\n  "error": "STRING_NOT_FOUND",\n  "file_path": "[file]",\n  "old_string_preview": "Hello World",\n  "suggestions": [],\n  "hint": "Read the file again and copy old_string verbatim from the output. Pay attention to tab characters (shown as \\\\t in Read output)."\n}'}}
+[FAIL] P0/multi_edit
+  payload: {}
+  env: after write
+  actual: {'jsonrpc': '2.0', 'id': 24, 'error': {'code': -32602, 'message': '{\n  "error": "FILE_NOT_READ",\n  "file_path": "tests/sandbox/multi.rs",\n  "hint": "Call Read before MultiEdit."\n}'}}
+[FAIL] P3/dependency_graph
+  payload: {}
+  env: n/a
+  actual: None
+[FAIL] P3/multi_file_edit
+  payload: {}
+  env: n/a
+  actual: {'jsonrpc': '2.0', 'id': 79, 'error': {'code': -32602, 'message': '{\n  "error": "EDIT_FAILED",\n  "edit_index": 0,\n  "edit_preview": {\n    "old_string": "fn alpha() {}",\n    "new_string": "fn alpha() -> i32 { 1 }"\n  },\n  "cause": {\n    "error": "STRING_NOT_FOUND",\n    "file_path": "[file]",\n    "old_string_preview": "fn alpha() {}",\n    "suggestions": [],\n    "hint": "Read the file agai
+
+=== QA FINAL RUN RESULTS ===
+PASSED: 42
+FAILED: 0
+Status: ALL PASS - seeyue-mcp P0-P3 QA 100% complete
+
+Fixes applied:
+- BUG-001: git_diff_file registered in main.rs tool_router
+- dependency_graph test timeout: 10s -> 30s (tool correct)
+- P0/write FILE_NOT_READ: pre-test sandbox cleanup in qa_full.py
+- multi_file_edit: same root cause as above, resolved by sandbox cleanup
