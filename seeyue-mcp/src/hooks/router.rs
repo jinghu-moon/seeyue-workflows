@@ -6,6 +6,7 @@
 // are handled inline (they directly call P1 PolicyEngine methods).
 // SessionStart, UserPromptSubmit, and PostToolUse:Bash have dedicated modules.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -15,7 +16,7 @@ use crate::hooks::protocol::{HookInput, emit_allow, emit_result};
 use crate::hooks::{posttool_bash, prompt_refresh, session_start};
 use crate::policy::evaluator::PolicyEngine;
 use crate::workflow::journal;
-use crate::workflow::state::SessionState;
+use crate::workflow::state::{self, SessionState};
 
 /// Dispatch a hook event to the appropriate handler.
 ///
@@ -48,7 +49,7 @@ pub fn dispatch(
             }
 
             let result = engine.check_bash(&cmd, session);
-            emit_result(result, None);
+            emit_result(result, Some(build_session_context(session)));
         }
 
         // ── PreToolUse:Write|Edit ───────────────────────────────────────
@@ -63,7 +64,7 @@ pub fn dispatch(
             }
 
             let result = engine.check_write(&path, session);
-            emit_result(result, None);
+            emit_result(result, Some(build_session_context(session)));
         }
 
         // ── PostToolUse:Write|Edit ──────────────────────────────────────
@@ -79,7 +80,7 @@ pub fn dispatch(
         // ── Stop ────────────────────────────────────────────────────────
         "Stop" => {
             let result = engine.check_stop(session);
-            emit_result(result, None);
+            emit_result(result, Some(build_session_context(session)));
         }
 
         // ── Unknown event → fail-open ───────────────────────────────────
@@ -194,4 +195,30 @@ fn append_audit(path: &Path, entry: &serde_json::Value) {
                 f.write_all(line.as_bytes())
             });
     }
+}
+
+// ─── Session context injector (Phase 4) ─────────────────────────────────────
+
+/// Build a `session_context` extra field to inject into every verdict response.
+///
+/// This allows the engine to read session state from the hook verdict output
+/// instead of reading session.yaml directly — completing Phase 4 of hook-slim.
+///
+/// Fields are kept minimal: only what downstream decision-making actually needs.
+fn build_session_context(session: &SessionState) -> HashMap<String, serde_json::Value> {
+    let budget_exceeded = state::check_loop_budget(session);
+    let ctx = json!({
+        "run_id":              session.run_id,
+        "phase":               session.phase.id.as_deref().or(session.phase.name.as_deref()),
+        "node_id":             session.node.id.as_deref().or(session.node.name.as_deref()),
+        "tdd_state":           session.node.tdd_state,
+        "recovery_status":     session.recovery.status,
+        "restore_pending":     session.recovery.status.as_deref() == Some("restore_pending"),
+        "last_checkpoint_id":  session.recovery.last_checkpoint_id,
+        "budget_exceeded":     budget_exceeded,
+        "pending_approvals":   session.approvals.pending.as_ref().map(|v| v.len()).unwrap_or(0),
+    });
+    let mut map = HashMap::new();
+    map.insert("session_context".to_string(), ctx);
+    map
 }
