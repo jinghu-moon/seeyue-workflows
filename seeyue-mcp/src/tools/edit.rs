@@ -66,6 +66,39 @@ pub struct MultiEditResult {
     pub diff:          DiffResult,
 }
 
+// ─── Edit 内存替换（preview_edit 复用）──────────────────────────────────────
+
+#[derive(Debug)]
+pub struct EditApplyResult {
+    pub new_content: String,
+    pub replacements: usize,
+    pub match_kind: String,
+}
+
+pub fn apply_edit_in_memory(
+    old_string:  &str,
+    new_string:  &str,
+    replace_all: bool,
+    content:     &str,
+) -> Result<EditApplyResult, ToolError> {
+    let (matched_old, match_kind, count) =
+        match_string(old_string, content, replace_all)?;
+
+    let new_content = if replace_all || count > 1 {
+        content.replace(&matched_old[..], new_string)
+    } else {
+        content.replacen(&matched_old[..], new_string, 1)
+    };
+
+    let replacements = if replace_all { count } else { 1 };
+
+    Ok(EditApplyResult {
+        new_content,
+        replacements,
+        match_kind: match_kind.to_string(),
+    })
+}
+
 // ─── Edit 主逻辑 ──────────────────────────────────────────────────────────────
 
 pub fn run_edit(
@@ -124,8 +157,12 @@ pub fn run_edit(
     let content   = &file_data.content;
 
     // ── Step 3: 字符串匹配 ────────────────────────────────────────────────
-    let (matched_old, match_kind, count) =
-        match_string(&params.old_string, content, params.replace_all)?;
+    let applied = apply_edit_in_memory(
+        &params.old_string,
+        &params.new_string,
+        params.replace_all,
+        content,
+    )?;
 
     // ── Step 4: 写前备份 ─────────────────────────────────────────────────
     let backup_trigger = if cache.edit_count(&path) == 0 {
@@ -146,17 +183,8 @@ pub fn run_edit(
     checkpoint.capture(&path, call_id, "Edit")?;
 
     // ── Step 6: 执行替换 ──────────────────────────────────────────────────
-    let new_content = if params.replace_all || count > 1 {
-        content.replace(&matched_old[..], &params.new_string)
-    } else {
-        content.replacen(&matched_old[..], &params.new_string, 1)
-    };
-
-    let replacements = if params.replace_all {
-        count
-    } else {
-        1
-    };
+    let new_content = applied.new_content;
+    let replacements = applied.replacements;
 
     // ── Step 7: 编码安全写入 ──────────────────────────────────────────────
     safe_write(
@@ -184,7 +212,7 @@ pub fn run_edit(
         kind:         "success".into(),
         file_path:    params.file_path,
         replacements,
-        match_kind:   match_kind.to_string(),
+        match_kind:   applied.match_kind,
         backup_path,
         backup_note,
         diff,

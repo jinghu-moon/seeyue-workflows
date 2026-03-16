@@ -1,4 +1,17 @@
 pub mod edit;
+pub mod env_info;
+pub mod find_definition;
+pub mod find_references;
+pub mod file_outline;
+pub mod git_diff_file;
+pub mod git_status;
 pub mod hooks;
 pub mod read;
+pub mod read_compressed;
+pub mod read_range;
+pub mod preview_edit;
+pub mod resolve_path;
+pub mod search_workspace;
+pub mod verify_syntax;
+pub mod workspace_tree;
 pub mod write;

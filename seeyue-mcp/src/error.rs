@@ -117,6 +117,56 @@ pub enum ToolError {
         uri:  String,
         hint: String,
     },
+
+    // ── P2: Tree-sitter ──────────────────────────────────────────────────
+    UnsupportedLanguage {
+        language: String,
+        hint:     String,
+    },
+    SyntaxError {
+        language: String,
+        errors:   Vec<SyntaxIssue>,
+        hint:     String,
+    },
+
+    // ── P2: Search ───────────────────────────────────────────────────────
+    InvalidRegex {
+        pattern: String,
+        message: String,
+        hint:    String,
+    },
+
+    // ── P2: Git ──────────────────────────────────────────────────────────
+    GitNotAvailable {
+        hint: String,
+    },
+    GitNotRepo {
+        hint: String,
+    },
+    GitError {
+        message: String,
+        hint:    String,
+    },
+
+    // ── P2: LSP ──────────────────────────────────────────────────────────
+    LspNotAvailable {
+        language: String,
+        hint:     String,
+    },
+    LspTimeout {
+        language: String,
+        hint:     String,
+    },
+    LspError {
+        message: String,
+        hint:    String,
+    },
+
+    // ── P2: Skills Prompts ───────────────────────────────────────────────
+    SkillNotFound {
+        name: String,
+        hint: String,
+    },
 }
 
 impl ToolError {
@@ -150,6 +200,16 @@ pub struct MatchLocation {
 pub struct EditPreview {
     pub old_string: String,
     pub new_string: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SyntaxIssue {
+    pub line:    usize,
+    pub column:  usize,
+    pub kind:    String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
