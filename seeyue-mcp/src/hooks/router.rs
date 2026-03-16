@@ -126,6 +126,7 @@ fn handle_posttool_write(
     let scope_drift = check_scope_drift(session, &file_path, &cwd);
 
     // Use shared helper — single source of truth for write_recorded schema.
+    let checkpoint_label = session.recovery.last_checkpoint_id.clone();
     let _ = journal::record_write_evidence(journal::WriteEvidenceParams {
         workflow_dir,
         run_id:           &run_id,
@@ -135,7 +136,7 @@ fn handle_posttool_write(
         path:             &file_path,
         lines_changed:    None,
         outcome:          "success",
-        checkpoint_label: None,
+        checkpoint_label: checkpoint_label.as_deref(),
         syntax_valid:     None,
         scope_drift,
     });

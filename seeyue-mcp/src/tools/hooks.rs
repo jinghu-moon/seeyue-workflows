@@ -106,6 +106,8 @@ pub fn run_posttool_write(params: PostToolWriteParams, app: &AppState) -> HookRe
     let phase   = session.phase.id.as_deref().or(session.phase.name.as_deref()).unwrap_or("none").to_string();
     let node_id = session.node.id.as_deref().or(session.node.name.as_deref()).unwrap_or("none").to_string();
 
+    let checkpoint_label = session.recovery.last_checkpoint_id.clone();
+
     if let Err(e) = journal::record_write_evidence(journal::WriteEvidenceParams {
         workflow_dir:     &app.workflow_dir,
         run_id:           &run_id,
@@ -115,7 +117,7 @@ pub fn run_posttool_write(params: PostToolWriteParams, app: &AppState) -> HookRe
         path:             &params.path,
         lines_changed:    params.lines_changed.map(|v| v as i64),
         outcome:          "success",
-        checkpoint_label: None,
+        checkpoint_label: checkpoint_label.as_deref(),
         syntax_valid:     None,
         scope_drift:      false,
     }) {

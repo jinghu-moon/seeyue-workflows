@@ -105,6 +105,8 @@ pub struct RecoveryState {
     pub status: Option<String>,
     #[serde(default)]
     pub restore_reason: Option<String>,
+    #[serde(default)]
+    pub last_checkpoint_id: Option<String>,
 }
 
 // ─── Load / Save ─────────────────────────────────────────────────────────────
