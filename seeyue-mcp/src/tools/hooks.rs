@@ -189,6 +189,11 @@ pub fn run_create_checkpoint(params: CreateCheckpointParams, app: &AppState) -> 
 pub fn run_advance_node(params: AdvanceNodeParams, app: &AppState) -> HookResult {
     let mut session = state::load_session(&app.workflow_dir);
 
+    // Loop budget guard — block before advancing if any metric is exceeded
+    if let Some(reason) = state::check_loop_budget(&session) {
+        return HookResult::block(format!("sy_advance_node blocked: {}", reason));
+    }
+
     let old_node_id = session.node.id.clone();
 
     // Update node fields
