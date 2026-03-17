@@ -16,7 +16,7 @@ use crate::error::ToolError;
 use crate::lsp;
 use crate::tools::read::resolve_path;
 use crate::treesitter::languages;
-use crate::AppState;
+use crate::app_state::AppState;
 
 // ─── Params / Result ─────────────────────────────────────────────────────────
 

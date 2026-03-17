@@ -12,6 +12,7 @@
 // P0: File editing tools (read/write/edit/multi_edit/rewind)
 // P1: Policy engine + hook tools + workflow resources
 
+mod app_state;
 mod encoding;
 mod error;
 mod git;
@@ -26,6 +27,8 @@ mod storage;
 mod treesitter;
 mod tools;
 mod workflow;
+
+use app_state::AppState;
 
 use std::{path::PathBuf, sync::{Arc, Mutex}};
 use tokio::sync::RwLock;
@@ -51,23 +54,6 @@ use storage::checkpoint::CheckpointStore;
 use error::ToolError;
 use policy::evaluator::PolicyEngine;
 use policy::spec_loader::PolicySpecs;
-
-// ─── 共享状态 ─────────────────────────────────────────────────────────────────
-
-#[derive(Clone)]
-pub struct AppState {
-    // P0
-    pub workspace:     Arc<PathBuf>,
-    pub cache:         Arc<RwLock<ReadCache>>,
-    pub checkpoint:    Arc<CheckpointStore>,
-    pub backup:        Arc<BackupManager>,
-    // P1
-    pub workflow_dir:  PathBuf,
-    pub policy_engine: Arc<PolicyEngine>,
-    // P2
-    pub lsp_pool:      Arc<Mutex<lsp::LspSessionPool>>,
-    pub skill_registry: Arc<prompts::SkillRegistry>,
-}
 
 // ─── MCP Server ───────────────────────────────────────────────────────────────
 
@@ -843,9 +829,124 @@ impl SeeyueMcpServer {
         .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
         .map_err(to_mcp_err)
     }
-}
 
-// ─── prompt_router impl ────────────────────────────────────────────────────
+    #[tool(description = "\
+        Structured git commit history. Returns hash/short/author/date/subject per commit. \
+        Supports limit (default 20, max 200), path filter, and since ref.")]
+    async fn git_log(
+        &self,
+        Parameters(p): Parameters<GitLogParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::git_log::run_git_log(
+            tools::git_log::GitLogParams { limit: p.limit, path: p.path, since: p.since },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Read multiple files in a single request (max 20). \
+        Missing or path-escaped files are reported per-entry with an error field.")]
+    async fn batch_read(
+        &self,
+        Parameters(p): Parameters<BatchReadParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::batch_read::run_batch_read(
+            tools::batch_read::BatchReadParams { paths: p.paths },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Format a file in-place using rustfmt/black/prettier/gofmt. \
+        check_only=true returns needs_formatting or already_formatted without writing. \
+        Returns UNSUPPORTED for unknown languages, FORMATTER_NOT_FOUND if tool missing.")]
+    async fn format_file(
+        &self,
+        Parameters(p): Parameters<FormatFileParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::format_file::run_format_file(
+            tools::format_file::FormatFileParams { path: p.path, check_only: p.check_only },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Per-line authorship via git blame --porcelain. \
+        Returns hash/short/author/date/content per line. \
+        Supports optional start_line/end_line range.")]
+    async fn git_blame(
+        &self,
+        Parameters(p): Parameters<GitBlameParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::git_blame::run_git_blame(
+            tools::git_blame::GitBlameParams {
+                path: p.path, start_line: p.start_line, end_line: p.end_line,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Atomically rename/move a file within the workspace. \
+        Creates parent directories as needed. \
+        Records a checkpoint before rename for rewind support.")]
+    async fn file_rename(
+        &self,
+        Parameters(p): Parameters<FileRenameParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::file_rename::run_file_rename(
+            tools::file_rename::FileRenameParams { old_path: p.old_path, new_path: p.new_path },
+            &self.state.checkpoint,
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Copy the workspace (respecting .gitignore) into .seeyue/snapshots/<label>/. \
+        Skips files >10 MB, total budget 200 MB. \
+        Returns snapshot_path, files_copied, bytes_copied.")]
+    async fn snapshot_workspace(
+        &self,
+        Parameters(p): Parameters<SnapshotWorkspaceParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::snapshot_workspace::run_snapshot_workspace(
+            tools::snapshot_workspace::SnapshotWorkspaceParams {
+                label: p.label, include_ignored: p.include_ignored,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Static call-hierarchy analysis: find callers or callees of a named symbol \
+        using regex-based search (no LSP required). \
+        direction: callers | callees | both. Supports path sub-tree filter.")]
+    async fn call_hierarchy(
+        &self,
+        Parameters(p): Parameters<CallHierarchyParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::call_hierarchy::run_call_hierarchy(
+            tools::call_hierarchy::CallHierarchyParams {
+                symbol: p.symbol, direction: p.direction, limit: p.limit, path: p.path,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+}
 
 #[prompt_router]
 impl SeeyueMcpServer {}
@@ -869,6 +970,8 @@ impl ServerHandler for SeeyueMcpServer {
              P1 Hook Tools: sy_pretool_bash, sy_pretool_write, sy_posttool_write, sy_stop, \
              sy_create_checkpoint, sy_advance_node — call these for policy decisions. \
              P2 Prompts: skills registry via prompts/list and prompts/get. \
+             P4 Extended: git_log, git_blame, batch_read, format_file, file_rename, \
+             snapshot_workspace, call_hierarchy. \
              Resources: workflow://session, workflow://task-graph, workflow://journal."
             .to_string()
         )

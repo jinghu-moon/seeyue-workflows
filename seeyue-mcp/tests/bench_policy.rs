@@ -178,6 +178,7 @@ fn bench<F: FnMut()>(name: &str, iterations: usize, mut f: F) -> BenchResult {
 const ITERS: usize = 10_000;
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_spec_loading() {
     let sep = "=".repeat(120);
     println!("\n{sep}");
@@ -198,6 +199,7 @@ fn bench_spec_loading() {
 }
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_command_classification() {
     let specs = load_specs();
 
@@ -256,6 +258,7 @@ fn bench_command_classification() {
 }
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_file_classification() {
     let specs = load_specs();
 
@@ -314,6 +317,7 @@ fn bench_file_classification() {
 }
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_policy_evaluator() {
     let specs = load_specs();
     let engine = PolicyEngine::new(specs);
@@ -400,6 +404,7 @@ fn bench_policy_evaluator() {
 }
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_session_loading() {
     let sep = "=".repeat(120);
     println!("\n{sep}");
@@ -449,6 +454,7 @@ fn bench_session_loading() {
 }
 
 #[test]
+#[ignore = "perf bench: cargo test --test bench_policy -- --ignored --nocapture"]
 fn bench_summary() {
     let specs = load_specs();
     let engine = PolicyEngine::new(specs);

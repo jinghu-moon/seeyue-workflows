@@ -326,3 +326,64 @@ pub struct TypeCheckParams {
     #[schemars(description = "Language: typescript | python (auto-detected if omitted)")]
     pub language: Option<String>,
 }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GitLogParams {
+    #[schemars(description = "Max commits to return (default: 20, max: 200)")]
+    pub limit: Option<usize>,
+    #[schemars(description = "Restrict to commits touching this relative path")]
+    pub path: Option<String>,
+    #[schemars(description = "Starting ref/branch/tag (default: HEAD)")]
+    pub since: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct BatchReadParams {
+    #[schemars(description = "List of relative file paths to read (max 20)")]
+    pub paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FormatFileParams {
+    #[schemars(description = "Relative file path to format")]
+    pub path: String,
+    #[schemars(description = "If true, only check formatting without writing (default: false)")]
+    pub check_only: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GitBlameParams {
+    #[schemars(description = "Relative file path")]
+    pub path: String,
+    #[schemars(description = "Start line (1-based, optional)")]
+    pub start_line: Option<usize>,
+    #[schemars(description = "End line (1-based, inclusive, optional)")]
+    pub end_line: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FileRenameParams {
+    #[schemars(description = "Source relative path")]
+    pub old_path: String,
+    #[schemars(description = "Destination relative path")]
+    pub new_path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SnapshotWorkspaceParams {
+    #[schemars(description = "Optional label for the snapshot directory")]
+    pub label: Option<String>,
+    #[schemars(description = "If true, also copy .gitignore'd files (default: false)")]
+    pub include_ignored: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CallHierarchyParams {
+    #[schemars(description = "Symbol name to analyse (function/method)")]
+    pub symbol: String,
+    #[schemars(description = "callers | callees | both (default: callers)")]
+    pub direction: Option<String>,
+    #[schemars(description = "Max results (default: 50, max: 200)")]
+    pub limit: Option<usize>,
+    #[schemars(description = "Restrict search to this relative sub-path (optional)")]
+    pub path: Option<String>,
+}

@@ -88,12 +88,14 @@ pub fn run_read(
     }
 
     // 截断保护
-    let actual_end = if end - start + 1 > MAX_LINES {
+    let actual_end = if total_lines == 0 {
+        0
+    } else if end - start + 1 > MAX_LINES {
         start + MAX_LINES - 1
     } else {
         end
     };
-    let truncated = actual_end < end;
+    let truncated = total_lines > 0 && actual_end < end;
 
     // ── 构建带行号的输出（tab 保持原样，不转空格）────────────────────────
     let num_width = total_lines.to_string().len().max(3);

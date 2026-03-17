@@ -8,7 +8,7 @@ use crate::lsp;
 use crate::tools::read::resolve_path;
 use crate::tools::search_workspace;
 use crate::treesitter::languages;
-use crate::AppState;
+use crate::app_state::AppState;
 
 // ─── 参数与响应 ───────────────────────────────────────────────────────────────
 

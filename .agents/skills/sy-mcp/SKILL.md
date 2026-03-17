@@ -43,6 +43,7 @@ Use when:
 | P1 | `sy_pretool_bash`, `sy_pretool_write`, `sy_posttool_write`, `sy_stop`, `sy_create_checkpoint`, `sy_advance_node` | Hook policy tools. Call at hook decision points. |
 | P2 | `file_outline`, `find_definition`, `find_references`, `verify_syntax`, `type_check`, `lint_file`, `run_test`, `run_command`, `session_summary` | Analysis tools. Call when context requires. |
 | P3 | `dependency_graph`, `multi_file_edit`, `create_file_tree`, `package_info`, `symbol_rename_preview`, `diff_since_checkpoint` | Complex operations. Call only when explicitly needed. |
+| P4 | `git_log`, `git_blame`, `git_status`, `git_diff_file`, `batch_read`, `format_file`, `file_rename`, `snapshot_workspace`, `call_hierarchy` | Extended tools. Git history, batch I/O, formatting, refactor support. |
 
 ---
 
@@ -266,6 +267,69 @@ Max files: prefer ≤ 5 per call for atomicity
 When: undoing last N write operations
 Requires: checkpoint created before the writes being undone
 Do NOT: use rewind as a substitute for rollback_boundary planning
+```
+
+---
+
+## P4: Extended Tool Usage
+
+### git_log
+
+```text
+When: reviewing commit history before refactor or understanding change timeline
+Params: limit (default 20, max 200), path (file filter), since (ref)
+Returns: hash/short/author/date/subject per commit
+```
+
+### git_blame
+
+```text
+When: tracing who introduced a bug or understanding authorship of a section
+Params: path (required), start_line/end_line (optional range)
+Returns: per-line hash/author/date/content
+```
+
+### batch_read
+
+```text
+When: need to read multiple files in one round-trip (max 20)
+Missing or path-escaped files are reported per-entry with error field — will NOT error the whole call
+Do NOT: use for write operations — still requires read-before-write for each file
+```
+
+### format_file
+
+```text
+When: after writing/editing source files to enforce code style
+Order: write → verify_syntax → format_file (check_only=false)
+check_only=true: returns needs_formatting or already_formatted without modifying
+Returns UNSUPPORTED for unknown languages, FORMATTER_NOT_FOUND if tool not installed
+```
+
+### file_rename
+
+```text
+Precondition: sy_pretool_write before calling (counts as a file write)
+Atomic: creates parent directories, records checkpoint, then renames
+Do NOT: use to overwrite existing files — returns IoError if dest exists
+```
+
+### snapshot_workspace
+
+```text
+When: before large-scale refactors or cross-session state preservation
+Output: .seeyue/snapshots/<label>/ — respects .gitignore by default
+Limits: 10 MB per file, 200 MB total
+Duplicate label → IoError — use unique labels (timestamp or phase name)
+```
+
+### call_hierarchy
+
+```text
+When: analysing impact of renaming/removing a function
+direction: callers (who calls this), callees (what this defines), both
+path: restrict search to sub-tree for performance
+No LSP required — uses static regex analysis
 ```
 
 ---

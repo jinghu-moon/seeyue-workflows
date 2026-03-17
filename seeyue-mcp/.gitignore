@@ -1,1 +1,4 @@
 *.sy-bak
+
+target/
+target_test/
