@@ -92,6 +92,33 @@ fn is_git_dry_run(command: &str) -> bool {
     dry_run_re.is_match(command)
 }
 
+/// Builtin dangerous command detection — independent of loaded specs.
+/// Used as a fallback when specs are empty (e.g. in unit tests).
+/// Covers the most common destructive/privileged/git-mutating patterns.
+pub fn is_builtin_dangerous(cmd: &str) -> bool {
+    static DANGEROUS: once_cell::sync::Lazy<regex::Regex> =
+        once_cell::sync::Lazy::new(|| {
+            regex::Regex::new(
+                r"(?x)
+                \brm\s+(-[^\s]*f|-[^\s]*r|--force|--recursive)   # rm -rf / rm -f
+                | \bdel\s+/[sqfQ]                                  # Windows del /s /q
+                | \bformat\b                                        # format drive
+                | \bmkfs\b                                          # make filesystem
+                | \bdd\b.*\bof=                                     # dd to device
+                | \bsudo\b                                          # privileged
+                | \bchmod\s+[0-7]*7[0-7]*                          # chmod 777
+                | \bchown\b.*\s/                                    # chown root paths
+                | \bgit\s+push\b                                    # git push
+                | \bgit\s+commit\b                                  # git commit
+                | \bgit\s+reset\s+--hard\b                         # git reset --hard
+                | \bgit\s+clean\s+-[^\s]*f                         # git clean -f
+                ",
+            )
+            .unwrap()
+        });
+    DANGEROUS.is_match(cmd)
+}
+
 #[cfg(test)]
 mod tests {
     // Unit tests require PolicySpecs loaded from actual YAML files.

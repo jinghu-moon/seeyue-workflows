@@ -49,7 +49,7 @@ impl PolicyEngine {
         // 2b. Persona command permission: reviewer personas MUST NOT run destructive commands
         if let Some(persona) = session.node.owner_persona.as_deref() {
             let cr_preview = command::classify_command(cmd, &self.specs);
-            if let Some(block) = self.check_persona_command(persona, &cr_preview.class) {
+            if let Some(block) = self.check_persona_command(persona, cmd, &cr_preview.class) {
                 return block
                     .with_command_class(cr_preview.class)
                     .with_risk(Risk::High);
@@ -424,8 +424,35 @@ impl PolicyEngine {
     fn check_persona_command(
         &self,
         persona: &str,
+        cmd: &str,
         class: &CommandClass,
     ) -> Option<HookResult> {
+        // Hardcoded reviewer guard — enforced regardless of persona_bindings spec.
+        // Checks the classified class AND a builtin regex so this guard works even
+        // when specs are empty (e.g. load_empty() in tests).
+        let reviewer_personas = ["spec_reviewer", "quality_reviewer"];
+        if reviewer_personas.contains(&persona) {
+            let destructive_classes = [
+                CommandClass::Destructive,
+                CommandClass::GitMutating,
+                CommandClass::Privileged,
+            ];
+            let is_dangerous = destructive_classes.contains(class)
+                || command::is_builtin_dangerous(cmd);
+            if is_dangerous {
+                return Some(
+                    HookResult::block(format!(
+                        "Reviewer persona '{}' may not run {:?} commands.",
+                        persona, class
+                    ))
+                    .with_instructions(vec![
+                        "Reviewers are read-only for destructive/git/privileged commands".to_string(),
+                    ]),
+                );
+            }
+        }
+
+        // Spec-driven check: may_run_commands: false
         let def = self.specs.persona_bindings.personas.get(persona)?;
         if def.may_run_commands == Some(false) {
             return Some(HookResult::block(format!(
@@ -433,24 +460,16 @@ impl PolicyEngine {
                 persona
             )));
         }
-        let reviewer_personas = ["spec_reviewer", "quality_reviewer"];
-        let destructive_classes = [
-            CommandClass::Destructive,
-            CommandClass::GitMutating,
-            CommandClass::Privileged,
-        ];
-        if reviewer_personas.contains(&persona) && destructive_classes.contains(class) {
-            return Some(
-                HookResult::block(format!(
-                    "Reviewer persona '{}' may not run {:?} commands.",
-                    persona, class
-                ))
-                .with_instructions(vec![
-                    "Reviewers are read-only for destructive/git/privileged commands".to_string(),
-                ]),
-            );
-        }
         None
+    }
+
+    /// Always-dangerous check independent of specs.
+    #[allow(dead_code)]
+    fn matches_builtin_dangerous(class: &CommandClass) -> bool {
+        matches!(
+            class,
+            CommandClass::Destructive | CommandClass::GitMutating | CommandClass::Privileged
+        )
     }
 
     // ── P1: Phase/Node validity ──────────────────────────────────────────

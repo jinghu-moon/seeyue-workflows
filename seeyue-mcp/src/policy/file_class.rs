@@ -28,6 +28,16 @@ pub fn classify_file(path: &str, specs: &PolicySpecs) -> FileClassifyResult {
     // Normalize path: backslash → forward slash, strip leading ./
     let normalized = normalize_path(path);
 
+    // Builtin secret guard — enforced regardless of loaded specs.
+    // Covers the most common secret file patterns as a safety invariant.
+    if is_builtin_secret(&normalized) {
+        return FileClassifyResult {
+            class: FileClass::SecretMaterial,
+            risk: Risk::Critical,
+            matched_pattern: Some("builtin_secret_pattern".to_string()),
+        };
+    }
+
     // Walk rules in precedence order (secret_material first)
     for rule in &specs.file_rules {
         if rule.matcher.is_match(&normalized) {
@@ -45,6 +55,27 @@ pub fn classify_file(path: &str, specs: &PolicySpecs) -> FileClassifyResult {
         risk: Risk::Low,
         matched_pattern: None,
     }
+}
+
+/// Builtin secret file detection — independent of loaded specs.
+/// Ensures secret material is always blocked even with empty specs.
+pub fn is_builtin_secret(normalized_path: &str) -> bool {
+    static SECRET: once_cell::sync::Lazy<regex::Regex> =
+        once_cell::sync::Lazy::new(|| {
+            regex::Regex::new(
+                r"(?x)
+                (^|/)\.(env)(\.[^/]*)?$              # .env, .env.local, .env.production
+                | (^|/)\.(secret|secrets)(/|$)        # .secret, .secrets/
+                | \.(pem|key|p12|pfx|jks)$            # private key files
+                | (^|/)(secrets?|private)(/|$)        # secrets/ or private/ dir
+                | (^|/)credentials?(\.[^/]*)?$        # credentials.json, credential.yaml
+                | (^|/)id_(rsa|ecdsa|ed25519)$        # SSH private keys
+                | (^|/)\.netrc$                       # netrc credentials
+                ",
+            )
+            .unwrap()
+        });
+    SECRET.is_match(normalized_path)
 }
 
 /// Check if a path is a production code file (not test/spec/docs).
