@@ -83,6 +83,16 @@ windows-sys = { version = "0.52", features = [
 [dev-dependencies]
 tempfile = "3"
 tokio    = { version = "1", features = ["full", "test-util"] }
+rstest   = "0.23"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name    = "policy"
+harness = false
+
+[[bench]]
+name    = "encoding"
+harness = false
 
 [[bin]]
 name = "sy-hook"

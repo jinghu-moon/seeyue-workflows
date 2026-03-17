@@ -1,0 +1,198 @@
+// benches/policy.rs
+//
+// Criterion benchmarks for the policy engine.
+// Run: cargo bench --bench policy
+
+use std::path::PathBuf;
+
+use criterion::{criterion_group, criterion_main, Criterion};
+
+use seeyue_mcp::policy::command;
+use seeyue_mcp::policy::evaluator::PolicyEngine;
+use seeyue_mcp::policy::file_class;
+use seeyue_mcp::policy::spec_loader::PolicySpecs;
+use seeyue_mcp::workflow::state::{
+    ApprovalState, LoopBudget, NodeState, PhaseState, RecoveryState, SessionState,
+};
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+fn project_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf()
+}
+
+fn load_specs() -> PolicySpecs {
+    PolicySpecs::load(&project_root()).unwrap_or_else(|_| PolicySpecs::load_empty())
+}
+
+fn make_session() -> SessionState {
+    SessionState {
+        schema_version: Some(1),
+        run_id: Some("wf-bench-001".to_string()),
+        phase: PhaseState {
+            id: Some("P1".to_string()),
+            name: Some("Implementation".to_string()),
+            status: Some("active".to_string()),
+        },
+        node: NodeState {
+            id: Some("P1-N1".to_string()),
+            name: Some("Test Node".to_string()),
+            status: Some("active".to_string()),
+            state: Some("green_verified".to_string()),
+            tdd_required: Some(false),
+            tdd_state: None,
+            tdd_exception: None,
+            target: Some(vec!["src/".to_string()]),
+            test_contract: None,
+            owner_persona: None,
+            phase_id: None,
+        },
+        loop_budget: LoopBudget {
+            max: Some(100),
+            used: Some(5),
+            exhausted: Some(false),
+            max_nodes: None,
+            consumed_nodes: None,
+            max_failures: None,
+            consumed_failures: None,
+            max_pending_approvals: None,
+            max_context_utilization: None,
+            current_context_utilization: None,
+            max_rework_cycles: None,
+            consumed_rework_cycles: None,
+        },
+        approvals: ApprovalState {
+            pending: None,
+            grants: None,
+        },
+        recovery: RecoveryState {
+            status: None,
+            restore_reason: None,
+            last_checkpoint_id: None,
+        },
+    }
+}
+
+// ─── Spec loading ─────────────────────────────────────────────────────────────
+
+fn bench_spec_loading(c: &mut Criterion) {
+    c.bench_function("PolicySpecs::load", |b| {
+        b.iter(|| PolicySpecs::load(&project_root()).unwrap_or_else(|_| PolicySpecs::load_empty()))
+    });
+}
+
+// ─── Command classification ──────────────────────────────────────────────────
+
+fn bench_command_classification(c: &mut Criterion) {
+    let specs = load_specs();
+    let commands = [
+        "ls -la",
+        "echo hello",
+        "cargo test",
+        "rm -rf /",
+        "git commit -m 'test'",
+        "git push origin main",
+        "curl https://example.com",
+        "sudo chmod 777 /etc/passwd",
+        "npm install express",
+    ];
+
+    let mut group = c.benchmark_group("command_classification");
+    for cmd in &commands {
+        group.bench_with_input(*cmd, cmd, |b, cmd| {
+            b.iter(|| command::classify_command(cmd, &specs))
+        });
+    }
+    group.finish();
+}
+
+// ─── File classification ──────────────────────────────────────────────────────
+
+fn bench_file_classification(c: &mut Criterion) {
+    let specs = load_specs();
+    let paths = [
+        "src/main.rs",
+        "docs/architecture-v4.md",
+        ".env",
+        "secrets/api-key.pem",
+        "workflow/policy.spec.yaml",
+        ".github/workflows/ci.yml",
+    ];
+
+    let mut group = c.benchmark_group("file_classification");
+    for path in &paths {
+        group.bench_with_input(*path, path, |b, path| {
+            b.iter(|| file_class::classify_file(path, &specs))
+        });
+    }
+    group.finish();
+}
+
+// ─── Policy evaluator ────────────────────────────────────────────────────────
+
+fn bench_policy_evaluator(c: &mut Criterion) {
+    let specs = load_specs();
+    let engine = PolicyEngine::new(specs);
+    let session = make_session();
+
+    let mut group = c.benchmark_group("policy_evaluator");
+
+    // check_bash
+    for cmd in &["ls -la", "rm -rf /", "git push origin main", "cargo test"] {
+        group.bench_with_input(
+            format!("check_bash/{}", cmd),
+            cmd,
+            |b, cmd| b.iter(|| engine.check_bash(cmd, &session)),
+        );
+    }
+
+    // check_write
+    for path in &["src/main.rs", ".env", "workflow/policy.spec.yaml", "tests/test.py"] {
+        group.bench_with_input(
+            format!("check_write/{}", path),
+            path,
+            |b, path| b.iter(|| engine.check_write(path, &session)),
+        );
+    }
+
+    // check_stop
+    group.bench_function("check_stop", |b| {
+        b.iter(|| engine.check_stop(&session))
+    });
+
+    group.finish();
+}
+
+// ─── Session loading ──────────────────────────────────────────────────────────
+
+fn bench_session_loading(c: &mut Criterion) {
+    let tmp = tempfile::tempdir().unwrap();
+    let workflow_dir = tmp.path().to_path_buf();
+    std::fs::write(
+        workflow_dir.join("session.yaml"),
+        "schema_version: 1\nrun_id: wf-bench-001\n\
+         phase:\n  id: P1\n  name: Implementation\n  status: active\n\
+         node:\n  id: P1-N1\n  status: active\n  state: green_verified\n\
+         loop_budget:\n  max: 100\n  used: 5\n  exhausted: false\n",
+    )
+    .unwrap();
+
+    c.bench_function("load_session", |b| {
+        b.iter(|| seeyue_mcp::workflow::state::load_session(&workflow_dir))
+    });
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+criterion_group!(
+    benches,
+    bench_spec_loading,
+    bench_command_classification,
+    bench_file_classification,
+    bench_policy_evaluator,
+    bench_session_loading,
+);
+criterion_main!(benches);
