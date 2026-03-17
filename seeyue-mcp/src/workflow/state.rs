@@ -57,7 +57,16 @@ pub struct NodeState {
     #[serde(default)]
     pub tdd_state: Option<String>,
     #[serde(default)]
+    pub tdd_exception: Option<serde_yaml::Value>,
+    #[serde(default)]
     pub test_contract: Option<serde_yaml::Value>,
+    /// Persona executing this node (e.g. "author", "spec_reviewer").
+    /// Read from session.yaml node.owner_persona.
+    #[serde(default)]
+    pub owner_persona: Option<String>,
+    /// phase_id this node belongs to (for cross-field consistency check).
+    #[serde(default)]
+    pub phase_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

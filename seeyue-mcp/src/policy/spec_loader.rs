@@ -14,6 +14,22 @@ use crate::policy::types::{CommandClass, FileClass, Risk};
 /// Type alias to reduce complexity in approval matrix return types.
 type ApprovalMatrixPair = (HashMap<String, ApprovalClassEntry>, HashMap<String, ApprovalClassEntry>);
 
+// ─── persona-bindings.yaml structures ───────────────────────────────────────
+
+#[derive(Debug, Deserialize, Default)]
+pub struct PersonaBindingsSpec {
+    #[serde(default)]
+    pub personas: HashMap<String, PersonaDef>,
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+pub struct PersonaDef {
+    #[serde(default)]
+    pub may_write_files: Option<bool>,
+    #[serde(default)]
+    pub may_run_commands: Option<bool>,
+}
+
 // ─── hooks.spec.yaml structures ──────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -98,6 +114,8 @@ pub struct PolicySpecs {
     pub command_approval: HashMap<String, ApprovalClassEntry>,
     pub file_approval: HashMap<String, ApprovalClassEntry>,
     pub workflow_dir: PathBuf,
+    /// Persona definitions from persona-bindings.yaml.
+    pub persona_bindings: PersonaBindingsSpec,
 }
 
 impl PolicySpecs {
@@ -115,12 +133,16 @@ impl PolicySpecs {
         // ── Load approval matrix ──
         let (command_approval, file_approval) = Self::load_approval_matrix(&workflow_dir)?;
 
+        // ── Load persona bindings ──
+        let persona_bindings = Self::load_persona_bindings(&workflow_dir);
+
         Ok(Self {
             command_rules,
             file_rules,
             command_approval,
             file_approval,
             workflow_dir,
+            persona_bindings,
         })
     }
 
@@ -132,6 +154,7 @@ impl PolicySpecs {
             command_approval: HashMap::new(),
             file_approval: HashMap::new(),
             workflow_dir: PathBuf::new(),
+            persona_bindings: PersonaBindingsSpec::default(),
         }
     }
 
@@ -214,6 +237,17 @@ impl PolicySpecs {
             .map_err(|e| format!("Failed to parse approval-matrix.yaml: {}", e))?;
 
         Ok((spec.command_classes, spec.file_classes))
+    }
+
+    /// Load persona bindings from persona-bindings.yaml.
+    /// Returns empty/permissive bindings if file is missing.
+    fn load_persona_bindings(workflow_dir: &Path) -> PersonaBindingsSpec {
+        let path = workflow_dir.join("persona-bindings.yaml");
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => return PersonaBindingsSpec::default(),
+        };
+        serde_yaml::from_str(&content).unwrap_or_default()
     }
 }
 

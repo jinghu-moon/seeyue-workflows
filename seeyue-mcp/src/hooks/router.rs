@@ -64,6 +64,45 @@ pub fn dispatch(
             }
 
             let result = engine.check_write(&path, session);
+
+            // Pre-destructive checkpoint: if allowed and target exists, write a .sy-bak
+            // snapshot so the overwrite is recoverable without the SQLite checkpoint store.
+            if result.verdict == crate::policy::types::Verdict::Allow {
+                let cwd = input.resolve_cwd();
+                let full_path = std::path::Path::new(&cwd).join(&path);
+                if full_path.exists() {
+                    let bak_path = full_path.with_extension(
+                        format!(
+                            "{}.sy-bak",
+                            full_path.extension().and_then(|e| e.to_str()).unwrap_or("")
+                        )
+                    );
+                    // Non-fatal: backup failure must not block the write.
+                    if let Ok(content) = fs::read(&full_path) {
+                        let _ = fs::write(&bak_path, &content);
+
+                        // Record pre-write backup event in journal.
+                        let run_id  = session.run_id.as_deref().unwrap_or("").to_string();
+                        let node_id = session.node.id.as_deref()
+                            .or(session.node.name.as_deref()).unwrap_or("").to_string();
+                        let phase_id = session.phase.id.as_deref()
+                            .or(session.phase.name.as_deref()).unwrap_or("none").to_string();
+                        if !run_id.is_empty() {
+                            let evt = journal::JournalEvent::new("pre_write_backup", "hook")
+                                .with_run_id(&run_id)
+                                .with_phase(&phase_id)
+                                .with_node_id(&node_id)
+                                .with_payload(serde_json::json!({
+                                    "original": path,
+                                    "backup": bak_path.display().to_string(),
+                                    "size_bytes": content.len(),
+                                }));
+                            let _ = journal::append_event(workflow_dir, evt);
+                        }
+                    }
+                }
+            }
+
             emit_result(result, Some(build_session_context(session)));
         }
 

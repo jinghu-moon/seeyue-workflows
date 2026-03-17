@@ -94,9 +94,26 @@ pub fn run_pretool_bash(params: PreToolBashParams, app: &AppState) -> HookResult
 }
 
 /// Execute sy_pretool_write: classify file and check policy.
+/// If the policy allows and the target file already exists, auto-capture a
+/// pre-destructive checkpoint so the write can be rewound via `rewind`.
 pub fn run_pretool_write(params: PreToolWriteParams, app: &AppState) -> HookResult {
     let session = state::load_session(&app.workflow_dir);
-    app.policy_engine.check_write(&params.path, &session)
+    let result = app.policy_engine.check_write(&params.path, &session);
+
+    // Pre-destructive checkpoint: snapshot existing file before an overwrite.
+    if result.verdict == crate::policy::types::Verdict::Allow {
+        let full_path = app.workspace.join(&params.path);
+        if full_path.exists() {
+            let call_id = format!(
+                "pre_write_{}",
+                chrono::Utc::now().timestamp_millis()
+            );
+            // Non-fatal: checkpoint failure must not block the write.
+            let _ = app.checkpoint.capture(&full_path, &call_id, "sy_pretool_write");
+        }
+    }
+
+    result
 }
 
 /// Execute sy_posttool_write: record write evidence to journal.

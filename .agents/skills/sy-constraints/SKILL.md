@@ -93,17 +93,16 @@ The following controls MUST be implemented with hooks, not skill text only:
 
 Project hook contract:
 - `.claude/settings.json` defines hook wiring.
-- `.claude/sy-hooks.policy.json` defines project policy (paths, patterns, guards).
-- `scripts/hooks/sy-session-start.cjs` injects first-turn workflow/bootstrap context.
-- `scripts/hooks/sy-prompt-refresh.cjs` re-anchors constraint routing on `UserPromptSubmit` in active phases.
-- `scripts/hooks/sy-pretool-bash.cjs` blocks dangerous shell/git operations and unauthorized commit/push.
-- `scripts/hooks/sy-pretool-bash-budget.cjs` enforces loop budget for auto/batch/parallel execution.
-- `scripts/hooks/sy-pretool-write.cjs` enforces pre-write gates (protected files, TDD red gate, secrets, placeholders, debug phase).
-- `scripts/hooks/sy-pretool-write-session.cjs` guards canonical `session.yaml` state integrity (legacy `session.md` fallback still supported).
-- `scripts/hooks/sy-posttool-write.cjs` appends audit evidence and invalidates stale index understanding.
-- `scripts/hooks/sy-posttool-bash-verify.cjs` captures verification evidence into staging/report data.
-- `scripts/hooks/sy-stop.cjs` enforces phase-aware completion checkpoint gating.
+- `seeyue-mcp/target/release/sy-hook.exe` is the unified Rust hook binary (replaces all .cjs scripts).
+- `sy-hook.exe SessionStart` injects first-turn workflow/bootstrap context.
+- `sy-hook.exe UserPromptSubmit` re-anchors constraint routing on UserPromptSubmit in active phases.
+- `sy-hook.exe PreToolUse:Bash` blocks dangerous shell/git operations, unauthorized commit/push, and enforces loop budget.
+- `sy-hook.exe PreToolUse:Write|Edit` enforces pre-write gates (protected files, TDD red gate, secrets, session integrity).
+- `sy-hook.exe PostToolUse:Write|Edit` appends audit evidence, records write journal, detects scope drift.
+- `sy-hook.exe PostToolUse:Bash` captures verification and TDD red/green evidence.
+- `sy-hook.exe Stop` enforces phase-aware completion checkpoint gating.
 - skills MUST describe policy; hooks MUST enforce policy.
+- MCP tool `sy_pretool_bash` / `sy_pretool_write` / `sy_posttool_write` / `sy_stop` mirror hook events for model-side policy context (see `sy-mcp`).
 
 ## Trigger Reliability Rule (from production patterns)
 

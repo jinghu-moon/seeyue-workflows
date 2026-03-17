@@ -95,20 +95,44 @@ pub fn handle(input: &HookInput, workflow_dir: &Path, session: &SessionState) ->
         false
     };
 
-    // 6a. Record red event
+    // 6a. Record red event — distinguish valid vs invalid red.
+    // policy.spec.yaml rejected_failure_kinds must NOT count as valid red evidence.
+    const REJECTED_FAILURE_KINDS: &[&str] = &[
+        "syntax_error",
+        "import_error",
+        "environment_error",
+        "connection_error",
+        "permission_error",
+        "fixture_initialization_error",
+    ];
+
     if !run_id.is_empty() && red_matched {
-        let evt = JournalEvent::new("red_recorded", "hook")
+        let failure_kind = verify_staging::classify_failure_kind(&stdout, &stderr, exit_code);
+        let is_rejected = REJECTED_FAILURE_KINDS.contains(&failure_kind.as_str());
+        let event_name = if is_rejected { "invalid_red_recorded" } else { "red_recorded" };
+        let rejection_reason: Option<String> = if is_rejected {
+            Some(format!(
+                "failure_kind '{}' is in rejected_failure_kinds — does not count as valid red",
+                failure_kind
+            ))
+        } else {
+            None
+        };
+
+        let evt = JournalEvent::new(event_name, "hook")
             .with_run_id(&run_id)
             .with_phase(&phase_id)
             .with_node_id(&node_id)
             .with_payload(json!({
                 "executed": true,
                 "testFailed": exit_code != 0,
-                "failureKind": verify_staging::classify_failure_kind(&stdout, &stderr, exit_code),
+                "failureKind": failure_kind,
                 "exitCode": exit_code,
                 "recorded": true,
+                "valid": !is_rejected,
                 "command": command,
                 "key_signal": key_signal,
+                "rejection_reason": rejection_reason,
             }));
         let _ = journal::append_event(workflow_dir, evt);
     }

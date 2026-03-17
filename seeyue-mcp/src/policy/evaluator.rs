@@ -46,6 +46,16 @@ impl PolicyEngine {
                 .with_risk(Risk::High);
         }
 
+        // 2b. Persona command permission: reviewer personas MUST NOT run destructive commands
+        if let Some(persona) = session.node.owner_persona.as_deref() {
+            let cr_preview = command::classify_command(cmd, &self.specs);
+            if let Some(block) = self.check_persona_command(persona, &cr_preview.class) {
+                return block
+                    .with_command_class(cr_preview.class)
+                    .with_risk(Risk::High);
+            }
+        }
+
         // 3. Classify
         let cr: ClassifyResult = command::classify_command(cmd, &self.specs);
 
@@ -97,10 +107,13 @@ impl PolicyEngine {
     /// 1. Bypass check
     /// 2. Classify file → file_class
     /// 3. Secret material → Block
-    /// 4. Approval matrix lookup
-    /// 5. TDD state check (for production code)
-    /// 6. Scope drift check
-    /// 7. Verdict
+    /// 4. Persona isolation check (reviewer/planner/reader MUST NOT write files)
+    /// 5. Protected files check (from policy.spec.yaml)
+    /// 6. Phase/Node validity check (phase completed or no active_id → block)
+    /// 7. Approval matrix lookup
+    /// 8. TDD state check (for production code)
+    /// 9. Scope drift check
+    /// 10. Verdict
     pub fn check_write(&self, path: &str, session: &SessionState) -> HookResult {
         // 1. Bypass
         if std::env::var("SY_BYPASS_PRETOOL_WRITE").unwrap_or_default() == "1" {
@@ -121,7 +134,19 @@ impl PolicyEngine {
             .with_risk(Risk::Critical);
         }
 
-        // 4. Approval matrix lookup
+        // 4. Persona isolation: non-author personas MUST NOT write files
+        if let Some(persona) = session.node.owner_persona.as_deref() {
+            if let Some(block) = self.check_persona_write(persona) {
+                return block.with_file_class(fr.class).with_risk(Risk::High);
+            }
+        }
+
+        // 5. Phase/Node validity: block production writes when phase completed or no active node
+        if file_class::is_production_code(path) {
+            if let Some(block) = self.check_phase_node_validity(session, path) {
+                return block.with_file_class(fr.class).with_risk(Risk::High);
+            }
+        }
         let entry = self.lookup_file_approval(&fr.class);
 
         let mut result = if entry.approval_required {
@@ -147,7 +172,36 @@ impl PolicyEngine {
             .with_file_class(fr.class)
             .with_risk(entry.risk);
 
-        // 5. TDD state check (only for production code that isn't already blocked)
+        // 5. TDD exception check: if tdd_exception exists but user_approved != true, block.
+        // policy.spec.yaml: must_block_until_user_approved == true
+        if result.verdict == Verdict::Allow && file_class::is_production_code(path) {
+            if let Some(exc) = &session.node.tdd_exception {
+                let user_approved = exc
+                    .get("user_approved")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if !user_approved {
+                    let reason = exc
+                        .get("reason")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("no reason provided");
+                    return HookResult::block(format!(
+                        "Production write blocked: tdd_exception exists but user_approved is false. \
+                         Reason: {}",
+                        reason
+                    ))
+                    .with_file_class(fr.class)
+                    .with_risk(entry.risk)
+                    .with_instructions(vec![
+                        "TDD exception requires explicit user approval before proceeding.".to_string(),
+                        format!("Exception reason: {}", reason),
+                        "Set tdd_exception.user_approved: true via sy_advance_node to unblock.".to_string(),
+                    ]);
+                }
+            }
+        }
+
+        // 6. TDD state check (only for production code that isn't already blocked)
         if result.verdict == Verdict::Allow
             && file_class::is_production_code(path)
             && !crate::workflow::state::check_tdd_ready(session)
@@ -172,7 +226,7 @@ impl PolicyEngine {
             ]);
         }
 
-        // 6. Scope drift check (only for production code that isn't already blocked)
+        // 7. Scope drift check (only for production code that isn't already blocked)
         if result.verdict == Verdict::Allow && file_class::is_production_code(path) {
             if let Some(instructions) = self.check_scope_drift(session, path) {
                 result = result.with_instructions(instructions);
@@ -344,6 +398,136 @@ impl PolicyEngine {
         } else {
             None
         }
+    }
+
+    // ── P1: Persona isolation ────────────────────────────────────────────
+
+    /// Block file writes for personas that are not allowed to write files.
+    fn check_persona_write(&self, persona: &str) -> Option<HookResult> {
+        let def = self.specs.persona_bindings.personas.get(persona)?;
+        if def.may_write_files == Some(false) {
+            return Some(
+                HookResult::block(format!(
+                    "Persona '{}' may not write files. Switch to author persona.",
+                    persona
+                ))
+                .with_instructions(vec![
+                    format!("Current persona: {}", persona),
+                    "Required: author persona for file writes".to_string(),
+                ]),
+            );
+        }
+        None
+    }
+
+    /// Block destructive commands for reviewer/planner/reader personas.
+    fn check_persona_command(
+        &self,
+        persona: &str,
+        class: &CommandClass,
+    ) -> Option<HookResult> {
+        let def = self.specs.persona_bindings.personas.get(persona)?;
+        if def.may_run_commands == Some(false) {
+            return Some(HookResult::block(format!(
+                "Persona '{}' may not run commands.",
+                persona
+            )));
+        }
+        let reviewer_personas = ["spec_reviewer", "quality_reviewer"];
+        let destructive_classes = [
+            CommandClass::Destructive,
+            CommandClass::GitMutating,
+            CommandClass::Privileged,
+        ];
+        if reviewer_personas.contains(&persona) && destructive_classes.contains(class) {
+            return Some(
+                HookResult::block(format!(
+                    "Reviewer persona '{}' may not run {:?} commands.",
+                    persona, class
+                ))
+                .with_instructions(vec![
+                    "Reviewers are read-only for destructive/git/privileged commands".to_string(),
+                ]),
+            );
+        }
+        None
+    }
+
+    // ── P1: Phase/Node validity ──────────────────────────────────────────
+
+    /// Block production writes when phase is completed or no active node in execute phase.
+    fn check_phase_node_validity(
+        &self,
+        session: &SessionState,
+        path: &str,
+    ) -> Option<HookResult> {
+        let phase_status = session.phase.status.as_deref().unwrap_or("");
+        let phase_id = session
+            .phase
+            .id
+            .as_deref()
+            .or(session.phase.name.as_deref())
+            .unwrap_or("");
+
+        // Block if phase is marked completed
+        if phase_status == "completed" && !phase_id.is_empty() {
+            return Some(
+                HookResult::block(format!(
+                    "Phase '{}' is completed — production writes are blocked.",
+                    phase_id
+                ))
+                .with_instructions(vec![
+                    format!("File: {}", path),
+                    format!("Phase: {} ({})", phase_id, phase_status),
+                    "Start a new execution phase before writing code.".to_string(),
+                ]),
+            );
+        }
+
+        // In execute phase: require active node
+        let phase_name = session
+            .phase
+            .name
+            .as_deref()
+            .or(session.phase.id.as_deref())
+            .unwrap_or("");
+        if phase_name == "execute" {
+            let node_id = session
+                .node
+                .id
+                .as_deref()
+                .or(session.node.name.as_deref())
+                .unwrap_or("");
+            if node_id.is_empty() {
+                return Some(
+                    HookResult::block(
+                        "No active node in execute phase — production writes are blocked.",
+                    )
+                    .with_instructions(vec![
+                        format!("File: {}", path),
+                        "Use sy_advance_node to activate a plan node first.".to_string(),
+                    ]),
+                );
+            }
+            let node_status = session.node.status.as_deref().unwrap_or("");
+            if !node_status.is_empty()
+                && !matches!(node_status, "in_progress" | "blocked" | "review")
+            {
+                return Some(
+                    HookResult::block(format!(
+                        "Node status '{}' does not allow production writes. \
+                         Allowed: in_progress, blocked, review.",
+                        node_status
+                    ))
+                    .with_instructions(vec![
+                        format!("File: {}", path),
+                        format!("Node: {} ({})", node_id, node_status),
+                    ]),
+                );
+            }
+        }
+
+        None
     }
 }
 
