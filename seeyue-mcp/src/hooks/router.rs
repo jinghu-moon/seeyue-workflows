@@ -11,7 +11,6 @@ use std::fs;
 use std::path::Path;
 
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 use crate::hooks::protocol::{HookInput, emit_allow, emit_result};
 use crate::hooks::{posttool_bash, prompt_refresh, session_start};
@@ -320,7 +319,5 @@ fn build_ctx_stop(session: &SessionState) -> HashMap<String, serde_json::Value> 
 
 /// Compute SHA-256 hex digest of a byte slice.
 fn hex_sha256(data: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    format!("{:x}", hasher.finalize())
+    crate::workflow::journal::hex_sha256(data)
 }

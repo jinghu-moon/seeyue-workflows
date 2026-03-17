@@ -10,7 +10,6 @@
 
 use rmcp::schemars;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 
 use crate::AppState;
 use crate::policy::types::HookResult;
@@ -438,7 +437,5 @@ fn load_boot_memory(workspace: &std::path::Path) -> serde_json::Value {
 
 /// Compute SHA-256 hex digest of a byte slice.
 fn hex_sha256(data: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    format!("{:x}", hasher.finalize())
+    crate::workflow::journal::hex_sha256(data)
 }

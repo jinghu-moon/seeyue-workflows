@@ -10,6 +10,7 @@ use std::path::Path;
 use chrono::Utc;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
+use sha2::{Digest, Sha256};
 
 // ─── Journal Event ───────────────────────────────────────────────────────────
 
@@ -186,4 +187,11 @@ pub fn count_lines(workflow_dir: &Path) -> usize {
         Ok(content) => content.lines().filter(|l| !l.trim().is_empty()).count(),
         Err(_) => 0,
     }
+}
+
+/// Compute SHA-256 hex digest of a byte slice.
+pub fn hex_sha256(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
 }
