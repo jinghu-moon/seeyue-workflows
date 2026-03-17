@@ -350,6 +350,42 @@ Shows when to call which MCP tools in the `sy-*` execution flow.
 | Phase transition | `sy_create_checkpoint` → `sy_advance_node` |
 | Before stop | `sy_stop` |
 | Bash command | `sy_pretool_bash(command)` before running |
+| Journal overflowing | `compact_journal(max_entries=200)` |
+| Search session state | `search_session(query, filter_event)` |
+
+| Journal overflowing | `compact_journal(max_entries=200)` |
+| Search session state | `search_session(query, filter_event)` |
+
+---
+
+## Keyword Trigger Routing
+
+When the following keywords appear in user requests or tool output, route to the
+corresponding MCP tool chain. This mirrors nocturne_memory's `manage_triggers`
+recall pattern applied to workflow state rather than memory nodes.
+
+| Keyword / Phrase | Recommended Tool Chain |
+|-----------------|------------------------|
+| `rewind` / `回滚` / `undo` | `sy_create_checkpoint` → `rewind` |
+| `test` / `测试` / `TDD` | `run_test` → `sy_advance_node(state=…)` |
+| `scope drift` / `越界` | `session_summary` → `diff_since_checkpoint` → `search_session(filter_event=write_recorded)` |
+| `compact` / `归档` / `journal too long` | `compact_journal(max_entries=200, summarize=true)` |
+| `search session` / `查 journal` | `search_session(query, filter_event, filter_phase)` |
+| `budget exceeded` / `超限` | surface `session_context.budget_exceeded` → STOP |
+| `restore pending` / `恢复中` | resolve recovery → `session_summary` before any write |
+
+---
+
+## session_context Field Guide (Disclosure)
+
+Each hook verdict path returns a **different subset** of session_context fields.
+Only read the fields documented for each path — others may be absent.
+
+| Path | Fields Returned |
+|------|-----------------|
+| `sy_pretool_bash` | `run_id`, `budget_exceeded`, `restore_pending`, `loop_count` |
+| `sy_pretool_write` | `run_id`, `tdd_state`, `restore_pending`, `last_checkpoint_id` |
+| `sy_stop` | `run_id`, `phase`, `node_id`, `pending_approvals`, `last_checkpoint_id` |
 
 ---
 
