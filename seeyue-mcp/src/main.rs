@@ -1123,9 +1123,15 @@ impl SeeyueMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let result = tools::notify::run_sy_notify(
             tools::notify::SyNotifyParams {
-                message: p.message,
-                level:   p.level,
-                title:   p.title,
+                message:  p.message,
+                level:    p.level,
+                title:    p.title,
+                progress: p.progress.map(|pp| tools::notify::NotifyProgressParams {
+                    value:  pp.value,
+                    max:    pp.max,
+                    label:  pp.label,
+                    status: pp.status,
+                }),
             },
             &self.state.workflow_dir,
         );
@@ -1140,9 +1146,10 @@ impl SeeyueMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let result = tools::approval::run_approval_request(
             tools::approval::ApprovalRequestParams {
-                subject:  p.subject,
-                detail:   p.detail,
-                category: p.category,
+                subject:      p.subject,
+                detail:       p.detail,
+                category:     p.category,
+                timeout_secs: p.timeout_secs,
             },
             &self.state.workflow_dir,
         );
@@ -1174,6 +1181,7 @@ impl SeeyueMcpServer {
         let result = tools::approval::run_approval_status(
             tools::approval::ApprovalStatusParams {
                 approval_id: p.approval_id,
+                since_ts:    p.since_ts,
             },
             &self.state.workflow_dir,
         );
@@ -1191,6 +1199,11 @@ impl SeeyueMcpServer {
                 node_id: p.node_id,
                 status:  p.status,
                 notes:   p.notes,
+                nodes:   p.nodes.map(|ns| ns.into_iter().map(|n| tools::task_graph_update::NodeUpdate {
+                    node_id: n.node_id,
+                    status:  n.status,
+                    notes:   n.notes,
+                }).collect()),
             },
             &self.state.workflow_dir,
         );
@@ -1205,7 +1218,73 @@ impl SeeyueMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let result = tools::progress_report::run_progress_report(
             tools::progress_report::ProgressReportParams {
-                phase: p.phase,
+                phase:  p.phase,
+                notify: p.notify.unwrap_or(false),
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Post a question to the user via Windows Toast + questions.jsonl. \
+        Returns question_id; poll sy_ask_user_status to retrieve the answer.")]
+    async fn sy_ask_user(
+        &self,
+        Parameters(p): Parameters<AskUserParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::ask_user::run_ask_user(
+            tools::ask_user::AskUserParams {
+                question: p.question,
+                options:  p.options,
+                default:  p.default,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Poll for user answers to questions posted by sy_ask_user. \
+        Omit question_id to return all pending questions.")]
+    async fn sy_ask_user_status(
+        &self,
+        Parameters(p): Parameters<AskUserStatusParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::ask_user::run_ask_user_status(
+            tools::ask_user::AskUserStatusParams {
+                question_id: p.question_id,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Request structured input from the user (text/code/file_path/json) \
+        via Toast + input_requests.jsonl. Returns request_id.")]
+    async fn sy_input_request(
+        &self,
+        Parameters(p): Parameters<InputRequestParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::input_request::run_input_request(
+            tools::input_request::InputRequestParams {
+                prompt:   p.prompt,
+                kind:     p.kind,
+                language: p.language,
+                example:  p.example,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Poll for submitted input responses from sy_input_request. \
+        Omit request_id to return all pending requests.")]
+    async fn sy_input_status(
+        &self,
+        Parameters(p): Parameters<InputStatusParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::input_request::run_input_status(
+            tools::input_request::InputStatusParams {
+                request_id: p.request_id,
             },
             &self.state.workflow_dir,
         );

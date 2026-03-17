@@ -10,6 +10,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::error::ToolError;
+use crate::platform::notify::{self as win_notify, NotifyLevel};
 use crate::workflow::state;
 
 // ─── Params / Result ─────────────────────────────────────────────────────────
@@ -17,7 +18,9 @@ use crate::workflow::state;
 #[derive(Debug)]
 pub struct ProgressReportParams {
     /// Filter to a specific phase id/name (default: current phase).
-    pub phase: Option<String>,
+    pub phase:  Option<String>,
+    /// If true, also send a Windows Toast with the summary line.
+    pub notify: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -93,7 +96,7 @@ pub fn run_progress_report(
 
     let _ = node_list;
 
-    Ok(ProgressReportResult {
+    let result = ProgressReportResult {
         kind:            "success".into(),
         phase:           phase_id,
         phase_status:    session.phase.status,
@@ -103,8 +106,15 @@ pub fn run_progress_report(
         files_written,
         event_counts,
         active_node,
-        summary,
-    })
+        summary:         summary.clone(),
+    };
+
+    if params.notify {
+        let level = if nodes_pending == 0 { NotifyLevel::Milestone } else { NotifyLevel::Info };
+        win_notify::send_toast("seeyue-mcp [progress]", &summary, level);
+    }
+
+    Ok(result)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

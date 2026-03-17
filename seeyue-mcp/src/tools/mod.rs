@@ -1,4 +1,5 @@
 pub mod approval;
+pub mod ask_user;
 pub mod batch_read;
 pub mod call_hierarchy;
 pub mod checkpoint_list;
@@ -18,6 +19,7 @@ pub mod git_diff_file;
 pub mod git_log;
 pub mod git_status;
 pub mod hooks;
+pub mod input_request;
 pub mod lint_file;
 pub mod memory_delete;
 pub mod memory_list;

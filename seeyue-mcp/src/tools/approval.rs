@@ -1,9 +1,9 @@
 // src/tools/approval.rs
 //
-// Three approval tools:
-//   - sy_approval_request: create a pending approval, send Windows toast
+// Approval tools:
+//   - sy_approval_request: create a pending approval, send Windows toast, optional timeout
 //   - sy_approval_resolve: mark approval approved/rejected
-//   - sy_approval_status:  query pending or all approvals
+//   - sy_approval_status:  query pending or all approvals (supports since_ts filter)
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -23,11 +23,13 @@ const APPROVALS_FILE: &str = "approvals.jsonl";
 #[derive(Debug, Deserialize)]
 pub struct ApprovalRequestParams {
     /// Short subject line shown in the toast and approval list.
-    pub subject:     String,
+    pub subject:      String,
     /// Optional longer description.
-    pub detail:      Option<String>,
+    pub detail:       Option<String>,
     /// Category tag (e.g. "destructive", "deploy", "policy").
-    pub category:    Option<String>,
+    pub category:     Option<String>,
+    /// Auto-reject after this many seconds if not resolved (omit = no timeout).
+    pub timeout_secs: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +46,8 @@ pub struct ApprovalResolveParams {
 pub struct ApprovalStatusParams {
     /// If provided, fetch a specific approval. Otherwise returns all pending.
     pub approval_id: Option<String>,
+    /// Return only entries created at or after this ISO 8601 timestamp.
+    pub since_ts:    Option<String>,
 }
 
 // ─── Result ──────────────────────────────────────────────────────────────────
@@ -56,6 +60,8 @@ pub struct ApprovalRequestResult {
     pub subject:     String,
     pub status:      String,
     pub notified:    bool,
+    pub timeout_secs: Option<u64>,
+    pub expires_at:   Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -69,12 +75,13 @@ pub struct ApprovalResolveResult {
 
 #[derive(Debug, Serialize)]
 pub struct ApprovalEntry {
-    pub approval_id: String,
-    pub subject:     String,
-    pub category:    Option<String>,
-    pub status:      String,
-    pub ts:          String,
-    pub detail:      Option<String>,
+    pub approval_id:  String,
+    pub subject:      String,
+    pub category:     Option<String>,
+    pub status:       String,
+    pub ts:           String,
+    pub detail:       Option<String>,
+    pub expires_at:   Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,15 +97,17 @@ pub struct ApprovalStatusResult {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ApprovalRecord {
-    approval_id: String,
-    ts:          String,
-    subject:     String,
-    detail:      Option<String>,
-    category:    Option<String>,
-    status:      String,   // "pending" | "approved" | "rejected"
-    decision:    Option<String>,
-    note:        Option<String>,
-    resolved_at: Option<String>,
+    approval_id:  String,
+    ts:           String,
+    subject:      String,
+    detail:       Option<String>,
+    category:     Option<String>,
+    status:       String,   // "pending" | "approved" | "rejected" | "timeout"
+    decision:     Option<String>,
+    note:         Option<String>,
+    resolved_at:  Option<String>,
+    timeout_secs: Option<u64>,
+    expires_at:   Option<String>,
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -136,6 +145,49 @@ fn append_record(workflow_dir: &Path, record: &ApprovalRecord) -> Result<(), Too
     Ok(())
 }
 
+/// Check if an approval has expired; if so, write a timeout record and return true.
+fn expire_if_needed(workflow_dir: &Path, record: &ApprovalRecord) -> bool {
+    if record.status != "pending" { return false; }
+    let expires_at = match &record.expires_at {
+        Some(e) => e.clone(),
+        None    => return false,
+    };
+    let now = Utc::now().to_rfc3339();
+    if now.as_str() < expires_at.as_str() { return false; }
+
+    let timed_out = ApprovalRecord {
+        status:      "timeout".into(),
+        decision:    Some("rejected".into()),
+        note:        Some("auto-rejected: timeout expired".into()),
+        resolved_at: Some(now.clone()),
+        ..ApprovalRecord {
+            approval_id:  record.approval_id.clone(),
+            ts:           record.ts.clone(),
+            subject:      record.subject.clone(),
+            detail:       record.detail.clone(),
+            category:     record.category.clone(),
+            timeout_secs: record.timeout_secs,
+            expires_at:   record.expires_at.clone(),
+            status:       "timeout".into(),
+            decision:     Some("rejected".into()),
+            note:         Some("auto-rejected: timeout expired".into()),
+            resolved_at:  Some(now),
+        }
+    };
+    let _ = append_record(workflow_dir, &timed_out);
+    let _ = journal::append_event(workflow_dir, JournalEvent {
+        event:   "approval_timeout".into(),
+        actor:   "system".into(),
+        payload: Some(serde_json::json!({ "approval_id": record.approval_id })),
+        phase:    None,
+        node_id:  None,
+        run_id:   None,
+        ts:       Utc::now().to_rfc3339(),
+        trace_id: None,
+    });
+    true
+}
+
 // ─── sy_approval_request ─────────────────────────────────────────────────────
 
 pub fn run_approval_request(
@@ -150,25 +202,35 @@ pub fn run_approval_request(
     }
 
     let approval_id = format!("apr_{}", Utc::now().timestamp_millis());
-    let ts = Utc::now().to_rfc3339();
+    let ts          = Utc::now().to_rfc3339();
+
+    // Compute expiry timestamp if timeout_secs provided
+    let expires_at: Option<String> = params.timeout_secs.map(|secs| {
+        (Utc::now() + chrono::Duration::seconds(secs as i64)).to_rfc3339()
+    });
 
     let record = ApprovalRecord {
-        approval_id: approval_id.clone(),
-        ts:          ts.clone(),
-        subject:     params.subject.clone(),
-        detail:      params.detail.clone(),
-        category:    params.category.clone(),
-        status:      "pending".into(),
-        decision:    None,
-        note:        None,
-        resolved_at: None,
+        approval_id:  approval_id.clone(),
+        ts:           ts.clone(),
+        subject:      params.subject.clone(),
+        detail:       params.detail.clone(),
+        category:     params.category.clone(),
+        status:       "pending".into(),
+        decision:     None,
+        note:         None,
+        resolved_at:  None,
+        timeout_secs: params.timeout_secs,
+        expires_at:   expires_at.clone(),
     };
     append_record(workflow_dir, &record)?;
 
     // Send Windows toast
+    let timeout_hint = expires_at.as_deref()
+        .map(|e| format!(" [expires {}]", &e[..19]))
+        .unwrap_or_default();
     let toast_msg = params.detail.as_deref()
-        .map(|d| format!("{} — {}", params.subject, d))
-        .unwrap_or_else(|| params.subject.clone());
+        .map(|d| format!("{} — {}{}", params.subject, d, timeout_hint))
+        .unwrap_or_else(|| format!("{}{}", params.subject, timeout_hint));
     let toast = win_notify::send_toast("seeyue-mcp [approval]", &toast_msg, NotifyLevel::Warn);
 
     // Journal
@@ -176,23 +238,27 @@ pub fn run_approval_request(
         event:   "approval_requested".into(),
         actor:   "tool".into(),
         payload: Some(serde_json::json!({
-            "approval_id": approval_id,
-            "subject":     params.subject,
-            "category":    params.category,
+            "approval_id":  approval_id,
+            "subject":      params.subject,
+            "category":     params.category,
+            "timeout_secs": params.timeout_secs,
+            "expires_at":   expires_at,
         })),
         phase:    None,
         node_id:  None,
         run_id:   None,
-        ts:       chrono::Utc::now().to_rfc3339(),
+        ts:       Utc::now().to_rfc3339(),
         trace_id: None,
     });
 
     Ok(ApprovalRequestResult {
-        kind:        "pending".into(),
+        kind:         "pending".into(),
         approval_id,
-        subject:     record.subject,
-        status:      "pending".into(),
-        notified:    toast.notified,
+        subject:      record.subject,
+        status:       "pending".into(),
+        notified:     toast.notified,
+        timeout_secs: params.timeout_secs,
+        expires_at:   record.expires_at,
     })
 }
 
@@ -226,7 +292,13 @@ pub fn run_approval_resolve(
         decision:    Some(params.decision.clone()),
         note:        params.note.clone(),
         resolved_at: Some(resolved_at.clone()),
-        ..existing
+        approval_id:  existing.approval_id.clone(),
+        ts:           existing.ts,
+        subject:      existing.subject.clone(),
+        detail:       existing.detail,
+        category:     existing.category,
+        timeout_secs: existing.timeout_secs,
+        expires_at:   existing.expires_at,
     };
     append_record(workflow_dir, &updated)?;
 
@@ -249,7 +321,7 @@ pub fn run_approval_resolve(
         phase:    None,
         node_id:  None,
         run_id:   None,
-        ts:       chrono::Utc::now().to_rfc3339(),
+        ts:       Utc::now().to_rfc3339(),
         trace_id: None,
     });
 
@@ -267,15 +339,44 @@ pub fn run_approval_status(
     params: ApprovalStatusParams,
     workflow_dir: &Path,
 ) -> Result<ApprovalStatusResult, ToolError> {
-    let all = load_approvals(workflow_dir);
+    let mut all = load_approvals(workflow_dir);
+
+    // Expire any timed-out pending approvals before returning
+    let ids: Vec<String> = all.iter().map(|r| r.approval_id.clone()).collect();
+    for id in &ids {
+        if let Some(r) = all.iter().find(|r| &r.approval_id == id) {
+            let r_clone = ApprovalRecord {
+                approval_id:  r.approval_id.clone(),
+                ts:           r.ts.clone(),
+                subject:      r.subject.clone(),
+                detail:       r.detail.clone(),
+                category:     r.category.clone(),
+                status:       r.status.clone(),
+                decision:     r.decision.clone(),
+                note:         r.note.clone(),
+                resolved_at:  r.resolved_at.clone(),
+                timeout_secs: r.timeout_secs,
+                expires_at:   r.expires_at.clone(),
+            };
+            expire_if_needed(workflow_dir, &r_clone);
+        }
+    }
+    // Reload after potential expiry writes
+    all = load_approvals(workflow_dir);
 
     let filtered: Vec<ApprovalEntry> = all.iter()
         .filter(|r| {
+            // approval_id filter
             if let Some(ref id) = params.approval_id {
-                &r.approval_id == id
-            } else {
-                r.status == "pending"
+                if &r.approval_id != id { return false; }
+            } else if r.status != "pending" {
+                return false;
             }
+            // since_ts filter
+            if let Some(ref since) = params.since_ts {
+                if r.ts.as_str() < since.as_str() { return false; }
+            }
+            true
         })
         .map(|r| ApprovalEntry {
             approval_id: r.approval_id.clone(),
@@ -284,6 +385,7 @@ pub fn run_approval_status(
             status:      r.status.clone(),
             ts:          r.ts.clone(),
             detail:      r.detail.clone(),
+            expires_at:  r.expires_at.clone(),
         })
         .collect();
 

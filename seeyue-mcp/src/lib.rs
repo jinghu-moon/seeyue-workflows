@@ -18,6 +18,8 @@ pub mod treesitter;
 pub mod workflow;
 
 pub mod tools {
+    pub mod approval;
+    pub mod ask_user;
     pub mod batch_read;
     pub mod call_hierarchy;
     pub mod checkpoint_list;
@@ -36,14 +38,17 @@ pub mod tools {
     pub mod git_diff_file;
     pub mod git_log;
     pub mod git_status;
+    pub mod input_request;
     pub mod lint_file;
     pub mod memory_delete;
     pub mod memory_list;
     pub mod memory_read;
     pub mod memory_write;
     pub mod multi_file_edit;
+    pub mod notify;
     pub mod package_info;
     pub mod preview_edit;
+    pub mod progress_report;
     pub mod read;
     pub mod read_compressed;
     pub mod read_range;
@@ -55,9 +60,6 @@ pub mod tools {
     pub mod session_summary;
     pub mod snapshot_workspace;
     pub mod symbol_rename_preview;
-    pub mod approval;
-    pub mod notify;
-    pub mod progress_report;
     pub mod task_graph_update;
     pub mod tdd_evidence;
     pub mod type_check;

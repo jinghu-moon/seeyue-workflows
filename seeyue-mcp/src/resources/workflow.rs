@@ -1,10 +1,11 @@
 // src/resources/workflow.rs
 //
-// Four MCP resources backed by direct file I/O:
+// MCP resources backed by direct file I/O:
 //   - workflow://session     → .ai/workflow/session.yaml
 //   - workflow://task-graph  → .ai/workflow/task-graph.yaml
 //   - workflow://journal     → .ai/workflow/journal.jsonl (last 200 lines)
 //   - memory://index         → .ai/memory/index.json
+//   - workflow://dashboard   → aggregated session + approvals + budget + recent events
 
 use std::path::Path;
 use std::fs;
@@ -16,6 +17,7 @@ pub const RESOURCE_SESSION:    &str = "workflow://session";
 pub const RESOURCE_TASK_GRAPH: &str = "workflow://task-graph";
 pub const RESOURCE_JOURNAL:    &str = "workflow://journal";
 pub const RESOURCE_MEMORY:     &str = "memory://index";
+pub const RESOURCE_DASHBOARD:  &str = "workflow://dashboard";
 
 /// List all available workflow resources as rmcp Resource objects.
 pub fn list_resources() -> Vec<Resource> {
@@ -48,6 +50,14 @@ pub fn list_resources() -> Vec<Resource> {
             )
             .with_mime_type("application/json")
             .no_annotation(),
+        RawResource::new(RESOURCE_DASHBOARD, "Workflow Dashboard")
+            .with_description(
+                "Aggregated snapshot: active node, pending approvals, pending questions, \
+                 pending inputs, budget info, and last 5 journal events. \
+                 Read once per turn to replace multiple separate status queries.",
+            )
+            .with_mime_type("application/json")
+            .no_annotation(),
     ]
 }
 
@@ -74,6 +84,9 @@ pub fn read_resource(
             let path = workspace.join(".ai/memory/index.json");
             read_file_or_empty(&path, "application/json")?
         }
+        RESOURCE_DASHBOARD => {
+            build_dashboard(workflow_dir)?
+        }
         _ => return Err(format!("Unknown resource URI: {}", uri)),
     };
 
@@ -82,7 +95,8 @@ pub fn read_resource(
     ]))
 }
 
-/// Read a file, returning empty content with a comment if it doesn't exist.
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 fn read_file_or_empty(path: &Path, mime: &str) -> Result<(String, String), String> {
     match fs::read_to_string(path) {
         Ok(content) => Ok((content, mime.to_string())),
@@ -96,20 +110,90 @@ fn read_file_or_empty(path: &Path, mime: &str) -> Result<(String, String), Strin
     }
 }
 
-/// Read the journal, returning the last 200 lines.
 fn read_journal(path: &Path) -> Result<(String, String), String> {
     match fs::read_to_string(path) {
         Ok(content) => {
             let lines: Vec<&str> = content.lines().collect();
             let max_lines = 200;
-            let start = if lines.len() > max_lines {
-                lines.len() - max_lines
-            } else {
-                0
-            };
-            let truncated = lines[start..].join("\n");
-            Ok((truncated, "application/jsonl".to_string()))
+            let start = if lines.len() > max_lines { lines.len() - max_lines } else { 0 };
+            Ok((lines[start..].join("\n"), "application/jsonl".to_string()))
         }
         Err(_) => Ok((String::new(), "application/jsonl".to_string())),
     }
+}
+
+/// Build the dashboard JSON aggregating key workflow state.
+fn build_dashboard(workflow_dir: &Path) -> Result<(String, String), String> {
+    // Session snapshot (YAML → Value)
+    let session_val: serde_json::Value = {
+        let path = workflow_dir.join("session.yaml");
+        match fs::read_to_string(&path) {
+            Ok(s) => serde_yaml::from_str(&s).unwrap_or(serde_json::Value::Null),
+            Err(_) => serde_json::Value::Null,
+        }
+    };
+
+    let pending_approvals = count_pending_jsonl(
+        &workflow_dir.join("approvals.jsonl"), "status", "pending");
+    let pending_questions = count_pending_jsonl(
+        &workflow_dir.join("questions.jsonl"), "status", "pending");
+    let pending_inputs = count_pending_jsonl(
+        &workflow_dir.join("input_requests.jsonl"), "status", "pending");
+
+    // Last 5 journal events
+    let recent_events: Vec<serde_json::Value> = {
+        let path = workflow_dir.join("journal.jsonl");
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                let mut events: Vec<serde_json::Value> = content
+                    .lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .filter_map(|l| serde_json::from_str(l).ok())
+                    .collect();
+                let start = if events.len() > 5 { events.len() - 5 } else { 0 };
+                events.split_off(start)
+            }
+            Err(_) => vec![],
+        }
+    };
+
+    let dashboard = serde_json::json!({
+        "active_node":       session_val.get("node").and_then(|n| n.get("name")),
+        "active_phase":      session_val.get("phase").and_then(|p| p.get("name")),
+        "loop_count":        session_val.get("loop_count"),
+        "budget_exceeded":   session_val.get("budget_exceeded"),
+        "restore_pending":   session_val.get("restore_pending"),
+        "pending_approvals": pending_approvals,
+        "pending_questions": pending_questions,
+        "pending_inputs":    pending_inputs,
+        "recent_events":     recent_events,
+    });
+
+    let json = serde_json::to_string_pretty(&dashboard)
+        .map_err(|e| format!("serialize dashboard: {e}"))?;
+    Ok((json, "application/json".to_string()))
+}
+
+/// Count records in a JSONL file where `field == value` (last-record-per-id wins).
+fn count_pending_jsonl(path: &std::path::Path, field: &str, value: &str) -> usize {
+    let content = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    let mut map: std::collections::HashMap<String, serde_json::Value> =
+        std::collections::HashMap::new();
+    for line in content.lines() {
+        if line.trim().is_empty() { continue; }
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+            let key = v.as_object()
+                .and_then(|o| o.iter().find(|(k, _)| k.ends_with("_id")))
+                .and_then(|(_, v)| v.as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| line.to_string());
+            map.insert(key, v);
+        }
+    }
+    map.values()
+        .filter(|v| v.get(field).and_then(|f| f.as_str()) == Some(value))
+        .count()
 }
