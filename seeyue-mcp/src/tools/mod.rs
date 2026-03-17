@@ -1,5 +1,6 @@
 pub mod batch_read;
 pub mod call_hierarchy;
+pub mod compact_journal;
 pub mod create_file_tree;
 pub mod dependency_graph;
 pub mod diff_since_checkpoint;
@@ -25,6 +26,7 @@ pub mod read_range;
 pub mod resolve_path;
 pub mod run_command;
 pub mod run_test;
+pub mod search_session;
 pub mod search_workspace;
 pub mod session_summary;
 pub mod snapshot_workspace;

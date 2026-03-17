@@ -387,3 +387,25 @@ pub struct CallHierarchyParams {
     #[schemars(description = "Restrict search to this relative sub-path (optional)")]
     pub path: Option<String>,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CompactJournalParams {
+    #[schemars(description = "Maximum recent lines to retain (default: 200)")]
+    pub max_entries: Option<usize>,
+    #[schemars(description = "Append event-type summary to session.yaml notes (default: false)")]
+    pub summarize: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SearchSessionParams {
+    #[schemars(description = "Free-text query matched against journal entries")]
+    pub query: String,
+    #[schemars(description = "Filter by exact event type (e.g. write_recorded)")]
+    pub filter_event: Option<String>,
+    #[schemars(description = "Filter by phase id/name")]
+    pub filter_phase: Option<String>,
+    #[schemars(description = "Filter by node id/name")]
+    pub filter_node: Option<String>,
+    #[schemars(description = "Maximum results to return (default: 20, max: 200)")]
+    pub limit: Option<usize>,
+}

@@ -946,6 +946,43 @@ impl SeeyueMcpServer {
         .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
         .map_err(to_mcp_err)
     }
+
+    /// Compact journal.jsonl: archive old entries, retain most recent N lines.
+    #[tool(description = "Compact journal.jsonl — archive old entries, retain recent max_entries lines. summarize=true appends event counts to session.yaml notes.")]
+    async fn compact_journal(
+        &self,
+        Parameters(p): Parameters<CompactJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::compact_journal::run_compact_journal(
+            tools::compact_journal::CompactJournalParams {
+                max_entries: p.max_entries,
+                summarize:   p.summarize.unwrap_or(false),
+            },
+            &self.state.workflow_dir,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    /// Search journal.jsonl for matching entries.
+    #[tool(description = "Search journal.jsonl for entries matching query. Supports filter_event, filter_phase, filter_node, and limit.")]
+    async fn search_session(
+        &self,
+        Parameters(p): Parameters<SearchSessionParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::search_session::run_search_session(
+            tools::search_session::SearchSessionParams {
+                query:        p.query,
+                filter_event: p.filter_event,
+                filter_phase: p.filter_phase,
+                filter_node:  p.filter_node,
+                limit:        p.limit,
+            },
+            &self.state.workflow_dir,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
 }
 
 #[prompt_router]
@@ -971,7 +1008,7 @@ impl ServerHandler for SeeyueMcpServer {
              sy_create_checkpoint, sy_advance_node — call these for policy decisions. \
              P2 Prompts: skills registry via prompts/list and prompts/get. \
              P4 Extended: git_log, git_blame, batch_read, format_file, file_rename, \
-             snapshot_workspace, call_hierarchy. \
+             snapshot_workspace, call_hierarchy, compact_journal, search_session. \
              Resources: workflow://session, workflow://task-graph, workflow://journal."
             .to_string()
         )

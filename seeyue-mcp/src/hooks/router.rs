@@ -49,7 +49,7 @@ pub fn dispatch(
             }
 
             let result = engine.check_bash(&cmd, session);
-            emit_result(result, Some(build_session_context(session)));
+            emit_result(result, Some(build_ctx_bash(session)));
         }
 
         // ── PreToolUse:Write|Edit ───────────────────────────────────────
@@ -103,7 +103,7 @@ pub fn dispatch(
                 }
             }
 
-            emit_result(result, Some(build_session_context(session)));
+            emit_result(result, Some(build_ctx_write(session)));
         }
 
         // ── PostToolUse:Write|Edit ──────────────────────────────────────
@@ -119,7 +119,7 @@ pub fn dispatch(
         // ── Stop ────────────────────────────────────────────────────────
         "Stop" => {
             let result = engine.check_stop(session);
-            emit_result(result, Some(build_session_context(session)));
+            emit_result(result, Some(build_ctx_stop(session)));
         }
 
         // ── Unknown event → fail-open ───────────────────────────────────
@@ -236,28 +236,52 @@ fn append_audit(path: &Path, entry: &serde_json::Value) {
     }
 }
 
-// ─── Session context injector (Phase 4) ─────────────────────────────────────
+// ─── Session context injector (Phase 4 + Disclosure) ────────────────────────
+//
+// Disclosure principle (borrowed from nocturne_memory):
+// Each call path receives only the fields it actually needs for decision-making.
+// This reduces per-verdict payload size and makes each field's provenance clear.
+//
+//   bash path  → budget + loop guard fields
+//   write path → TDD + recovery fields
+//   stop path  → approval + checkpoint + phase/node fields
 
-/// Build a `session_context` extra field to inject into every verdict response.
-///
-/// This allows the engine to read session state from the hook verdict output
-/// instead of reading session.yaml directly — completing Phase 4 of hook-slim.
-///
-/// Fields are kept minimal: only what downstream decision-making actually needs.
-fn build_session_context(session: &SessionState) -> HashMap<String, serde_json::Value> {
-    let budget_exceeded = state::check_loop_budget(session);
-    let ctx = json!({
-        "run_id":              session.run_id,
-        "phase":               session.phase.id.as_deref().or(session.phase.name.as_deref()),
-        "node_id":             session.node.id.as_deref().or(session.node.name.as_deref()),
-        "tdd_state":           session.node.tdd_state,
-        "recovery_status":     session.recovery.status,
-        "restore_pending":     session.recovery.status.as_deref() == Some("restore_pending"),
-        "last_checkpoint_id":  session.recovery.last_checkpoint_id,
-        "budget_exceeded":     budget_exceeded,
-        "pending_approvals":   session.approvals.pending.as_ref().map(|v| v.len()).unwrap_or(0),
-    });
+fn make_ctx(ctx: serde_json::Value) -> HashMap<String, serde_json::Value> {
     let mut map = HashMap::new();
     map.insert("session_context".to_string(), ctx);
     map
+}
+
+/// Bash path: budget guard + restore gate.
+fn build_ctx_bash(session: &SessionState) -> HashMap<String, serde_json::Value> {
+    let budget_exceeded = state::check_loop_budget(session);
+    make_ctx(json!({
+        "run_id":          session.run_id,
+        "budget_exceeded": budget_exceeded,
+        "restore_pending": session.recovery.status.as_deref() == Some("restore_pending"),
+        "loop_count":      session.loop_budget.consumed_nodes
+                               .or(session.loop_budget.used)
+                               .unwrap_or(0),
+    }))
+}
+
+/// Write path: TDD gate + recovery gate.
+fn build_ctx_write(session: &SessionState) -> HashMap<String, serde_json::Value> {
+    make_ctx(json!({
+        "run_id":              session.run_id,
+        "tdd_state":           session.node.tdd_state,
+        "restore_pending":     session.recovery.status.as_deref() == Some("restore_pending"),
+        "last_checkpoint_id":  session.recovery.last_checkpoint_id,
+    }))
+}
+
+/// Stop path: approval count + phase/node for resume.
+fn build_ctx_stop(session: &SessionState) -> HashMap<String, serde_json::Value> {
+    make_ctx(json!({
+        "run_id":              session.run_id,
+        "phase":               session.phase.id.as_deref().or(session.phase.name.as_deref()),
+        "node_id":             session.node.id.as_deref().or(session.node.name.as_deref()),
+        "pending_approvals":   session.approvals.pending.as_ref().map(|v| v.len()).unwrap_or(0),
+        "last_checkpoint_id":  session.recovery.last_checkpoint_id,
+    }))
 }
