@@ -1113,6 +1113,104 @@ impl SeeyueMcpServer {
         );
         Ok(to_text(serde_json::to_string_pretty(&result).unwrap()))
     }
+
+    #[tool(description = "Send a Windows Toast notification and record to journal. \
+        Levels: info (default) | warn | milestone. \
+        Returns notified:bool and method used.")]
+    async fn sy_notify(
+        &self,
+        Parameters(p): Parameters<SyNotifyParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::notify::run_sy_notify(
+            tools::notify::SyNotifyParams {
+                message: p.message,
+                level:   p.level,
+                title:   p.title,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Create a pending approval request and send a Windows Toast notification. \
+        Returns approval_id to track the request.")]
+    async fn sy_approval_request(
+        &self,
+        Parameters(p): Parameters<ApprovalRequestParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::approval::run_approval_request(
+            tools::approval::ApprovalRequestParams {
+                subject:  p.subject,
+                detail:   p.detail,
+                category: p.category,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Resolve a pending approval as approved or rejected. \
+        approval_id from sy_approval_request. decision: approved | rejected.")]
+    async fn sy_approval_resolve(
+        &self,
+        Parameters(p): Parameters<ApprovalResolveParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::approval::run_approval_resolve(
+            tools::approval::ApprovalResolveParams {
+                approval_id: p.approval_id,
+                decision:    p.decision,
+                note:        p.note,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Query approval status. If approval_id is omitted, returns all pending approvals.")]
+    async fn sy_approval_status(
+        &self,
+        Parameters(p): Parameters<ApprovalStatusParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::approval::run_approval_status(
+            tools::approval::ApprovalStatusParams {
+                approval_id: p.approval_id,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Update a node's status or notes in task-graph.yaml. \
+        status values: completed | in_progress | skipped | pending.")]
+    async fn sy_task_graph_update(
+        &self,
+        Parameters(p): Parameters<TaskGraphUpdateParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::task_graph_update::run_task_graph_update(
+            tools::task_graph_update::TaskGraphUpdateParams {
+                node_id: p.node_id,
+                status:  p.status,
+                notes:   p.notes,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Generate a human-readable progress report for the current workflow phase. \
+        Aggregates completed/total nodes, files written, key events.")]
+    async fn sy_progress_report(
+        &self,
+        Parameters(p): Parameters<ProgressReportParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = tools::progress_report::run_progress_report(
+            tools::progress_report::ProgressReportParams {
+                phase: p.phase,
+            },
+            &self.state.workflow_dir,
+        );
+        result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
 }
 
 #[prompt_router]
@@ -1139,7 +1237,9 @@ impl ServerHandler for SeeyueMcpServer {
              P2 Prompts: skills registry via prompts/list and prompts/get. \
              P4 Extended: git_log, git_blame, batch_read, format_file, file_rename, \
              snapshot_workspace, call_hierarchy, compact_journal, search_session. \
-             Resources: workflow://session, workflow://task-graph, workflow://journal."
+             P3 Interactive: sy_notify, sy_approval_request/resolve/status, \
+             sy_task_graph_update, sy_progress_report. \
+             Resources: workflow://session, workflow://task-graph, workflow://journal, memory://index."
             .to_string()
         )
     }
@@ -1172,6 +1272,9 @@ impl ServerHandler for SeeyueMcpServer {
 async fn main() -> Result<()> {
     // Windows: 启用 ANSI 颜色（ENABLE_VIRTUAL_TERMINAL_PROCESSING），MCP stdout 保持干净
     platform::terminal::init();
+
+    // Windows Toast: 注册自定义 AppUserModelID，确保通知显示 "seeyue-mcp" 应用名
+    platform::notify::ensure_registered();
 
     let workspace = std::env::var("SEEYUE_MCP_WORKSPACE")
         .or_else(|_| std::env::var("AGENT_EDITOR_WORKSPACE"))

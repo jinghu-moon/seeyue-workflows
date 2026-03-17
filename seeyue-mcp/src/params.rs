@@ -470,3 +470,57 @@ pub struct SessionEndParams {
     #[schemars(description = "Optional note to append to the session memory entry")]
     pub note: Option<String>,
 }
+
+// ─── Interactive Tools (P3) ───────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SyNotifyParams {
+    #[schemars(description = "Notification body message")]
+    pub message: String,
+    #[schemars(description = "Level: info (default) | warn | milestone")]
+    pub level:   Option<String>,
+    #[schemars(description = "Optional title override (default: seeyue-mcp)")]
+    pub title:   Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ApprovalRequestParams {
+    #[schemars(description = "Short subject line shown in the toast and approval list")]
+    pub subject:  String,
+    #[schemars(description = "Optional longer description")]
+    pub detail:   Option<String>,
+    #[schemars(description = "Category tag (e.g. destructive, deploy, policy)")]
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ApprovalResolveParams {
+    #[schemars(description = "Approval ID returned by sy_approval_request")]
+    pub approval_id: String,
+    #[schemars(description = "Decision: approved | rejected")]
+    pub decision:    String,
+    #[schemars(description = "Optional note recorded with the resolution")]
+    pub note:        Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct ApprovalStatusParams {
+    #[schemars(description = "If provided, fetch a specific approval. Otherwise returns all pending.")]
+    pub approval_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TaskGraphUpdateParams {
+    #[schemars(description = "Node id to update")]
+    pub node_id: String,
+    #[schemars(description = "New status value (e.g. completed, in_progress, skipped)")]
+    pub status:  Option<String>,
+    #[schemars(description = "Notes to attach to the node")]
+    pub notes:   Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct ProgressReportParams {
+    #[schemars(description = "Filter to a specific phase id/name (default: current phase)")]
+    pub phase: Option<String>,
+}

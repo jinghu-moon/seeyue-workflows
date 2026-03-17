@@ -55,6 +55,10 @@ pub mod tools {
     pub mod session_summary;
     pub mod snapshot_workspace;
     pub mod symbol_rename_preview;
+    pub mod approval;
+    pub mod notify;
+    pub mod progress_report;
+    pub mod task_graph_update;
     pub mod tdd_evidence;
     pub mod type_check;
     pub mod verify_syntax;
