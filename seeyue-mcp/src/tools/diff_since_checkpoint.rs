@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::checkpoint::CheckpointStore;
-use crate::diff;
+use crate::storage::checkpoint::CheckpointStore;
+use crate::render::diff;
 use crate::error::ToolError;
 
 // ─── Params / Result ─────────────────────────────────────────────────────────

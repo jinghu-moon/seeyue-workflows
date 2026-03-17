@@ -12,10 +12,6 @@
 // P0: File editing tools (read/write/edit/multi_edit/rewind)
 // P1: Policy engine + hook tools + workflow resources
 
-mod backup;
-mod cache;
-mod checkpoint;
-mod diff;
 mod encoding;
 mod error;
 mod git;
@@ -24,7 +20,9 @@ mod params;
 mod platform;
 mod policy;
 mod prompts;
+mod render;
 mod resources;
+mod storage;
 mod treesitter;
 mod tools;
 mod workflow;
@@ -47,9 +45,9 @@ use rmcp::{
     transport::stdio,
 };
 
-use backup::{BackupManager, BackupConfig};
-use cache::ReadCache;
-use checkpoint::CheckpointStore;
+use storage::backup::{BackupManager, BackupConfig};
+use storage::cache::ReadCache;
+use storage::checkpoint::CheckpointStore;
 use error::ToolError;
 use policy::evaluator::PolicyEngine;
 use policy::spec_loader::PolicySpecs;

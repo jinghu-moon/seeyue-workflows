@@ -9,7 +9,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::checkpoint::CheckpointStore;
+use crate::storage::checkpoint::CheckpointStore;
 use crate::error::ToolError;
 
 // ─── Params / Result ─────────────────────────────────────────────────────────

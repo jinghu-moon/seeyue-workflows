@@ -87,7 +87,7 @@ impl Term {
     ///
     /// 布局：左侧色条 | 旧行号 | 新行号 | 标记 | 内容
     /// Hunk header：Line 139 – 144  ·  2 removed  ·  2 added
-    pub fn print_diff(path: &str, hunks: &[crate::diff::DiffHunk], hook: Option<&str>) {
+    pub fn print_diff(path: &str, hunks: &[crate::render::diff::DiffHunk], hook: Option<&str>) {
         let mut err = stderr();
 
         // 文件头
@@ -120,14 +120,14 @@ impl Term {
         writeln!(err).ok();
     }
 
-    fn print_diff_line(out: &mut impl Write, line: &crate::diff::DiffLine) {
+    fn print_diff_line(out: &mut impl Write, line: &crate::render::diff::DiffLine) {
         let old_s = line.line_old.map(|n| format!("{n:>4}")).unwrap_or_else(|| "    ".into());
         let new_s = line.line_new.map(|n| format!("{n:>4}")).unwrap_or_else(|| "    ".into());
         let content = truncate(&line.content, 70);
 
         if is_ansi() {
             match line.kind {
-                crate::diff::DiffLineKind::Del => {
+                crate::render::diff::DiffLineKind::Del => {
                     execute!(out,
                         SetBackgroundColor(Color::Red), Print(" "), ResetColor,
                         SetForegroundColor(Color::DarkRed),   Print(format!(" {old_s}")),
@@ -140,7 +140,7 @@ impl Term {
                         ResetColor,
                     ).ok();
                 }
-                crate::diff::DiffLineKind::Add => {
+                crate::render::diff::DiffLineKind::Add => {
                     execute!(out,
                         SetBackgroundColor(Color::DarkGreen), Print(" "), ResetColor,
                         SetForegroundColor(Color::DarkGrey),  Print(format!(" {old_s}")),
@@ -153,7 +153,7 @@ impl Term {
                         ResetColor,
                     ).ok();
                 }
-                crate::diff::DiffLineKind::Ctx => {
+                crate::render::diff::DiffLineKind::Ctx => {
                     execute!(out,
                         SetForegroundColor(Color::DarkGrey),
                         Print(format!("   {old_s} {new_s}    {content}\n")),
@@ -164,9 +164,9 @@ impl Term {
         } else {
             // 无 ANSI fallback（重定向到文件时）
             let mark = match line.kind {
-                crate::diff::DiffLineKind::Del => "-",
-                crate::diff::DiffLineKind::Add => "+",
-                crate::diff::DiffLineKind::Ctx => " ",
+                crate::render::diff::DiffLineKind::Del => "-",
+                crate::render::diff::DiffLineKind::Add => "+",
+                crate::render::diff::DiffLineKind::Ctx => " ",
             };
             writeln!(out, "  {old_s} {new_s} {mark} {content}").ok();
         }

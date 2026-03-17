@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::diff::DiffResult;
+use crate::render::diff::DiffResult;
 use crate::encoding::safe_read;
 use crate::error::ToolError;
 use crate::tools::edit::apply_edit_in_memory;
@@ -57,7 +57,7 @@ pub fn run_preview_edit(
         &original,
     )?;
 
-    let diff = crate::diff::compute_diff(&params.file_path, &original, &applied.new_content, None);
+    let diff = crate::render::diff::compute_diff(&params.file_path, &original, &applied.new_content, None);
 
     let language = languages::detect_language(&path);
     let syntax = verify_syntax::run_verify_syntax(

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::diff::DiffResult;
+use crate::render::diff::DiffResult;
 use crate::encoding::{detect_encoding, safe_read};
 use crate::error::ToolError;
 use crate::git;
@@ -56,7 +56,7 @@ pub fn run_git_diff_file(
         String::new()
     };
 
-    let diff = crate::diff::compute_diff(&display_path, &base_content, &new_content, None);
+    let diff = crate::render::diff::compute_diff(&display_path, &base_content, &new_content, None);
 
     Ok(GitDiffFileResult {
         kind: "success".into(),

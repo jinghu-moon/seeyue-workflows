@@ -9,9 +9,9 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::checkpoint::CheckpointStore;
-use crate::cache::ReadCache;
-use crate::backup::BackupManager;
+use crate::storage::checkpoint::CheckpointStore;
+use crate::storage::cache::ReadCache;
+use crate::storage::backup::BackupManager;
 use crate::error::ToolError;
 use crate::tools::edit::apply_edit_in_memory;
 use crate::treesitter::languages;

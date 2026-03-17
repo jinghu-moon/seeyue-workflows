@@ -51,7 +51,7 @@ pub struct BudgetSummary {
 
 pub fn run_session_summary(
     workflow_dir: &Path,
-    checkpoint_store: &crate::checkpoint::CheckpointStore,
+    checkpoint_store: &crate::storage::checkpoint::CheckpointStore,
 ) -> Result<SessionSummaryResult, ToolError> {
     let session_path = workflow_dir.join("session.yaml");
     if !session_path.exists() {

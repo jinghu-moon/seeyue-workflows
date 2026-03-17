@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::backup::{BackupManager, BackupTrigger};
-use crate::cache::ReadCache;
-use crate::checkpoint::CheckpointStore;
-use crate::diff::{compute_diff, DiffResult};
+use crate::storage::backup::{BackupManager, BackupTrigger};
+use crate::storage::cache::ReadCache;
+use crate::storage::checkpoint::CheckpointStore;
+use crate::render::diff::{compute_diff, DiffResult};
 use crate::encoding::{safe_read, safe_write, sha256_hex, EncodingInfo, LineEnding};
 use crate::error::ToolError;
 use crate::tools::read::resolve_path;

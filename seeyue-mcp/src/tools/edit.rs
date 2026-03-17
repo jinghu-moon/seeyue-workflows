@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::backup::{BackupManager, BackupTrigger};
-use crate::cache::ReadCache;
-use crate::checkpoint::CheckpointStore;
-use crate::diff::{compute_diff, DiffResult};
+use crate::storage::backup::{BackupManager, BackupTrigger};
+use crate::storage::cache::ReadCache;
+use crate::storage::checkpoint::CheckpointStore;
+use crate::render::diff::{compute_diff, DiffResult};
 use crate::encoding::{
     find_unicode_confusion, safe_read, safe_write, sha256_hex,
     try_tab_normalized_match,
@@ -438,7 +438,7 @@ fn find_match_locations(needle: &str, haystack: &str) -> Vec<MatchLocation> {
 // ─── 格式化备份信息 ───────────────────────────────────────────────────────────
 
 fn format_backup_info(
-    record: Option<&crate::backup::BackupRecord>,
+    record: Option<&crate::storage::backup::BackupRecord>,
 ) -> (Option<String>, Option<String>) {
     match record {
         Some(r) => (Some(r.backup_path.display().to_string()), None),

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::cache::ReadCache;
+use crate::storage::cache::ReadCache;
 use crate::encoding::safe_read;
 use crate::error::ToolError;
 
