@@ -29,6 +29,8 @@ fn params(query: &str) -> SearchSessionParams {
         filter_node:  None,
         limit:        None,
         sort_by:      None,
+        since:        None,
+        until:        None,
     }
 }
 
@@ -63,6 +65,8 @@ fn test_search_filter_event() {
             filter_node:  None,
             limit:        None,
             sort_by:      None,
+            since:        None,
+            until:        None,
         },
         tmp.path(),
     ).unwrap();
@@ -84,6 +88,8 @@ fn test_search_filter_phase() {
             filter_node:  None,
             limit:        None,
             sort_by:      None,
+            since:        None,
+            until:        None,
         },
         tmp.path(),
     ).unwrap();
@@ -105,6 +111,8 @@ fn test_search_filter_node() {
             filter_node:  Some("node_2".into()),
             limit:        None,
             sort_by:      None,
+            since:        None,
+            until:        None,
         },
         tmp.path(),
     ).unwrap();
@@ -142,6 +150,8 @@ fn test_search_limit_respected() {
             filter_node:  None,
             limit:        Some(1),
             sort_by:      None,
+            since:        None,
+            until:        None,
         },
         tmp.path(),
     ).unwrap();

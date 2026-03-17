@@ -3,6 +3,7 @@
 // Returns a structured summary of the current workflow session:
 // active node, phase, loop budget consumption, modified files, checkpoint count.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use serde::Serialize;
@@ -33,6 +34,7 @@ pub struct SessionSummaryResult {
     pub checkpoint_count:  u32,
     pub recovery_status:   Option<String>,
     pub recent_events:     Vec<RecentEventEntry>,
+    pub event_counts:      HashMap<String, usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -85,6 +87,7 @@ pub fn run_session_summary(
             checkpoint_count:  0,
             recovery_status:   None,
             recent_events:     vec![],
+            event_counts:      HashMap::new(),
         });
     }
 
@@ -115,6 +118,7 @@ pub fn run_session_summary(
 
     // Read recent journal events (last 10) for quick context
     let recent_events = build_recent_events(workflow_dir, 10);
+    let event_counts  = build_event_counts(workflow_dir);
 
     Ok(SessionSummaryResult {
         status: "ok".to_string(),
@@ -134,6 +138,7 @@ pub fn run_session_summary(
         checkpoint_count,
         recovery_status:   session.recovery.status,
         recent_events,
+        event_counts,
     })
 }
 
@@ -158,4 +163,23 @@ fn build_recent_events(workflow_dir: &Path, max: usize) -> Vec<RecentEventEntry>
             Some(RecentEventEntry { ts, event, phase, node_id, payload_preview })
         })
         .collect()
+}
+
+/// Count each event type in journal.jsonl for the full session history.
+fn build_event_counts(workflow_dir: &Path) -> HashMap<String, usize> {
+    let path = workflow_dir.join("journal.jsonl");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return HashMap::new(),
+    };
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for line in content.lines() {
+        if line.trim().is_empty() { continue; }
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+            if let Some(event) = v.get("event").and_then(|e| e.as_str()) {
+                *counts.entry(event.to_string()).or_insert(0) += 1;
+            }
+        }
+    }
+    counts
 }

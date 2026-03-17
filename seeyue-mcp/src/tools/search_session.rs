@@ -27,6 +27,10 @@ pub struct SearchSessionParams {
     pub limit: Option<usize>,
     /// Sort order: "time" (default, newest first) | "event_weight" (high-value events first).
     pub sort_by: Option<String>,
+    /// Include only events at or after this ISO 8601 timestamp (e.g. "2026-03-17T00:00:00Z").
+    pub since: Option<String>,
+    /// Include only events at or before this ISO 8601 timestamp.
+    pub until: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -131,6 +135,15 @@ pub fn run_search_session(
         total += 1;
 
         let ts    = v.get("ts").and_then(|e| e.as_str()).unwrap_or("").to_string();
+
+        // Time range filter (lexicographic ISO 8601 comparison)
+        if let Some(ref since) = params.since {
+            if !ts.is_empty() && ts.as_str() < since.as_str() { continue; }
+        }
+        if let Some(ref until) = params.until {
+            if !ts.is_empty() && ts.as_str() > until.as_str() { continue; }
+        }
+
         let actor = v.get("actor").and_then(|e| e.as_str()).map(str::to_string);
         let payload_preview = v.get("payload").map(|p| {
             let s = serde_json::to_string(p).unwrap_or_default();

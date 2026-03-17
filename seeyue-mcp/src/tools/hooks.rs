@@ -89,6 +89,13 @@ pub struct SessionStartParams {
     pub skip_recovery: Option<bool>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct SessionEndParams {
+    #[serde(default)]
+    #[schemars(description = "Optional note to append to the session memory entry")]
+    pub note: Option<String>,
+}
+
 // ─── Tool Implementations ────────────────────────────────────────────────────
 
 /// Execute sy_pretool_bash: classify command and check policy.
@@ -438,4 +445,111 @@ fn load_boot_memory(workspace: &std::path::Path) -> serde_json::Value {
 /// Compute SHA-256 hex digest of a byte slice.
 fn hex_sha256(data: &[u8]) -> String {
     crate::workflow::journal::hex_sha256(data)
+}
+
+/// Execute sy_session_end: write a session summary to .ai/memory/sessions/<date>-<run_id>.md.
+///
+/// Extracts node_entered + write_recorded events from the current run,
+/// generates a Markdown summary, and persists it to memory for future sessions.
+pub fn run_session_end(params: SessionEndParams, app: &AppState) -> serde_json::Value {
+    let session  = state::load_session(&app.workflow_dir);
+    let run_id   = session.run_id.as_deref().unwrap_or("unknown").to_string();
+    let phase    = session.phase.id.as_deref().or(session.phase.name.as_deref()).unwrap_or("none");
+    let node_id  = session.node.id.as_deref().or(session.node.name.as_deref()).unwrap_or("none");
+    let date_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
+
+    // Collect events for this run from journal
+    let journal_path = app.workflow_dir.join("journal.jsonl");
+    let mut nodes_visited: Vec<String> = Vec::new();
+    let mut files_written: Vec<String> = Vec::new();
+    let mut event_count = 0usize;
+
+    if let Ok(content) = std::fs::read_to_string(&journal_path) {
+        for line in content.lines() {
+            if line.trim().is_empty() { continue; }
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+            let ev_run = v.get("run_id").and_then(|r| r.as_str()).unwrap_or("");
+            if ev_run != run_id { continue; }
+            event_count += 1;
+            let event = v.get("event").and_then(|e| e.as_str()).unwrap_or("");
+            match event {
+                "node_entered" => {
+                    if let Some(nid) = v.get("node_id").and_then(|n| n.as_str()) {
+                        if !nodes_visited.contains(&nid.to_string()) {
+                            nodes_visited.push(nid.to_string());
+                        }
+                    }
+                }
+                "write_recorded" => {
+                    if let Some(path) = v.get("payload")
+                        .and_then(|p| p.get("path"))
+                        .and_then(|s| s.as_str())
+                    {
+                        if !files_written.contains(&path.to_string()) {
+                            files_written.push(path.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Build Markdown summary
+    let mut md = format!(
+        "# Session Summary\n\nrun_id: `{run_id}`  \nphase: `{phase}`  \nfinal_node: `{node_id}`  \ndate: {date_str}\n\n"
+    );
+    if !nodes_visited.is_empty() {
+        md.push_str("## Nodes Visited\n\n");
+        for n in &nodes_visited {
+            md.push_str(&format!("- {n}\n"));
+        }
+        md.push('\n');
+    }
+    if !files_written.is_empty() {
+        md.push_str("## Files Written\n\n");
+        for f in &files_written {
+            md.push_str(&format!("- {f}\n"));
+        }
+        md.push('\n');
+    }
+    md.push_str(&format!("## Stats\n\nevent_count: {event_count}\n"));
+    if let Some(note) = &params.note {
+        md.push_str(&format!("\n## Notes\n\n{note}\n"));
+    }
+
+    // Persist to .ai/memory/sessions/<date>-<run_id>.md
+    let key = format!("sessions/{date_str}-{run_id}");
+    let write_result = crate::tools::memory_write::run_memory_write(
+        crate::tools::memory_write::MemoryWriteParams {
+            key:     key.clone(),
+            content: md,
+            tags:    vec!["session".to_string(), "auto".to_string()],
+            mode:    None,
+        },
+        &app.workspace,
+    );
+
+    // Record journal event
+    let ev = journal::JournalEvent::new("session_ended", "session_end")
+        .with_run_id(&run_id)
+        .with_phase(phase)
+        .with_node_id(node_id)
+        .with_payload(serde_json::json!({
+            "memory_key":    key,
+            "nodes_visited": nodes_visited.len(),
+            "files_written": files_written.len(),
+            "event_count":   event_count,
+            "memory_saved":  write_result.is_ok(),
+        }));
+    let _ = journal::append_event(&app.workflow_dir, ev);
+
+    serde_json::json!({
+        "run_id":          run_id,
+        "nodes_visited":   nodes_visited,
+        "files_written":   files_written,
+        "event_count":     event_count,
+        "memory_saved":    write_result.is_ok(),
+        "memory_key":      write_result.ok().map(|r| r.key),
+    })
 }

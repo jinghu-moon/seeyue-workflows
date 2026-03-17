@@ -26,12 +26,15 @@ pub struct MemoryWriteParams {
     /// Optional tags for retrieval.
     #[serde(default)]
     pub tags:    Vec<String>,
+    /// Write mode: "overwrite" (default) | "append" (append to existing content).
+    #[serde(default)]
+    pub mode:    Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct MemoryWriteResult {
     #[serde(rename = "type")]
-    pub kind:    String, // "created" | "updated"
+    pub kind:    String, // "created" | "updated" | "appended"
     pub key:     String,
     pub path:    String,
     pub tags:    Vec<String>,
@@ -72,11 +75,21 @@ pub fn run_memory_write(
     }
 
     let existed = file_path.exists();
-    fs::write(&file_path, &params.content)
+    let mode = params.mode.as_deref().unwrap_or("overwrite");
+
+    let final_content = if mode == "append" && existed {
+        let existing = fs::read_to_string(&file_path)
+            .map_err(|e| ToolError::IoError { message: format!("read existing memory: {e}") })?;
+        format!("{}\n\n---\n\n{}", existing.trim_end(), params.content)
+    } else {
+        params.content.clone()
+    };
+
+    fs::write(&file_path, &final_content)
         .map_err(|e| ToolError::IoError { message: format!("write memory file: {e}") })?;
 
     let updated = Utc::now().to_rfc3339();
-    let preview: String = params.content.chars().take(PREVIEW_CHARS).collect();
+    let preview: String = final_content.chars().take(PREVIEW_CHARS).collect();
 
     // Update index.json
     let index_path = memory_dir.join("index.json");
@@ -100,7 +113,7 @@ pub fn run_memory_write(
         .map_err(|e| ToolError::IoError { message: format!("write index: {e}") })?;
 
     Ok(MemoryWriteResult {
-        kind:    if existed { "updated" } else { "created" }.into(),
+        kind:    if !existed { "created" } else if mode == "append" { "appended" } else { "updated" }.into(),
         key:     params.key,
         path:    format!(".ai/memory/{rel_path}"),
         tags:    params.tags,
@@ -109,7 +122,7 @@ pub fn run_memory_write(
 }
 
 /// Validate memory key: alphanumeric, dash, underscore, forward-slash only.
-fn validate_key(key: &str) -> Result<(), ToolError> {
+pub fn validate_key(key: &str) -> Result<(), ToolError> {
     if key.trim().is_empty() {
         return Err(ToolError::MissingParameter {
             missing: "key".into(),

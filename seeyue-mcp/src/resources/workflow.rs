@@ -1,9 +1,10 @@
 // src/resources/workflow.rs
 //
-// Three MCP resources backed by direct file I/O:
+// Four MCP resources backed by direct file I/O:
 //   - workflow://session     → .ai/workflow/session.yaml
 //   - workflow://task-graph  → .ai/workflow/task-graph.yaml
 //   - workflow://journal     → .ai/workflow/journal.jsonl (last 200 lines)
+//   - memory://index         → .ai/memory/index.json
 
 use std::path::Path;
 use std::fs;
@@ -11,9 +12,10 @@ use std::fs;
 use rmcp::model::*;
 
 /// Known workflow resource URIs.
-pub const RESOURCE_SESSION: &str = "workflow://session";
+pub const RESOURCE_SESSION:    &str = "workflow://session";
 pub const RESOURCE_TASK_GRAPH: &str = "workflow://task-graph";
-pub const RESOURCE_JOURNAL: &str = "workflow://journal";
+pub const RESOURCE_JOURNAL:    &str = "workflow://journal";
+pub const RESOURCE_MEMORY:     &str = "memory://index";
 
 /// List all available workflow resources as rmcp Resource objects.
 pub fn list_resources() -> Vec<Resource> {
@@ -39,6 +41,13 @@ pub fn list_resources() -> Vec<Resource> {
             )
             .with_mime_type("application/jsonl")
             .no_annotation(),
+        RawResource::new(RESOURCE_MEMORY, "Memory Index")
+            .with_description(
+                "Cross-session memory index. Lists all persisted memory keys, tags, and previews. \
+                 Source: .ai/memory/index.json",
+            )
+            .with_mime_type("application/json")
+            .no_annotation(),
     ]
 }
 
@@ -46,6 +55,7 @@ pub fn list_resources() -> Vec<Resource> {
 pub fn read_resource(
     uri: &str,
     workflow_dir: &Path,
+    workspace: &Path,
 ) -> Result<ReadResourceResult, String> {
     let (content, mime) = match uri {
         RESOURCE_SESSION => {
@@ -59,6 +69,10 @@ pub fn read_resource(
         RESOURCE_JOURNAL => {
             let path = workflow_dir.join("journal.jsonl");
             read_journal(&path)?
+        }
+        RESOURCE_MEMORY => {
+            let path = workspace.join(".ai/memory/index.json");
+            read_file_or_empty(&path, "application/json")?
         }
         _ => return Err(format!("Unknown resource URI: {}", uri)),
     };
