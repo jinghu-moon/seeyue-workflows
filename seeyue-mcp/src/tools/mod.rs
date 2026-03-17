@@ -17,6 +17,8 @@ pub mod git_log;
 pub mod git_status;
 pub mod hooks;
 pub mod lint_file;
+pub mod memory_read;
+pub mod memory_write;
 pub mod multi_file_edit;
 pub mod package_info;
 pub mod preview_edit;

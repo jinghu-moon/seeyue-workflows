@@ -11,12 +11,17 @@ use std::fs;
 use std::path::Path;
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 use crate::hooks::protocol::{HookInput, emit_allow, emit_result};
 use crate::hooks::{posttool_bash, prompt_refresh, session_start};
 use crate::policy::evaluator::PolicyEngine;
+use crate::tools::compact_journal::{CompactJournalParams, run_compact_journal};
 use crate::workflow::journal;
 use crate::workflow::state::{self, SessionState};
+
+const AUTO_FLUSH_THRESHOLD: usize = 150;
+const AUTO_FLUSH_RETAIN:    usize = 100;
 
 /// Dispatch a hook event to the appropriate handler.
 ///
@@ -167,6 +172,21 @@ fn handle_posttool_write(
 
     // Use shared helper — single source of truth for write_recorded schema.
     let checkpoint_label = session.recovery.last_checkpoint_id.clone();
+
+    // Compute before hash (from .sy-bak) and after hash (current file)
+    let full_path = Path::new(&cwd).join(&file_path);
+    let before_hash = {
+        let bak = full_path.with_extension(
+            format!("{}.sy-bak", full_path.extension().and_then(|e| e.to_str()).unwrap_or(""))
+        );
+        if bak.exists() { fs::read(&bak).ok().map(|b| hex_sha256(&b)) } else { None }
+    };
+    let after_hash = if full_path.exists() {
+        fs::read(&full_path).ok().map(|b| hex_sha256(&b))
+    } else {
+        None
+    };
+
     let _ = journal::record_write_evidence(journal::WriteEvidenceParams {
         workflow_dir,
         run_id:           &run_id,
@@ -179,7 +199,17 @@ fn handle_posttool_write(
         checkpoint_label: checkpoint_label.as_deref(),
         syntax_valid:     None,
         scope_drift,
+        before_hash,
+        after_hash,
     });
+
+    // Auto-flush: compact journal if it exceeds threshold
+    if journal::count_lines(workflow_dir) > AUTO_FLUSH_THRESHOLD {
+        let _ = run_compact_journal(
+            CompactJournalParams { max_entries: Some(AUTO_FLUSH_RETAIN), summarize: false },
+            workflow_dir,
+        );
+    }
 
     emit_allow("allow_posttool_write")
 }
@@ -284,4 +314,13 @@ fn build_ctx_stop(session: &SessionState) -> HashMap<String, serde_json::Value> 
         "pending_approvals":   session.approvals.pending.as_ref().map(|v| v.len()).unwrap_or(0),
         "last_checkpoint_id":  session.recovery.last_checkpoint_id,
     }))
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Compute SHA-256 hex digest of a byte slice.
+fn hex_sha256(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
 }

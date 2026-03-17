@@ -965,7 +965,7 @@ impl SeeyueMcpServer {
     }
 
     /// Search journal.jsonl for matching entries.
-    #[tool(description = "Search journal.jsonl for entries matching query. Supports filter_event, filter_phase, filter_node, and limit.")]
+    #[tool(description = "Search journal.jsonl for entries matching query. Supports filter_event, filter_phase, filter_node, limit, and sort_by (timestamp|event_weight).")]
     async fn search_session(
         &self,
         Parameters(p): Parameters<SearchSessionParams>,
@@ -977,8 +977,53 @@ impl SeeyueMcpServer {
                 filter_phase: p.filter_phase,
                 filter_node:  p.filter_node,
                 limit:        p.limit,
+                sort_by:      p.sort_by,
             },
             &self.state.workflow_dir,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    // ── Memory Tools ──────────────────────────────────────────────────────
+
+    #[tool(description = "\
+        Persist a named memory entry to .ai/memory/<key>.md. \
+        Key format: alphanumeric, dash, underscore, slash (e.g. decisions/arch-v4). \
+        Tags support retrieval by category. \
+        Updates index.json for fast lookup across sessions.")]
+    async fn memory_write(
+        &self,
+        Parameters(p): Parameters<MemoryWriteParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::memory_write::run_memory_write(
+            tools::memory_write::MemoryWriteParams {
+                key:     p.key,
+                content: p.content,
+                tags:    p.tags,
+            },
+            &self.state.workspace,
+        )
+        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+        .map_err(to_mcp_err)
+    }
+
+    #[tool(description = "\
+        Search persisted memory entries from .ai/memory/. \
+        Matches query against key, tags, and content preview. \
+        Returns full content inline when exactly one entry matches. \
+        boot_memory in sy_session_start returns the 5 most recently updated entries.")]
+    async fn memory_read(
+        &self,
+        Parameters(p): Parameters<MemoryReadParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::memory_read::run_memory_read(
+            tools::memory_read::MemoryReadParams {
+                query: p.query,
+                tag:   p.tag,
+                limit: p.limit,
+            },
+            &self.state.workspace,
         )
         .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
         .map_err(to_mcp_err)

@@ -117,6 +117,10 @@ pub struct WriteEvidenceParams<'a> {
     pub checkpoint_label:  Option<&'a str>,
     pub syntax_valid:      Option<bool>,
     pub scope_drift:       bool,
+    /// SHA-256 hex of file content before the write (from .sy-bak if available).
+    pub before_hash:       Option<String>,
+    /// SHA-256 hex of file content after the write.
+    pub after_hash:        Option<String>,
 }
 
 /// Record a `write_recorded` journal event with the canonical evidence schema.
@@ -142,6 +146,12 @@ pub fn record_write_evidence(p: WriteEvidenceParams<'_>) -> Result<(), String> {
     if let Some(sv) = p.syntax_valid {
         payload["syntax_valid"] = serde_json::json!(sv);
     }
+    if let Some(ref h) = p.before_hash {
+        payload["before_hash"] = serde_json::json!(h);
+    }
+    if let Some(ref h) = p.after_hash {
+        payload["after_hash"] = serde_json::json!(h);
+    }
     let evt = JournalEvent::new("write_recorded", "hook")
         .with_run_id(p.run_id)
         .with_phase(p.phase)
@@ -166,5 +176,14 @@ pub fn read_recent(workflow_dir: &Path, max_lines: usize) -> Result<String, Stri
             Ok(lines[start..].join("\n"))
         }
         Err(_) => Ok(String::new()),
+    }
+}
+
+/// Count non-empty lines in journal.jsonl (used for auto-flush threshold check).
+pub fn count_lines(workflow_dir: &Path) -> usize {
+    let path = workflow_dir.join("journal.jsonl");
+    match fs::read_to_string(&path) {
+        Ok(content) => content.lines().filter(|l| !l.trim().is_empty()).count(),
+        Err(_) => 0,
     }
 }

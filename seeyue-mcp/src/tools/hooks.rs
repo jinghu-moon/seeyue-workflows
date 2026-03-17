@@ -10,10 +10,15 @@
 
 use rmcp::schemars;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 use crate::AppState;
 use crate::policy::types::HookResult;
 use crate::workflow::{journal, state};
+use crate::tools::compact_journal::{CompactJournalParams, run_compact_journal};
+
+const AUTO_FLUSH_THRESHOLD: usize = 150;
+const AUTO_FLUSH_RETAIN:    usize = 100;
 
 // ─── Tool Parameters ─────────────────────────────────────────────────────────
 
@@ -122,8 +127,25 @@ pub fn run_posttool_write(params: PostToolWriteParams, app: &AppState) -> HookRe
     let run_id  = session.run_id.as_deref().unwrap_or("").to_string();
     let phase   = session.phase.id.as_deref().or(session.phase.name.as_deref()).unwrap_or("none").to_string();
     let node_id = session.node.id.as_deref().or(session.node.name.as_deref()).unwrap_or("none").to_string();
-
     let checkpoint_label = session.recovery.last_checkpoint_id.clone();
+
+    // Compute before hash (from .sy-bak) and after hash (current file)
+    let full_path = app.workspace.join(&params.path);
+    let before_hash = {
+        let bak = full_path.with_extension(
+            format!("{}.sy-bak", full_path.extension().and_then(|e| e.to_str()).unwrap_or(""))
+        );
+        if bak.exists() {
+            std::fs::read(&bak).ok().map(|b| hex_sha256(&b))
+        } else {
+            None
+        }
+    };
+    let after_hash = if full_path.exists() {
+        std::fs::read(&full_path).ok().map(|b| hex_sha256(&b))
+    } else {
+        None
+    };
 
     if let Err(e) = journal::record_write_evidence(journal::WriteEvidenceParams {
         workflow_dir:     &app.workflow_dir,
@@ -137,11 +159,28 @@ pub fn run_posttool_write(params: PostToolWriteParams, app: &AppState) -> HookRe
         checkpoint_label: checkpoint_label.as_deref(),
         syntax_valid:     None,
         scope_drift:      false,
+        before_hash,
+        after_hash,
     }) {
         return HookResult::allow(format!("Write recorded (journal warning: {})", e));
     }
 
-    HookResult::allow(format!("Write recorded: {}", params.path))
+    // Auto-flush: compact journal if it exceeds threshold
+    let line_count = journal::count_lines(&app.workflow_dir);
+    let auto_compacted = if line_count > AUTO_FLUSH_THRESHOLD {
+        run_compact_journal(
+            CompactJournalParams { max_entries: Some(AUTO_FLUSH_RETAIN), summarize: false },
+            &app.workflow_dir,
+        ).is_ok()
+    } else {
+        false
+    };
+
+    if auto_compacted {
+        HookResult::allow(format!("Write recorded: {} (auto_compacted: journal flushed)", params.path))
+    } else {
+        HookResult::allow(format!("Write recorded: {}", params.path))
+    }
 }
 
 /// Execute sy_stop: check whether the session can stop.
@@ -345,6 +384,9 @@ pub fn run_session_start(params: SessionStartParams, app: &AppState) -> serde_js
     // Check loop budget
     let budget_status = state::check_loop_budget(&session);
 
+    // Load boot_memory: top 5 recently-updated memory entries from .ai/memory/index.json
+    let boot_memory = load_boot_memory(&app.workspace);
+
     serde_json::json!({
         "run_id":             session.run_id,
         "phase":              session.phase.id,
@@ -357,5 +399,46 @@ pub fn run_session_start(params: SessionStartParams, app: &AppState) -> serde_js
         "budget_exceeded":    budget_status,
         "recovery_required":  session.recovery.status.as_deref() == Some("restore_pending"),
         "restore_reason":     session.recovery.restore_reason,
+        "boot_memory":        boot_memory,
     })
+}
+
+/// Load top 5 recently-updated memory hints from .ai/memory/index.json.
+/// Returns empty array if no memory store exists yet.
+fn load_boot_memory(workspace: &std::path::Path) -> serde_json::Value {
+    let index_path = workspace.join(".ai/memory/index.json");
+    if !index_path.exists() {
+        return serde_json::json!([]);
+    }
+    let raw = match std::fs::read_to_string(&index_path) {
+        Ok(s) => s,
+        Err(_) => return serde_json::json!([]),
+    };
+    let index: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_str(&raw).unwrap_or_default();
+
+    let mut entries: Vec<(String, serde_json::Value)> = index.into_iter().collect();
+    // Sort by updated descending
+    entries.sort_by(|a, b| {
+        let ta = a.1.get("updated").and_then(|v| v.as_str()).unwrap_or("");
+        let tb = b.1.get("updated").and_then(|v| v.as_str()).unwrap_or("");
+        tb.cmp(ta)
+    });
+    entries.truncate(5);
+
+    serde_json::json!(entries.into_iter().map(|(key, entry)| serde_json::json!({
+        "key":     key,
+        "tags":    entry.get("tags"),
+        "updated": entry.get("updated"),
+        "preview": entry.get("preview"),
+    })).collect::<Vec<_>>())
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Compute SHA-256 hex digest of a byte slice.
+fn hex_sha256(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
 }

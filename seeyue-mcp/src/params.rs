@@ -408,4 +408,29 @@ pub struct SearchSessionParams {
     pub filter_node: Option<String>,
     #[schemars(description = "Maximum results to return (default: 20, max: 200)")]
     pub limit: Option<usize>,
+    #[schemars(description = "Sort order: timestamp (default) | event_weight (important events first)")]
+    pub sort_by: Option<String>,
+}
+
+// ─── Memory Tools ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MemoryWriteParams {
+    #[schemars(description = "Memory key (alphanumeric, dash, underscore, slash). E.g. decisions/arch-v4")]
+    pub key: String,
+    #[schemars(description = "Markdown content to store")]
+    pub content: String,
+    #[serde(default)]
+    #[schemars(description = "Optional tags for retrieval")]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MemoryReadParams {
+    #[schemars(description = "Free-text query matched against key, tags, and content preview")]
+    pub query: String,
+    #[schemars(description = "Filter by tag (exact match on any tag in the entry)")]
+    pub tag: Option<String>,
+    #[schemars(description = "Maximum entries to return (default: 10, max: 50)")]
+    pub limit: Option<usize>,
 }

@@ -25,6 +25,8 @@ pub struct SearchSessionParams {
     pub filter_node: Option<String>,
     /// Maximum results to return (default: 20, max: 200).
     pub limit: Option<usize>,
+    /// Sort order: "time" (default, newest first) | "event_weight" (high-value events first).
+    pub sort_by: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -35,6 +37,7 @@ pub struct JournalEntry {
     pub node_id:         Option<String>,
     pub actor:           Option<String>,
     pub payload_preview: Option<String>,
+    pub weight:          u8,
 }
 
 #[derive(Debug, Serialize)]
@@ -42,6 +45,7 @@ pub struct SearchSessionResult {
     #[serde(rename = "type")]
     pub kind:      String, // "success"
     pub query:     String,
+    pub sort_by:   String,
     pub total:     usize,
     pub truncated: bool,
     pub entries:   Vec<JournalEntry>,
@@ -50,6 +54,20 @@ pub struct SearchSessionResult {
 const DEFAULT_LIMIT: usize = 20;
 const MAX_LIMIT:     usize = 200;
 const PREVIEW_LEN:   usize = 120;
+
+/// Event weight for priority sorting (higher = more important).
+fn event_weight(event: &str) -> u8 {
+    match event {
+        "checkpoint_created"  => 10,
+        "stop_attempted"      => 8,
+        "write_recorded"      => 7,
+        "node_entered"        => 6,
+        "node_exited"         => 5,
+        "session_started"     => 9,
+        "aborted"             => 8,
+        _                     => 3,
+    }
+}
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
@@ -64,7 +82,8 @@ pub fn run_search_session(
         });
     }
 
-    let limit = params.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
+    let limit   = params.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
+    let sort_by = params.sort_by.as_deref().unwrap_or("time").to_string();
     let journal_path = workflow_dir.join("journal.jsonl");
 
     let content = if journal_path.exists() {
@@ -75,36 +94,26 @@ pub fn run_search_session(
     };
 
     let query_lower = params.query.to_lowercase();
-
     let mut matched: Vec<JournalEntry> = Vec::new();
     let mut total = 0usize;
 
-    // Iterate in reverse so most recent entries come first
+    // Collect all matching entries (newest first for time sort)
     for line in content.lines().rev() {
-        if line.trim().is_empty() {
-            continue;
-        }
+        if line.trim().is_empty() { continue; }
 
-        // Free-text match on raw JSON line
-        if !line.to_lowercase().contains(&query_lower) {
-            continue;
-        }
+        if !line.to_lowercase().contains(&query_lower) { continue; }
 
-        // Parse for structured filters
         let v: serde_json::Value = match serde_json::from_str(line) {
             Ok(v) => v,
             Err(_) => continue,
         };
 
-        let event = v.get("event").and_then(|e| e.as_str()).unwrap_or("").to_string();
-        let phase = v.get("phase").and_then(|e| e.as_str()).map(|s| s.to_string());
-        let node_id = v.get("node_id").and_then(|e| e.as_str()).map(|s| s.to_string());
+        let event   = v.get("event").and_then(|e| e.as_str()).unwrap_or("").to_string();
+        let phase   = v.get("phase").and_then(|e| e.as_str()).map(str::to_string);
+        let node_id = v.get("node_id").and_then(|e| e.as_str()).map(str::to_string);
 
-        // Structured filters
         if let Some(ref fe) = params.filter_event {
-            if !event.eq_ignore_ascii_case(fe) {
-                continue;
-            }
+            if !event.eq_ignore_ascii_case(fe) { continue; }
         }
         if let Some(ref fp) = params.filter_phase {
             match &phase {
@@ -121,34 +130,34 @@ pub fn run_search_session(
 
         total += 1;
 
-        if matched.len() < limit {
-            let ts    = v.get("ts").and_then(|e| e.as_str()).unwrap_or("").to_string();
-            let actor = v.get("actor").and_then(|e| e.as_str()).map(|s| s.to_string());
-            let payload_preview = v.get("payload").map(|p| {
-                let s = serde_json::to_string(p).unwrap_or_default();
-                if s.len() > PREVIEW_LEN {
-                    format!("{}…", &s[..PREVIEW_LEN])
-                } else {
-                    s
-                }
-            });
+        let ts    = v.get("ts").and_then(|e| e.as_str()).unwrap_or("").to_string();
+        let actor = v.get("actor").and_then(|e| e.as_str()).map(str::to_string);
+        let payload_preview = v.get("payload").map(|p| {
+            let s = serde_json::to_string(p).unwrap_or_default();
+            if s.len() > PREVIEW_LEN { format!("{}…", &s[..PREVIEW_LEN]) } else { s }
+        });
+        let weight = event_weight(&event);
 
-            matched.push(JournalEntry {
-                ts,
-                event,
-                phase,
-                node_id,
-                actor,
-                payload_preview,
-            });
-        }
+        matched.push(JournalEntry { ts, event, phase, node_id, actor, payload_preview, weight });
     }
+
+    let total_found = total;
+
+    // Apply sort
+    if sort_by == "event_weight" {
+        matched.sort_by(|a, b| b.weight.cmp(&a.weight).then(b.ts.cmp(&a.ts)));
+    }
+    // "time" sort is already newest-first from the reverse iteration
+
+    let truncated = matched.len() > limit;
+    matched.truncate(limit);
 
     Ok(SearchSessionResult {
         kind:      "success".into(),
         query:     params.query,
-        total,
-        truncated: total > limit,
+        sort_by,
+        total:     total_found,
+        truncated,
         entries:   matched,
     })
 }

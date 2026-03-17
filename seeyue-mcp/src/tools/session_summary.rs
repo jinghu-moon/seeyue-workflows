@@ -8,9 +8,18 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::error::ToolError;
-use crate::workflow::state;
+use crate::workflow::{journal, state};
 
 // ─── Result ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct RecentEventEntry {
+    pub ts:              String,
+    pub event:           String,
+    pub phase:           Option<String>,
+    pub node_id:         Option<String>,
+    pub payload_preview: Option<String>,
+}
 
 #[derive(Debug, Serialize)]
 pub struct SessionSummaryResult {
@@ -23,6 +32,7 @@ pub struct SessionSummaryResult {
     pub pending_approvals: u32,
     pub checkpoint_count:  u32,
     pub recovery_status:   Option<String>,
+    pub recent_events:     Vec<RecentEventEntry>,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,6 +84,7 @@ pub fn run_session_summary(
             pending_approvals: 0,
             checkpoint_count:  0,
             recovery_status:   None,
+            recent_events:     vec![],
         });
     }
 
@@ -102,6 +113,9 @@ pub fn run_session_summary(
 
     let checkpoint_count = checkpoint_store.list().len() as u32;
 
+    // Read recent journal events (last 10) for quick context
+    let recent_events = build_recent_events(workflow_dir, 10);
+
     Ok(SessionSummaryResult {
         status: "ok".to_string(),
         run_id: session.run_id,
@@ -119,5 +133,29 @@ pub fn run_session_summary(
         pending_approvals,
         checkpoint_count,
         recovery_status:   session.recovery.status,
+        recent_events,
     })
+}
+
+/// Parse last N journal lines into RecentEventEntry vec.
+fn build_recent_events(workflow_dir: &Path, max: usize) -> Vec<RecentEventEntry> {
+    let raw = match journal::read_recent(workflow_dir, max) {
+        Ok(s) => s,
+        Err(_) => return vec![],
+    };
+    raw.lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|line| {
+            let v: serde_json::Value = serde_json::from_str(line).ok()?;
+            let ts      = v.get("ts").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let event   = v.get("event").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let phase   = v.get("phase").and_then(|x| x.as_str()).map(str::to_string);
+            let node_id = v.get("node_id").and_then(|x| x.as_str()).map(str::to_string);
+            let payload_preview = v.get("payload").map(|p| {
+                let s = serde_json::to_string(p).unwrap_or_default();
+                if s.len() > 120 { format!("{}…", &s[..120]) } else { s }
+            });
+            Some(RecentEventEntry { ts, event, phase, node_id, payload_preview })
+        })
+        .collect()
 }
