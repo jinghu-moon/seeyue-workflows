@@ -72,8 +72,11 @@ fn make_session() -> SessionState {
             state: Some("green_verified".to_string()),
             tdd_required: Some(false),
             tdd_state: None,
+            tdd_exception: None,
             target: Some(vec!["src/".to_string()]),
             test_contract: None,
+            owner_persona: None,
+            phase_id: None,
         },
         loop_budget: LoopBudget {
             max: Some(100),
@@ -96,6 +99,7 @@ fn make_session() -> SessionState {
         recovery: RecoveryState {
             status: None,
             restore_reason: None,
+            last_checkpoint_id: None,
         },
     }
 }
