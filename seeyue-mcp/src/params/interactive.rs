@@ -120,3 +120,35 @@ pub struct InputStatusParams {
     #[schemars(description = "Request ID returned by sy_input_request (omit = all pending)")]
     pub request_id: Option<String>,
 }
+
+// ─── P2-N4: Interaction MCP params ───────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct ListInteractionsParams {
+    #[schemars(description = "Filter by status: pending (default) | all")]
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReadInteractionParams {
+    #[schemars(description = "Interaction ID to read (e.g. ix-20260318-001)")]
+    pub interaction_id: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ResolveInteractionParams {
+    #[schemars(description = "Interaction ID to resolve")]
+    pub interaction_id: String,
+    #[schemars(description = "Selected option ID (e.g. approve, reject, or free text)")]
+    pub selected_option: String,
+    #[schemars(description = "Optional comment from the resolver")]
+    pub comment: Option<String>,
+}
+
+// ─── P2-N5: Capability probe params ──────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema, Default)]
+pub struct ProbeInteractionCapabilityParams {
+    #[schemars(description = "Override workspace path for binary search (optional, for testing)")]
+    pub workspace_override: Option<String>,
+}

@@ -399,3 +399,74 @@ pub fn run_approval_status(
         approvals:     filtered,
     })
 }
+
+// ─── P2-N3: Interaction Projection ───────────────────────────────────────────
+//
+// Projects a legacy approval request into the interaction store layout
+// (.ai/workflow/interactions/requests/). This is additive-only — the existing
+// approval tools and approvals.jsonl are NOT modified.
+
+/// Result of projecting an approval into the interaction store.
+#[derive(Debug, Serialize)]
+pub struct InteractionProjectionResult {
+    pub interaction_id: String,
+    pub kind:           String,  // "approval_request"
+    pub schema:         u32,     // 1
+    pub file_path:      String,
+    pub projected:      bool,
+}
+
+/// Write an interaction request file for an approval.
+/// Path: <workflow_dir>/interactions/requests/<approval_id>.json
+/// The file follows the interaction.schema.yaml v1 layout.
+pub fn project_approval_as_interaction(
+    approval_id: &str,
+    subject: &str,
+    detail: Option<&str>,
+    category: Option<&str>,
+    workflow_dir: &Path,
+) -> Result<InteractionProjectionResult, ToolError> {
+    let requests_dir = workflow_dir.join("interactions").join("requests");
+    fs::create_dir_all(&requests_dir)
+        .map_err(|e| ToolError::IoError { message: format!("create interactions/requests dir: {e}") })?;
+
+    let ts = Utc::now().to_rfc3339();
+    let interaction_id = format!("ix-{}-000", &ts[..10].replace('-', ""));
+
+    let obj = serde_json::json!({
+        "schema": 1,
+        "interaction_id": interaction_id,
+        "kind": "approval_request",
+        "status": "pending",
+        "title": subject,
+        "message": detail.unwrap_or(subject),
+        "selection_mode": "boolean",
+        "options": [
+            {"id": "approve", "label": "Approve", "recommended": true},
+            {"id": "reject",  "label": "Reject",  "recommended": false}
+        ],
+        "comment_mode": "disabled",
+        "presentation": {
+            "mode": "text_menu",
+            "color_profile": "auto",
+            "theme": "auto"
+        },
+        "originating_request_id": approval_id,
+        "risk_level": category.unwrap_or("medium"),
+        "created_at": ts,
+    });
+
+    let file_path = requests_dir.join(format!("{}.json", approval_id));
+    let content = serde_json::to_string_pretty(&obj)
+        .map_err(|e| ToolError::IoError { message: format!("serialize interaction: {e}") })?;
+    fs::write(&file_path, format!("{content}\n"))
+        .map_err(|e| ToolError::IoError { message: format!("write interaction file: {e}") })?;
+
+    Ok(InteractionProjectionResult {
+        interaction_id,
+        kind:      "approval_request".into(),
+        schema:    1,
+        file_path: file_path.to_string_lossy().into_owned(),
+        projected: true,
+    })
+}

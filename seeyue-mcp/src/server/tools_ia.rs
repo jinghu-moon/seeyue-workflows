@@ -193,6 +193,74 @@ impl SeeyueMcpServer {
             .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
             .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
     }
+
+    // ─── P2-N4: Interaction MCP Tools ────────────────────────────────────────
+
+    #[tool(description = "List pending interaction IDs from .ai/workflow/interactions/requests/. Filter by status (default: pending).")]
+    async fn sy_list_interactions(
+        &self,
+        Parameters(p): Parameters<ListInteractionsParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = crate::tools::interaction_mcp::run_list_interactions(
+            crate::tools::interaction_mcp::ListInteractionsParams {
+                status: p.status,
+            },
+            &self.state.workflow_dir,
+        );
+        result
+            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Read a specific interaction request by ID from .ai/workflow/interactions/requests/.")]
+    async fn sy_read_interaction(
+        &self,
+        Parameters(p): Parameters<ReadInteractionParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = crate::tools::interaction_mcp::run_read_interaction(
+            crate::tools::interaction_mcp::ReadInteractionParams {
+                interaction_id: p.interaction_id,
+            },
+            &self.state.workflow_dir,
+        );
+        result
+            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Probe interaction capability: checks for MCP elicitation support and sy-interact binary. Returns preferred_mode (elicitation|local_presenter|text_fallback).")]
+    async fn sy_probe_interaction_capability(
+        &self,
+        Parameters(p): Parameters<ProbeInteractionCapabilityParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = crate::tools::interaction_strategy::run_probe_interaction_capability(
+            crate::tools::interaction_strategy::ProbeInteractionCapabilityParams {
+                workspace_override: p.workspace_override,
+            },
+            self.state.workspace.as_ref(),
+        );
+        result
+            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
+
+    #[tool(description = "Write a response file for an interaction (MCP-driven resolution). Writes to .ai/workflow/interactions/responses/.")]
+    async fn sy_resolve_interaction(
+        &self,
+        Parameters(p): Parameters<ResolveInteractionParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let result = crate::tools::interaction_mcp::run_resolve_interaction(
+            crate::tools::interaction_mcp::ResolveInteractionParams {
+                interaction_id:  p.interaction_id,
+                selected_option: p.selected_option,
+                comment:         p.comment,
+            },
+            &self.state.workflow_dir,
+        );
+        result
+            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
+            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+    }
 }
 
 impl SeeyueMcpServer {

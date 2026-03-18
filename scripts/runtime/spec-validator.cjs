@@ -20,6 +20,7 @@ const DEFAULT_SPEC_PATHS = [
   "workflow/router.spec.yaml",
   "workflow/policy.spec.yaml",
   "workflow/execution.spec.yaml",
+  "workflow/interaction.schema.yaml",
 ];
 
 const EXPECTED_SCHEMA_KIND = {
@@ -36,6 +37,7 @@ const EXPECTED_SCHEMA_KIND = {
   "workflow/router.spec.yaml": "router_spec",
   "workflow/policy.spec.yaml": "policy_spec",
   "workflow/execution.spec.yaml": "execution_spec",
+  "workflow/interaction.schema.yaml": "interaction_schema",
 };
 
 const SPEC_STATUSES = new Set(["draft", "frozen"]);

@@ -41,6 +41,8 @@ pub mod tools {
     pub mod git_log;
     pub mod git_status;
     pub mod input_request;
+    pub mod interaction_mcp;
+    pub mod interaction_strategy;
     pub mod lint_file;
     pub mod memory_delete;
     pub mod memory_list;

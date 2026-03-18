@@ -112,3 +112,10 @@ specs:
     freeze_gate: P2-N2
     cross_refs:
     - workflow/file-classes.yaml
+  workflow/interaction.schema.yaml:
+    schema_kind: interaction_schema
+    status: draft
+    schema_version: 1
+    freeze_gate: P0-N1
+    cross_refs:
+    - workflow/runtime.schema.yaml

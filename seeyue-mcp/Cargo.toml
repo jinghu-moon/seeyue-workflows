@@ -104,3 +104,6 @@ lto           = "thin"
 codegen-units = 1
 strip         = true
 panic         = "abort"
+
+# Declare this package as its own workspace root (not part of the repo root workspace)
+[workspace]

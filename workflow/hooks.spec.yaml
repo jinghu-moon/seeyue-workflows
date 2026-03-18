@@ -96,46 +96,57 @@ hook_matrix:
   script: scripts/hooks/sy-session-start.cjs
   purpose: bootstrap routing and constraints
   required: true
+  failure_mode: advisory
 - event: UserPromptSubmit
   script: scripts/hooks/sy-prompt-refresh.cjs
   purpose: long-session prompt re-anchor
   required: true
+  failure_mode: advisory
 - event: BeforeToolSelection
   script: scripts/hooks/sy-before-tool-selection.cjs
   purpose: pre-tool routing interception
   required: false
+  failure_mode: advisory
 - event: PreToolUse:Bash
   script: scripts/hooks/sy-pretool-bash.cjs
   purpose: command class, approval, and destructive guard
   required: true
+  failure_mode: hard_gate
 - event: PreToolUse:Bash
   script: scripts/hooks/sy-pretool-bash-budget.cjs
   purpose: loop budget gate
   required: true
+  failure_mode: hard_gate
 - event: PreToolUse:Write|Edit
   script: scripts/hooks/sy-pretool-write.cjs
   purpose: TDD, secret, protected-file, and debug gates
   required: true
+  failure_mode: hard_gate
 - event: PreToolUse:Write|Edit
   script: scripts/hooks/sy-pretool-write-session.cjs
   purpose: session integrity gate
   required: true
+  failure_mode: hard_gate
 - event: PostToolUse:Write|Edit
   script: scripts/hooks/sy-posttool-write.cjs
   purpose: write evidence and scope drift capture
   required: true
+  failure_mode: telemetry
 - event: PostToolUse:Bash
   script: scripts/hooks/sy-posttool-bash-verify.cjs
   purpose: verification + TDD evidence capture
   required: true
+  failure_mode: telemetry
 - event: AfterModel
   script: scripts/hooks/sy-after-model.cjs
   purpose: post-model synthesis inspection
   required: false
+  failure_mode: advisory
 - event: Stop
   script: scripts/hooks/sy-stop.cjs
   purpose: checkpoint and resume frontier gate
   required: true
+  failure_mode: hard_gate
 command_classification:
   priority:
   - destructive

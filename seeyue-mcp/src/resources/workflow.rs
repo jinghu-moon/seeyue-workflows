@@ -21,6 +21,7 @@ pub const RESOURCE_DASHBOARD:  &str = "workflow://dashboard";
 pub const RESOURCE_QUESTIONS:  &str = "workflow://questions";
 pub const RESOURCE_INPUTS:     &str = "workflow://inputs";
 pub const RESOURCE_ERRORS:     &str = "workspace://errors";
+pub const RESOURCE_INTERACTIONS_ACTIVE: &str = "workflow://interactions/active";
 
 /// List all available workflow resources as rmcp Resource objects.
 pub fn list_resources() -> Vec<Resource> {
@@ -82,6 +83,13 @@ pub fn list_resources() -> Vec<Resource> {
             )
             .with_mime_type("application/json")
             .no_annotation(),
+        RawResource::new(RESOURCE_INTERACTIONS_ACTIVE, "Active Interactions")
+            .with_description(
+                "Current active interaction index: active_id, pending_count, blocking_kind, blocking_reason. \
+                 Source: .ai/workflow/interactions/active.json",
+            )
+            .with_mime_type("application/json")
+            .no_annotation(),
     ]
 }
 
@@ -122,6 +130,12 @@ pub fn read_resource(
         RESOURCE_ERRORS => {
             let path = workflow_dir.join("errors.json");
             read_file_or_empty(&path, "application/json")?
+        }
+        RESOURCE_INTERACTIONS_ACTIVE => {
+            let data = crate::tools::interaction_mcp::read_active_interactions(workflow_dir);
+            let json = serde_json::to_string_pretty(&data)
+                .map_err(|e| format!("serialize interactions/active: {e}"))?;
+            (json, "application/json".to_string())
         }
         _ => return Err(format!("Unknown resource URI: {}", uri)),
     };

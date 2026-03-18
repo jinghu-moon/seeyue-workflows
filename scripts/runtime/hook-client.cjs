@@ -261,7 +261,97 @@ function buildOutputEnvelope(result) {
       }
     }
   }
+  // Merge interaction envelope fields (P2-N2)
+  const interactionEnvelope = buildInteractionEnvelope(result);
+  for (const [key, value] of Object.entries(interactionEnvelope)) {
+    if (!(key in envelope)) {
+      envelope[key] = value;
+    }
+  }
   return envelope;
+}
+
+/**
+ * buildInteractionEnvelope — P2-N2
+ *
+ * Enriches the output envelope with interaction-awareness fields.
+ * Does NOT create interaction store entries — runtime kernel decides that.
+ *
+ * Fields added:
+ *   interaction_required  {boolean}         true when an interaction is needed
+ *   interaction_kind      {string|null}      'approval_request'|'restore_request'|'question_request'|'input_request'|null
+ *   blocking_kind         {string|null}      e.g. 'hard_gate'|'advisory'|null
+ *   reason_code           {string|null}      machine-readable reason tag
+ *   risk_level            {string|null}      'low'|'medium'|'high'|'critical'|null
+ *   scope                 {string|null}      file path or command scope context
+ */
+function buildInteractionEnvelope(result) {
+  const verdict = String(result.verdict || "allow");
+  const isBlocking = verdict === "block" || verdict === "block_with_approval_request";
+  const hasApproval = verdict === "block_with_approval_request" || !!result.approvalRequest;
+  const isRestorePendingFlag = result.metadata && result.metadata.restore_pending;
+
+  // Determine interaction_kind
+  let interactionKind = null;
+  if (hasApproval) {
+    interactionKind = "approval_request";
+  } else if (isRestorePendingFlag) {
+    interactionKind = "restore_request";
+  } else if (result.metadata && result.metadata.question_pending) {
+    interactionKind = "question_request";
+  } else if (result.metadata && result.metadata.input_pending) {
+    interactionKind = "input_request";
+  }
+
+  // Determine blocking_kind
+  let blockingKind = null;
+  if (isBlocking) {
+    blockingKind = "hard_gate";
+  } else if (verdict === "force_continue") {
+    blockingKind = "advisory";
+  }
+
+  // Extract reason_code from metadata or approval request
+  let reasonCode = null;
+  if (result.metadata && result.metadata.reason_code) {
+    reasonCode = String(result.metadata.reason_code);
+  } else if (result.approvalRequest && result.approvalRequest.reason_code) {
+    reasonCode = String(result.approvalRequest.reason_code);
+  } else if (isBlocking) {
+    // Derive from reason string if present
+    const reason = String(result.reason || "");
+    const codeMatch = reason.match(/\[([A-Z_]+)\]/);
+    reasonCode = codeMatch ? codeMatch[1] : null;
+  }
+
+  // Risk level
+  let riskLevel = null;
+  if (result.metadata && result.metadata.risk_level) {
+    riskLevel = String(result.metadata.risk_level);
+  } else if (result.approvalRequest && result.approvalRequest.risk_level) {
+    riskLevel = String(result.approvalRequest.risk_level);
+  } else if (blockingKind === "hard_gate") {
+    riskLevel = "high";
+  }
+
+  // Scope
+  let scope = null;
+  if (result.metadata && result.metadata.scope) {
+    scope = String(result.metadata.scope);
+  } else if (result.metadata && result.metadata.file_path) {
+    scope = String(result.metadata.file_path);
+  } else if (result.metadata && result.metadata.command) {
+    scope = String(result.metadata.command).slice(0, 120);
+  }
+
+  return {
+    interaction_required: interactionKind !== null,
+    interaction_kind: interactionKind,
+    blocking_kind: blockingKind,
+    reason_code: reasonCode,
+    risk_level: riskLevel,
+    scope,
+  };
 }
 
 function persistOutputTemplatesForTest(rootDir, outputTemplates) {
@@ -2772,6 +2862,7 @@ module.exports = {
   buildAllowResult,
   buildBlockResult,
   buildForceContinueResult,
+  buildInteractionEnvelope,
   getActiveNode,
   getActivePhase,
   getRecommendedNext,

@@ -281,6 +281,101 @@ function runGeminiAfterModelMapping() {
   );
 }
 
+// ─── P2-N1: failure_mode fixture cases ──────────────────────────────────────
+
+const VALID_FAILURE_MODES = new Set(["hard_gate", "advisory", "telemetry"]);
+
+function loadHooksSpec() {
+  const specPath = path.join(projectRoot, "workflow", "hooks.spec.yaml");
+  assert(fs.existsSync(specPath), `hooks.spec.yaml not found at ${specPath}`);
+  // Simple YAML key extraction — read raw and parse hook_matrix entries
+  const src = fs.readFileSync(specPath, "utf8");
+  return src;
+}
+
+/**
+ * RED case: assert hooks.spec.yaml does NOT have failure_mode on all hook_matrix entries.
+ * This should fail before we add failure_mode to the spec.
+ */
+function runHooksMissingFailureMode() {
+  const src = loadHooksSpec();
+  // Extract hook_matrix block line by line
+  const lines = src.split("\n");
+  let inMatrix = false;
+  const matrixLines = [];
+  for (const line of lines) {
+    if (line === "hook_matrix:") {
+      inMatrix = true;
+      matrixLines.push(line);
+      continue;
+    }
+    if (inMatrix) {
+      if (/^[a-zA-Z_]/.test(line)) break;
+      matrixLines.push(line);
+    }
+  }
+  if (!inMatrix || matrixLines.length === 0) {
+    return; // No hook_matrix at all — clearly missing, RED passes
+  }
+  const block = matrixLines.join("\n");
+  const eventCount = (block.match(/^- event:/gm) || []).length;
+  const failureModeCount = (block.match(/^  failure_mode:/gm) || []).length;
+  // RED: expect mismatch (failure_mode not yet added)
+  assert(
+    failureModeCount < eventCount,
+    `Expected failure_mode to be missing from some hook_matrix entries (RED), but found ${failureModeCount}/${eventCount}`
+  );
+}
+
+/**
+ * GREEN case: assert hooks.spec.yaml has failure_mode on ALL hook_matrix entries
+ * with valid values.
+ */
+function runHooksFailureMode() {
+  const src = loadHooksSpec();
+  // Extract hook_matrix block — scan for hook_matrix: then take lines until next top-level key
+  const lines = src.split("\n");
+  let inMatrix = false;
+  const matrixLines = [];
+  for (const line of lines) {
+    if (line === "hook_matrix:") {
+      inMatrix = true;
+      matrixLines.push(line);
+      continue;
+    }
+    if (inMatrix) {
+      // A top-level key starts at column 0 with a word char (not '-' or ' ')
+      if (/^[a-zA-Z_]/.test(line)) {
+        break; // end of hook_matrix block
+      }
+      matrixLines.push(line);
+    }
+  }
+  assert(inMatrix, "hooks.spec.yaml must contain hook_matrix:");
+  const block = matrixLines.join("\n");
+
+  // Count event entries (lines starting with '- event:')
+  const eventEntries = block.match(/^- event:/gm) || [];
+  const eventCount = eventEntries.length;
+  assert(eventCount > 0, `hook_matrix must have at least one event entry. Block:\n${block.slice(0, 300)}`);
+
+  // Count failure_mode entries
+  const failureModeEntries = block.match(/^  failure_mode:\s*\S+/gm) || [];
+  assert(
+    failureModeEntries.length === eventCount,
+    `Every hook_matrix entry must have failure_mode. Found ${failureModeEntries.length}/${eventCount}`
+  );
+
+  // Validate each failure_mode value
+  for (const entry of failureModeEntries) {
+    const value = entry.replace(/^  failure_mode:\s*/, "").trim();
+    assert(
+      VALID_FAILURE_MODES.has(value),
+      `Invalid failure_mode value '${value}'. Must be one of: ${[...VALID_FAILURE_MODES].join(", ")}`
+    );
+  }
+}
+
 const CASES = {
   "fixture-shapes": assertFixtureShapes,
   "claude-minimal-allow": runClaudeMinimalAllow,
@@ -289,13 +384,28 @@ const CASES = {
   "gemini-context-mapping": runGeminiAfterToolContextMapping,
   "gemini-toolcfg-mapping": runGeminiToolSelectionMapping,
   "gemini-aftermodel-mapping": runGeminiAfterModelMapping,
+  "hooks-missing-failure-mode": runHooksMissingFailureMode,
+  "hooks-failure-mode": runHooksFailureMode,
 };
 
 function main() {
   const fixtures = loadFixtures();
   let failed = false;
 
-  for (const [caseName, runner] of Object.entries(CASES)) {
+  const caseArgIdx = process.argv.indexOf("--case");
+  const selectedCase = caseArgIdx !== -1 ? process.argv[caseArgIdx + 1] : null;
+
+  const entriesToRun = selectedCase
+    ? Object.entries(CASES).filter(([name]) => name === selectedCase)
+    : Object.entries(CASES);
+
+  if (selectedCase && entriesToRun.length === 0) {
+    console.error(`Unknown case: ${selectedCase}`);
+    console.error(`Available: ${Object.keys(CASES).join(", ")}`);
+    process.exit(1);
+  }
+
+  for (const [caseName, runner] of entriesToRun) {
     try {
       if (runner.length === 1) {
         runner(fixtures);
@@ -313,7 +423,9 @@ function main() {
   if (failed) {
     process.exit(1);
   }
-  console.log("HOOK_TEMPLATE_FIXTURES_PASS");
+  if (!selectedCase) {
+    console.log("HOOK_TEMPLATE_FIXTURES_PASS");
+  }
 }
 
 main();
