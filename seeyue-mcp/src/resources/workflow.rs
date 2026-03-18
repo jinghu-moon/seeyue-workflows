@@ -18,6 +18,9 @@ pub const RESOURCE_TASK_GRAPH: &str = "workflow://task-graph";
 pub const RESOURCE_JOURNAL:    &str = "workflow://journal";
 pub const RESOURCE_MEMORY:     &str = "memory://index";
 pub const RESOURCE_DASHBOARD:  &str = "workflow://dashboard";
+pub const RESOURCE_QUESTIONS:  &str = "workflow://questions";
+pub const RESOURCE_INPUTS:     &str = "workflow://inputs";
+pub const RESOURCE_ERRORS:     &str = "workspace://errors";
 
 /// List all available workflow resources as rmcp Resource objects.
 pub fn list_resources() -> Vec<Resource> {
@@ -58,6 +61,27 @@ pub fn list_resources() -> Vec<Resource> {
             )
             .with_mime_type("application/json")
             .no_annotation(),
+        RawResource::new(RESOURCE_QUESTIONS, "Pending Questions")
+            .with_description(
+                "Questions posted by sy_ask_user awaiting user response. \
+                 Source: .ai/workflow/questions.jsonl",
+            )
+            .with_mime_type("application/jsonl")
+            .no_annotation(),
+        RawResource::new(RESOURCE_INPUTS, "Pending Input Requests")
+            .with_description(
+                "Structured input requests posted by sy_input_request. \
+                 Source: .ai/workflow/input_requests.jsonl",
+            )
+            .with_mime_type("application/jsonl")
+            .no_annotation(),
+        RawResource::new(RESOURCE_ERRORS, "Workspace Errors")
+            .with_description(
+                "Aggregated lint and type-check errors from the last run. \
+                 Source: .ai/workflow/errors.json (written by lint_file/type_check tools)",
+            )
+            .with_mime_type("application/json")
+            .no_annotation(),
     ]
 }
 
@@ -86,6 +110,18 @@ pub fn read_resource(
         }
         RESOURCE_DASHBOARD => {
             build_dashboard(workflow_dir)?
+        }
+        RESOURCE_QUESTIONS => {
+            let path = workflow_dir.join("questions.jsonl");
+            read_file_or_empty(&path, "application/jsonl")?
+        }
+        RESOURCE_INPUTS => {
+            let path = workflow_dir.join("input_requests.jsonl");
+            read_file_or_empty(&path, "application/jsonl")?
+        }
+        RESOURCE_ERRORS => {
+            let path = workflow_dir.join("errors.json");
+            read_file_or_empty(&path, "application/json")?
         }
         _ => return Err(format!("Unknown resource URI: {}", uri)),
     };

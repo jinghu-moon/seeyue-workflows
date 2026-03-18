@@ -1290,6 +1290,124 @@ impl SeeyueMcpServer {
         );
         result.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(|e| ErrorData::invalid_params(e.to_json(), None))
     }
+
+    /// Find files matching a glob pattern in the workspace.
+    #[tool(description = "Find files matching a glob pattern. Respects .gitignore by default.")]
+    async fn find_files(
+        &self,
+        Parameters(p): Parameters<params::FindFilesParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::find_files::run_find_files(
+            tools::find_files::FindFilesParams {
+                pattern:           p.pattern,
+                respect_gitignore: p.respect_gitignore,
+                show_hidden:       p.show_hidden,
+                limit:             p.limit,
+            },
+            &self.state.workspace,
+        ).map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// Get hover information (type, docs) for a symbol via LSP.
+    #[tool(description = "Get LSP hover info (type signature, docs) for symbol at given position.")]
+    async fn get_hover_info(
+        &self,
+        Parameters(p): Parameters<params::GetHoverInfoParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::get_hover_info::run_get_hover_info(
+            tools::get_hover_info::GetHoverInfoParams {
+                path:   p.path,
+                line:   p.line as usize,
+                column: p.column as usize,
+            },
+            &self.state,
+        ).await.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// Unified error handler hook: records tool failures, sends Toast, returns recovery hints.
+    #[tool(description = "Record a tool error to journal, optionally notify, return recovery suggestions.")]
+    async fn sy_on_error(
+        &self,
+        Parameters(p): Parameters<params::OnErrorParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::on_error::run_on_error(
+            tools::on_error::OnErrorParams {
+                tool:       p.tool,
+                error:      p.error,
+                error_kind: p.error_kind,
+                path:       p.path,
+                notify:     p.notify,
+                node_id:    p.node_id,
+                run_id:     p.run_id,
+            },
+            &self.state.workflow_dir,
+        ).map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// Open a file in VS Code / Cursor at a specific line.
+    #[tool(description = "Open a file in VS Code or Cursor at a given line/column. editor: auto|vscode|cursor.")]
+    async fn open_in_editor(
+        &self,
+        Parameters(p): Parameters<params::OpenInEditorParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::open_in_editor::run_open_in_editor(
+            tools::open_in_editor::OpenInEditorParams {
+                path:   p.path,
+                line:   p.line,
+                column: p.column,
+                editor: p.editor,
+            },
+            &self.state.workspace,
+        ).map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// List running processes; optionally filter by name or port.
+    #[tool(description = "List running processes (Windows tasklist). Filter by name substring or port.")]
+    async fn process_list(
+        &self,
+        Parameters(p): Parameters<params::ProcessListParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::process_list::run_process_list(
+            tools::process_list::ProcessListParams {
+                filter_name: p.filter_name,
+                filter_port: p.filter_port,
+                limit:       p.limit,
+            },
+        ).map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// Execute a script file (.ps1/.sh/.py/.js/.ts) with the appropriate interpreter.
+    #[tool(description = "Run a script file. Supports .ps1 .sh .py .js .ts. Configurable timeout.")]
+    async fn run_script(
+        &self,
+        Parameters(p): Parameters<params::RunScriptParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::run_script::run_script(
+            tools::run_script::RunScriptParams {
+                script:       p.script,
+                args:         p.args,
+                working_dir:  p.working_dir,
+                timeout_secs: p.timeout_secs,
+                env:          p.env,
+            },
+            &self.state,
+        ).await.map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
+
+    /// Check workflow loop budget and warn when threshold is exceeded.
+    #[tool(description = "Check loop budget consumption. Warns (Toast + journal) when warn_at fraction exceeded.")]
+    async fn session_budget_warning(
+        &self,
+        Parameters(p): Parameters<params::SessionBudgetWarningParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        tools::session_budget_warning::run_session_budget_warning(
+            tools::session_budget_warning::SessionBudgetWarningParams {
+                threshold: p.warn_at.map(|v| v as f32),
+                notify:    p.notify,
+            },
+            &self.state.workflow_dir,
+        ).map(|r| to_text(serde_json::to_string_pretty(&r).unwrap())).map_err(to_mcp_err)
+    }
 }
 
 #[prompt_router]

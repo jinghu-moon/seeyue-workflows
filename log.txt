@@ -67,3 +67,23 @@ Fixes applied:
 - dependency_graph test timeout: 10s -> 30s (tool correct)
 - P0/write FILE_NOT_READ: pre-test sandbox cleanup in qa_full.py
 - multi_file_edit: same root cause as above, resolved by sandbox cleanup
+
+=== QA RUN RESULTS ===
+PASSED: 42
+FAILED: 0
+
+=== QA RUN RESULTS ===
+PASSED: 42
+FAILED: 0
+
+=== QA RUN RESULTS ===
+PASSED: 42
+FAILED: 0
+
+=== QA RUN RESULTS ===
+PASSED: 42
+FAILED: 0
+
+=== QA RUN RESULTS ===
+PASSED: 42
+FAILED: 0

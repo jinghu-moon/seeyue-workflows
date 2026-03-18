@@ -220,6 +220,31 @@ impl LspSession {
         Ok(parse_locations(&result))
     }
 
+    pub fn request_hover(
+        &mut self,
+        path: &Path,
+        language_id: &str,
+        text: &str,
+        line: usize,
+        column: usize,
+    ) -> Result<Option<serde_json::Value>, ToolError> {
+        self.ensure_initialized()?;
+
+        let uri = path_to_uri(path);
+        self.open_document(&uri, language_id, text)?;
+
+        let params = json!({
+            "textDocument": { "uri": uri },
+            "position": { "line": line.saturating_sub(1), "character": column.saturating_sub(1) },
+        });
+
+        let result = self.send_request("textDocument/hover", params)?;
+        if result.is_null() {
+            return Ok(None);
+        }
+        Ok(Some(result))
+    }
+
     pub fn request_references(
         &mut self,
         path: &Path,
