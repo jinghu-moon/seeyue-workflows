@@ -1,0 +1,33 @@
+{
+  "session": {
+    "phase": { "current": "P2", "status": "in_progress" },
+    "node": { "active_id": "P2-N1", "state": "in_progress", "owner_persona": "author" },
+    "interaction": {
+      "active_interaction_id": "ix-20260318-001",
+      "pending_count": 1,
+      "last_dispatched_at": null,
+      "blocking_kind": "approval",
+      "blocking_reason": "destructive_write_requires_approval"
+    }
+  },
+  "nodes": {
+    "P2-N1": {
+      "status": "in_progress",
+      "tdd_state": "green_pending",
+      "review_state": { "spec_review": "pending", "quality_review": "pending" }
+    }
+  },
+  "expected": {
+    "route_verdict": "block",
+    "block_reason": "interaction_pending",
+    "next_persona": "human",
+    "next_capability": "human_interaction",
+    "recommended_next": [
+      {
+        "type": "resolve_interaction",
+        "interaction_id": "ix-20260318-001",
+        "blocking_kind": "approval"
+      }
+    ]
+  }
+}

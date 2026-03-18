@@ -301,7 +301,7 @@ rollback_boundary:
 - `why`: Runtime consumers need a stable projection without embedding the entire interaction object into `session.yaml`.
 - `depends_on`: [P1-N1]
 - `verify.cmd`: >
-    node "scripts/runtime/validate-specs.cjs" --spec "workflow/runtime.schema.yaml"
+    node "scripts/runtime/validate-specs.cjs" --spec "workflow/runtime.schema.yaml" --scope targeted
     && node "tests/runtime/run-state-repair-fixtures.cjs" --case interaction-defaults
 - `verify.pass_signal`: exit 0
 - `risk_level`: medium

@@ -17,7 +17,7 @@ const { getInteractionBlock } = require("./interaction-projection.cjs");
  */
 function shouldBlockForInteraction(session) {
   const block = getInteractionBlock(session);
-  return block !== null && typeof block.active_id === "string" && block.active_id.length > 0;
+  return block !== null && typeof block.active_interaction_id === "string" && block.active_interaction_id.length > 0;
 }
 
 /**
@@ -38,7 +38,7 @@ function getInteractionBlocker(session) {
   }
   return {
     type: "interaction_pending",
-    interaction_id: block.active_id,
+    interaction_id: block.active_interaction_id,
     blocking_kind: block.blocking_kind || "unknown",
     reason: block.blocking_reason || "active_interaction_requires_resolution",
     pending_count: block.pending_count || 1,

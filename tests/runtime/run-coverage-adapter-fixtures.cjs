@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const {
@@ -50,7 +51,7 @@ function parseJsonOutput(result, label) {
 const cases = {
   "missing-coverage-input-fails": () => {
     const rootDir = makeTempRoot("coverage-adapter-missing-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {});
     const result = runAdapter(rootDir, ["--root", rootDir, "--write", "--json"]);
     if (result.status === 0) {
@@ -62,7 +63,7 @@ const cases = {
   },
   "istanbul-summary-write-staging": () => {
     const rootDir = makeTempRoot("coverage-adapter-istanbul-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {});
     writeJson(path.join(rootDir, "coverage", "coverage-summary.json"), {
       total: {
@@ -91,7 +92,7 @@ const cases = {
   },
   "cobertura-patch-regression-fails": () => {
     const rootDir = makeTempRoot("coverage-adapter-cobertura-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: { task: { mode: "bugfix" } },
       nodes: {
@@ -158,7 +159,7 @@ const cases = {
   },
   "auto-discovers-active-node-contract": () => {
     const rootDir = makeTempRoot("coverage-adapter-contract-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         task: { mode: "bugfix" },

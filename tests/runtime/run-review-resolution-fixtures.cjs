@@ -7,6 +7,7 @@ const path = require("node:path");
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const { buildReviewHandoffCapsule, createCapsule } = require("../../scripts/runtime/context-manager.cjs");
@@ -53,7 +54,7 @@ function seedReviewHandoff(rootDir, options = {}) {
 const cases = {
   "review-decision-requires-handoff-capsule": () => {
     const rootDir = makeTempRoot("review-resolve-missing-handoff-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -92,7 +93,7 @@ const cases = {
   },
   "record-spec-review-pass-refreshes-quality-review-handoff": () => {
     const rootDir = makeTempRoot("review-resolve-spec-pass-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -153,7 +154,7 @@ const cases = {
   },
   "record-quality-review-rework-refreshes-author-rework-route": () => {
     const rootDir = makeTempRoot("review-resolve-quality-rework-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },

@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const {
@@ -48,7 +49,7 @@ function parseJsonOutput(result, label) {
 const cases = {
   "inspect-detects-parallel-group-drift": () => {
     const rootDir = makeTempRoot("runtime-repair-inspect-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       nodes: {
         "P2-N1": { parallel_group: "legacy_group" },
@@ -73,7 +74,7 @@ const cases = {
   },
   "apply-clears-parallel-group-and-emits-journal": () => {
     const rootDir = makeTempRoot("runtime-repair-apply-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       nodes: {
         "P2-N1": { parallel_group: "legacy_group" },
@@ -112,7 +113,7 @@ const cases = {
   },
   "controller-verify-can-repair-before-evaluation": () => {
     const rootDir = makeTempRoot("runtime-repair-controller-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -159,6 +160,57 @@ const cases = {
         review_ready: true,
       },
     });
+  },
+
+  "interaction-missing-defaults": () => {
+    // RED: session has no interaction block → inspect must report repairable
+    const rootDir = makeTempRoot("runtime-repair-interaction-missing-");
+    copyRuntimeFixtureFiles(rootDir);
+    writeRuntimeState(rootDir, {});
+    const session = readSession(rootDir);
+    // Strip interaction block if present
+    const sessionWithout = { ...session };
+    delete sessionWithout.interaction;
+    writeSession(rootDir, sessionWithout);
+
+    const result = inspectRuntimeStateRepair(rootDir);
+    if (!result.repairable) {
+      throw new Error("expected repairable=true when interaction block is missing");
+    }
+    const interactionRepair = result.repairs.find((r) => r.target === "session:interaction");
+    if (!interactionRepair) {
+      throw new Error("expected repair targeting session:interaction");
+    }
+  },
+
+  "interaction-defaults": () => {
+    // GREEN: apply repair → session gains interaction block with correct defaults
+    const rootDir = makeTempRoot("runtime-repair-interaction-defaults-");
+    copyRuntimeFixtureFiles(rootDir);
+    writeRuntimeState(rootDir, {});
+    const session = readSession(rootDir);
+    const sessionWithout = { ...session };
+    delete sessionWithout.interaction;
+    writeSession(rootDir, sessionWithout);
+
+    const result = applyRuntimeStateRepair(rootDir);
+    if (!result.applied) {
+      throw new Error("expected applied=true after repairing missing interaction block");
+    }
+
+    const repaired = readSession(rootDir);
+    if (!repaired.interaction) {
+      throw new Error("expected session.interaction to exist after repair");
+    }
+    if (repaired.interaction.pending_count !== 0) {
+      throw new Error("expected interaction.pending_count=0");
+    }
+    if (repaired.interaction.active_interaction_id !== null) {
+      throw new Error("expected interaction.active_interaction_id=null");
+    }
+    if (repaired.interaction.last_dispatched_at !== null) {
+      throw new Error("expected interaction.last_dispatched_at=null");
+    }
   },
 };
 

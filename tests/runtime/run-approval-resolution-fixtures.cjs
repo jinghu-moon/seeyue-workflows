@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
-
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const {
@@ -31,7 +29,7 @@ function writeRuntimeState(rootDir, fixture) {
 const cases = {
   "approve-pending-request-clears-queue-and-refreshes-next": () => {
     const rootDir = makeTempRoot("approval-resolve-approve-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -127,7 +125,7 @@ const cases = {
   },
   "reject-pending-request-keeps-node-blocked": () => {
     const rootDir = makeTempRoot("approval-resolve-reject-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -202,7 +200,7 @@ const cases = {
   },
   "expire-pending-request-records-expired-and-clears-active-request": () => {
     const rootDir = makeTempRoot("approval-resolve-expire-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -270,7 +268,7 @@ const cases = {
   },
   "rejects-mismatched-approval-id": () => {
     const rootDir = makeTempRoot("approval-resolve-mismatch-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         approvals: {

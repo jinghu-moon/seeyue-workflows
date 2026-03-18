@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const {
@@ -89,7 +90,7 @@ function loadReport(rootDir) {
 const cases = {
   "build-report-from-staging-ready": () => {
     const rootDir = makeTempRoot("report-builder-ready-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -171,7 +172,7 @@ const cases = {
   },
   "build-report-from-staging-not-ready": () => {
     const rootDir = makeTempRoot("report-builder-fail-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -216,7 +217,7 @@ const cases = {
   },
   "controller-verify-write-report": () => {
     const rootDir = makeTempRoot("controller-write-report-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -259,7 +260,7 @@ const cases = {
   },
   "build-report-from-existing-report-fallback": () => {
     const rootDir = makeTempRoot("report-builder-fallback-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },

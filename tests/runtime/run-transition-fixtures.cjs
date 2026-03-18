@@ -1,11 +1,9 @@
 "use strict";
 
-const fs = require("node:fs");
-const path = require("node:path");
-
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const {
@@ -36,7 +34,7 @@ function writeRuntimeState(rootDir, fixture) {
 const cases = {
   "start-node-transition-updates-all-assets": () => {
     const rootDir = makeTempRoot("transition-start-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -87,7 +85,7 @@ const cases = {
   },
   "phase-transition-completes-current-phase-and-enters-next": () => {
     const rootDir = makeTempRoot("transition-phase-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -132,7 +130,7 @@ const cases = {
   },
   "resume-transition-clears-restore-pending": () => {
     const rootDir = makeTempRoot("transition-resume-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         node: { active_id: "P2-N1", state: "red_pending", owner_persona: "author" },
@@ -165,7 +163,7 @@ const cases = {
   },
   "review-complete-finalizes-node-before-starting-next": () => {
     const rootDir = makeTempRoot("transition-review-complete-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -240,7 +238,7 @@ const cases = {
   },
   "request-approval-transition-materializes-active-request": () => {
     const rootDir = makeTempRoot("transition-request-approval-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -320,7 +318,7 @@ const cases = {
   },
   "retry-transition-restarts-failed-node": () => {
     const rootDir = makeTempRoot("transition-retry-node-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -373,7 +371,7 @@ const cases = {
   },
   "hold-retry-backoff-keeps-node-failed": () => {
     const rootDir = makeTempRoot("transition-retry-backoff-hold-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -423,7 +421,7 @@ const cases = {
   },
   "failed-request-approval-persists-transition-context": () => {
     const rootDir = makeTempRoot("transition-node-failed-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -502,7 +500,7 @@ const cases = {
   },
   "timeout-request-approval-increments-failure-budget": () => {
     const rootDir = makeTempRoot("transition-timeout-approval-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -577,7 +575,7 @@ const cases = {
   },
   "verify-terminal-handoff-completes-session": () => {
     const rootDir = makeTempRoot("transition-terminal-handoff-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -658,7 +656,7 @@ const cases = {
   },
   "verify-auto-advance-starts-next-ready-node": () => {
     const rootDir = makeTempRoot("transition-verify-auto-start-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },

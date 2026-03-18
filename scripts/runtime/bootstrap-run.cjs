@@ -309,6 +309,11 @@ function buildSession(rootDir, options, previousSession, initialPhaseId, runId) 
       active_request: null,
       grants: [],
     },
+    interaction: {
+      active_interaction_id: null,
+      pending_count: 0,
+      last_dispatched_at: null,
+    },
     recovery: {
       last_checkpoint_id: null,
       restore_pending: false,

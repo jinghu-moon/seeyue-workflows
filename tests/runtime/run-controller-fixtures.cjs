@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const {
   buildFixtureState,
   assertSubset,
+  copyRuntimeFixtureFiles,
   makeTempRoot,
 } = require("./runtime-fixture-lib.cjs");
 const { buildReviewHandoffCapsule, createCapsule } = require("../../scripts/runtime/context-manager.cjs");
@@ -77,7 +78,7 @@ function seedReviewHandoff(rootDir, options = {}) {
 const cases = {
   "run-starts-route-cycle": () => {
     const rootDir = makeTempRoot("controller-run-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -121,7 +122,7 @@ const cases = {
   },
   "run-emits-node-bypassed-for-conditional-ready-node": () => {
     const rootDir = makeTempRoot("controller-run-bypass-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -169,7 +170,7 @@ const cases = {
   },
   "run-auto-loop-enters-next-phase-and-starts-first-node": () => {
     const rootDir = makeTempRoot("controller-run-auto-loop-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "completed" },
@@ -260,7 +261,7 @@ const cases = {
   },
   "run-auto-loop-stops-at-max-hops": () => {
     const rootDir = makeTempRoot("controller-run-max-hops-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "completed" },
@@ -319,7 +320,7 @@ const cases = {
   },
   "run-auto-loop-max-hops-multi-phase-advance": () => {
     const rootDir = makeTempRoot("controller-run-max-hops-multi-phase-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P1", status: "completed" },
@@ -439,7 +440,7 @@ const cases = {
   },
   "run-auto-loop-stops-at-max-hops-long": () => {
     const rootDir = makeTempRoot("controller-run-long-hops-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P1", status: "completed" },
@@ -582,7 +583,7 @@ const cases = {
   },
   "run-auto-loop-stops-at-spec-review-frontier": () => {
     const rootDir = makeTempRoot("controller-run-spec-review-frontier-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -624,7 +625,7 @@ const cases = {
   },
   "run-auto-loop-stops-at-quality-review-frontier": () => {
     const rootDir = makeTempRoot("controller-run-quality-review-frontier-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -666,7 +667,7 @@ const cases = {
   },
   "resume-restore-pending-route": () => {
     const rootDir = makeTempRoot("controller-resume-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         node: { active_id: "P2-N1", state: "red_pending", owner_persona: "author" },
@@ -691,7 +692,7 @@ const cases = {
   },
   "resume-manual-restore-blocks-for-human": () => {
     const rootDir = makeTempRoot("controller-resume-manual-restore-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         node: { active_id: "P2-N1", state: "green_pending", owner_persona: "author" },
@@ -716,7 +717,7 @@ const cases = {
   },
   "resume-auto-detects-interrupted-run": () => {
     const rootDir = makeTempRoot("controller-resume-auto-recovery-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "in_progress" },
@@ -770,7 +771,7 @@ const cases = {
   },
   "resume-derives-retry-from-journal": () => {
     const rootDir = makeTempRoot("controller-retry-journal-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -837,7 +838,7 @@ const cases = {
   },
   "resume-holds-when-retry-backoff-pending": () => {
     const rootDir = makeTempRoot("controller-retry-backoff-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     const failureTs = new Date(Date.now() - 60_000).toISOString();
     writeRuntimeState(rootDir, {
       session: {
@@ -898,7 +899,7 @@ const cases = {
   },
   "approval-approved-refreshes-next": () => {
     const rootDir = makeTempRoot("controller-approval-approved-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -969,7 +970,7 @@ const cases = {
   },
   "approval-approved-auto-loop-enters-next-phase-and-starts-first-node": () => {
     const rootDir = makeTempRoot("controller-approval-auto-loop-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -1090,7 +1091,7 @@ const cases = {
   },
   "approval-rejected-hands-back-to-human": () => {
     const rootDir = makeTempRoot("controller-approval-rejected-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "blocked" },
@@ -1157,7 +1158,7 @@ const cases = {
   },
   "review-spec-pass-auto-loop-handoffs-to-quality-review-frontier": () => {
     const rootDir = makeTempRoot("controller-review-spec-pass-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1211,7 +1212,7 @@ const cases = {
   },
   "review-quality-pass-auto-loop-starts-next-ready-node": () => {
     const rootDir = makeTempRoot("controller-review-quality-pass-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1274,7 +1275,7 @@ const cases = {
   },
   "verify-review-phase-reads-ready-report": () => {
     const rootDir = makeTempRoot("controller-verify-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1294,6 +1295,7 @@ const cases = {
         completion: { node_complete_ready: true, phase_complete_ready: true },
       },
     });
+    fs.mkdirSync(path.join(rootDir, ".ai", "analysis"), { recursive: true });
     fs.writeFileSync(
       path.join(rootDir, ".ai", "analysis", "ai.report.json"),
       JSON.stringify({
@@ -1322,7 +1324,7 @@ const cases = {
   },
   "verify-builds-action-context-from-existing-report": () => {
     const rootDir = makeTempRoot("controller-verify-evidence-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1367,7 +1369,7 @@ const cases = {
   },
   "verify-auto-advance-starts-next-ready-node": () => {
     const rootDir = makeTempRoot("controller-verify-auto-start-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1421,7 +1423,7 @@ const cases = {
   },
   "verify-auto-advance-enters-next-phase-and-starts-first-node": () => {
     const rootDir = makeTempRoot("controller-verify-auto-phase-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1535,7 +1537,7 @@ const cases = {
   },
   "verify-stop-gate-finalizes-session": () => {
     const rootDir = makeTempRoot("controller-verify-stop-gate-");
-    fs.cpSync(path.resolve(__dirname, "..", ".."), rootDir, { recursive: true });
+    copyRuntimeFixtureFiles(rootDir);
     writeRuntimeState(rootDir, {
       session: {
         phase: { current: "P2", status: "review" },
@@ -1594,6 +1596,47 @@ const cases = {
     const journal = readJournalEvents(rootDir);
     if (!journal.some((item) => item.event === "session_stopped")) {
       throw new Error("expected session_stopped event");
+    }
+  },
+
+  "interaction-blocks-loop": () => {
+    // GREEN: session with active interaction → controller loop must stop with interaction_pending
+    const rootDir = makeTempRoot("controller-interaction-blocks-");
+    copyRuntimeFixtureFiles(rootDir);
+
+    // Write session with active interaction via fixture helpers
+    writeRuntimeState(rootDir, {
+      session: {
+        phase: { current: "P2", status: "in_progress" },
+        node: { active_id: "P2-N1", state: "in_progress", owner_persona: "author" },
+        interaction: {
+          active_interaction_id: "ix-20260318-001",
+          pending_count: 1,
+          last_dispatched_at: null,
+          blocking_kind: "approval",
+          blocking_reason: "destructive_write_requires_approval",
+        },
+      },
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(rootDir, "scripts", "runtime", "controller.cjs"),
+       "--root", rootDir, "--mode", "run", "--auto-loop", "--json"],
+      { cwd: rootDir, encoding: "utf8" },
+    );
+
+    let output;
+    try {
+      output = JSON.parse(result.stdout || "{}");
+    } catch {
+      throw new Error(`controller output not JSON: ${result.stdout || result.stderr}`);
+    }
+
+    // With --auto-loop, loop_summary.stop_reason must be interaction_pending
+    const stopReason = output?.loop_summary?.stop_reason;
+    if (stopReason !== "interaction_pending") {
+      throw new Error(`expected stop_reason=interaction_pending, got: ${stopReason}`);
     }
   },
 };

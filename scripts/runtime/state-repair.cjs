@@ -15,6 +15,69 @@ function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
 }
 
+const INTERACTION_DEFAULTS = {
+  active_interaction_id: null,
+  pending_count: 0,
+  last_dispatched_at: null,
+};
+
+function buildInteractionDefaultRepairs(session) {
+  const repairs = [];
+  const interaction = session?.interaction;
+
+  if (!interaction) {
+    repairs.push({
+      repair_kind: "add_interaction_defaults_v1",
+      severity: "safe_auto_repair",
+      target: "session:interaction",
+      path: ".ai/workflow/session.yaml#interaction",
+      before: undefined,
+      after: INTERACTION_DEFAULTS,
+      reason: "session.interaction block missing — required by runtime.schema.yaml",
+    });
+    return repairs;
+  }
+
+  for (const [key, defaultValue] of Object.entries(INTERACTION_DEFAULTS)) {
+    if (!(key in interaction)) {
+      repairs.push({
+        repair_kind: `add_interaction_field_${key}_v1`,
+        severity: "safe_auto_repair",
+        target: `session:interaction.${key}`,
+        path: `.ai/workflow/session.yaml#interaction.${key}`,
+        before: undefined,
+        after: defaultValue,
+        reason: `session.interaction.${key} missing — required by runtime.schema.yaml`,
+      });
+    }
+  }
+
+  return repairs;
+}
+
+function applyInteractionDefaultRepairs(session, repairs) {
+  const interactionRepairs = repairs.filter((r) =>
+    r.repair_kind === "add_interaction_defaults_v1" ||
+    r.repair_kind.startsWith("add_interaction_field_"),
+  );
+  if (interactionRepairs.length === 0) return clone(session);
+
+  const baseInteraction = clone(session?.interaction) || {};
+  const addBlock = interactionRepairs.find((r) => r.repair_kind === "add_interaction_defaults_v1");
+  const merged = addBlock ? { ...INTERACTION_DEFAULTS } : { ...INTERACTION_DEFAULTS, ...baseInteraction };
+
+  for (const r of interactionRepairs) {
+    if (r.repair_kind.startsWith("add_interaction_field_")) {
+      const key = Object.keys(INTERACTION_DEFAULTS).find((k) =>
+        r.repair_kind === `add_interaction_field_${k}_v1`,
+      );
+      if (key !== undefined) merged[key] = r.after;
+    }
+  }
+
+  return { ...clone(session), interaction: merged };
+}
+
 function buildParallelGroupRepairs(taskGraph, specs) {
   const nodes = Array.isArray(taskGraph?.nodes) ? taskGraph.nodes : [];
   const parallelNodesSupported = specs?.routerSpec?.node_routing?.parallel_nodes_supported;
@@ -42,6 +105,7 @@ function inspectRuntimeStateRepair(rootDir, options = {}) {
   const taskGraph = readTaskGraph(rootPath);
   const repairs = [
     ...buildParallelGroupRepairs(taskGraph, specs),
+    ...buildInteractionDefaultRepairs(session),
   ];
 
   return {
@@ -89,13 +153,16 @@ function applyRuntimeStateRepair(rootDir, options = {}) {
   }
 
   const nextTaskGraph = applyParallelGroupRepairs(taskGraph, inspection.repairs);
-  const nextSession = {
-    ...clone(session),
-    timestamps: {
-      ...(session?.timestamps || {}),
-      updated_at: nowIso(),
+  const nextSession = applyInteractionDefaultRepairs(
+    {
+      ...clone(session),
+      timestamps: {
+        ...(session?.timestamps || {}),
+        updated_at: nowIso(),
+      },
     },
-  };
+    inspection.repairs,
+  );
 
   writeTaskGraph(rootPath, nextTaskGraph);
   writeSession(rootPath, nextSession);
@@ -190,6 +257,7 @@ function main() {
 module.exports = {
   applyRuntimeStateRepair,
   buildParallelGroupRepairs,
+  buildInteractionDefaultRepairs,
   inspectRuntimeStateRepair,
   parseArgs,
 };

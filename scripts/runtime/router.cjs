@@ -11,6 +11,7 @@ const {
   reviewAccepted,
   reviewFailed,
 } = require("./runtime-state.cjs");
+const { shouldBlockForInteraction, getInteractionBlocker } = require("./interaction-router.cjs");
 
 function buildRouteBasis() {
   return {
@@ -251,6 +252,27 @@ function evaluateRouter(input) {
       next_capability: "human_approval",
       recommended_next: [humanNext(phaseId || "runtime", "repair invalid runtime state")],
       block_reason: "invalid_state",
+      route_basis: routeBasis,
+    });
+  }
+
+  if (shouldBlockForInteraction(session)) {
+    routeBasis.blockers.push("interaction_pending");
+    const blocker = getInteractionBlocker(session);
+    return buildResult({
+      route_verdict: "block",
+      active_phase: phaseId,
+      active_node: activeNode?.id || session?.node?.active_id || "none",
+      next_persona: "human",
+      next_capability: "human_interaction",
+      recommended_next: [{
+        type: "resolve_interaction",
+        interaction_id: blocker?.interaction_id || null,
+        blocking_kind: blocker?.blocking_kind || "unknown",
+        reason: blocker?.reason || "active_interaction_requires_resolution",
+        priority: blocker?.priority || 90,
+      }],
+      block_reason: "interaction_pending",
       route_basis: routeBasis,
     });
   }

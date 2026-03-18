@@ -4,6 +4,32 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
+const RUNTIME_FIXTURE_DIRS = ["scripts", "workflow"];
+const trackedTempRoots = new Set();
+let tempCleanupRegistered = false;
+
+function copyRuntimeFixtureFiles(rootDir, dirs = RUNTIME_FIXTURE_DIRS) {
+  for (const dir of dirs) {
+    fs.cpSync(path.join(PROJECT_ROOT, dir), path.join(rootDir, dir), { recursive: true });
+  }
+}
+
+function cleanupTrackedTempRoots() {
+  for (const rootDir of Array.from(trackedTempRoots).reverse()) {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+    trackedTempRoots.delete(rootDir);
+  }
+}
+
+function registerTempCleanup() {
+  if (tempCleanupRegistered) {
+    return;
+  }
+  tempCleanupRegistered = true;
+  process.on("exit", cleanupTrackedTempRoots);
+}
+
 function deepMerge(baseValue, overrideValue) {
   if (overrideValue === undefined) {
     return structuredClone(baseValue);
@@ -58,6 +84,11 @@ function makeBaseSession() {
       last_checkpoint_id: null,
       restore_pending: false,
       restore_reason: null,
+    },
+    interaction: {
+      active_interaction_id: null,
+      pending_count: 0,
+      last_dispatched_at: null,
     },
     timestamps: {
       created_at: "2026-03-08T12:00:00Z",
@@ -272,12 +303,17 @@ function assertSubset(actual, expected, prefix = "result") {
 }
 
 function makeTempRoot(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  registerTempCleanup();
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  trackedTempRoots.add(rootDir);
+  return rootDir;
 }
 
 module.exports = {
   assertSubset,
   buildFixtureState,
+  cleanupTrackedTempRoots,
+  copyRuntimeFixtureFiles,
   deepMerge,
   loadFixtureMap,
   makeBaseSession,

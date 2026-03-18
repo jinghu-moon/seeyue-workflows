@@ -13,6 +13,7 @@ const { readSession } = require("./store.cjs");
 const { applyRuntimeTransition } = require("./transition-applier.cjs");
 const { applyRuntimeStateRepair } = require("./state-repair.cjs");
 const { buildReviewActionContext, buildVerifyActionContext } = require("./verification-evidence.cjs");
+const { shouldBlockForInteraction } = require("./interaction-router.cjs");
 
 const REPORT_RELATIVE_PATH = ".ai/analysis/ai.report.json";
 const ALLOWED_MODES = new Set(["run", "resume", "verify"]);
@@ -267,6 +268,10 @@ function evaluateLoopContinuation(mode, decision, applyResult, loopConfig, hopCo
   const budgetStopReason = detectLoopBudgetStopReason(session);
   if (budgetStopReason) {
     return { continue_loop: false, stop_reason: budgetStopReason };
+  }
+
+  if (shouldBlockForInteraction(session)) {
+    return { continue_loop: false, stop_reason: "interaction_pending" };
   }
 
   if (session.approvals?.pending === true) {
