@@ -21,3 +21,5 @@ Thumbs.db
 *.sy-bak
 .seeyue/
 seeyue-mcp/seeyue-mcp/
+tests/sandbox/*.exe
+tests/sandbox/*.pdb
