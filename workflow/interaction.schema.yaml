@@ -1,0 +1,400 @@
+﻿schema_kind: interaction_schema
+schema_version: 1
+schema_dialect: seeyue_workflow_schema/v1
+status: draft
+owner: seeyue-workflows
+meta:
+  purpose: Define the machine-readable interaction contract shared by runtime, hooks, MCP, and sy-interact.
+  authority: machine_source_of_truth
+  primary_consumers:
+    - runtime
+    - hooks
+    - host_wrapper
+    - sy_interact
+    - mcp_server
+    - adapters
+  source_documents:
+    - docs/interaction-tui-architecture.md
+    - docs/sy-interact-cli-spec.md
+    - docs/hooks-mcp-interaction-refactor-plan.md
+capabilities:
+  presentation_modes:
+    - tui_menu
+    - text_menu
+    - plain_prompt
+  selection_modes:
+    - boolean
+    - single_select
+    - multi_select
+    - text
+    - number
+    - path
+    - secret
+  comment_modes:
+    - disabled
+    - optional
+    - required
+  color_profiles:
+    - auto
+    - mono
+    - ansi16
+    - ansi256
+    - rgb24
+  risk_levels:
+    - low
+    - medium
+    - high
+    - critical
+request_envelope:
+  type: object
+  additional_properties: false
+  required:
+    - schema
+    - interaction_id
+    - kind
+    - status
+    - title
+    - message
+    - selection_mode
+    - options
+    - comment_mode
+    - presentation
+    - originating_request_id
+    - created_at
+  properties:
+    schema:
+      type: integer
+      const: 1
+    interaction_id:
+      type: string
+      pattern: ^ix-[0-9]{8}-[0-9]{3,}$
+    kind:
+      type: string
+      enum:
+        - approval_request
+        - restore_request
+        - question_request
+        - input_request
+        - conflict_resolution
+        - handoff_notice
+    status:
+      type: string
+      enum:
+        - pending
+        - answered
+        - cancelled
+        - expired
+        - failed
+        - superseded
+    title:
+      type: string
+    message:
+      type: string
+    detail:
+      type: string
+      nullable: true
+    reason_code:
+      type: string
+      nullable: true
+    risk_level:
+      type: string
+      enum:
+        - low
+        - medium
+        - high
+        - critical
+      nullable: true
+    blocker_kind:
+      type: string
+      enum:
+        - none
+        - approval
+        - restore
+        - question
+        - input
+        - policy
+        - trust
+      nullable: true
+    selection_mode:
+      type: string
+      enum:
+        - boolean
+        - single_select
+        - multi_select
+        - text
+        - number
+        - path
+        - secret
+    options:
+      type: array
+      min_items: 0
+      items:
+        type: object
+        additional_properties: false
+        required:
+          - id
+          - label
+        properties:
+          id:
+            type: string
+          label:
+            type: string
+          description:
+            type: string
+            nullable: true
+          recommended:
+            type: boolean
+            default: false
+          danger:
+            type: boolean
+            default: false
+          disabled:
+            type: boolean
+            default: false
+          requires_comment:
+            type: boolean
+            default: false
+          metadata:
+            type: object
+            nullable: true
+    default_option_ids:
+      type: array
+      items:
+        type: string
+      nullable: true
+    comment_mode:
+      type: string
+      enum:
+        - disabled
+        - optional
+        - required
+    comment_label:
+      type: string
+      nullable: true
+    comment_placeholder:
+      type: string
+      nullable: true
+    scope:
+      type: object
+      additional_properties: false
+      nullable: true
+      properties:
+        files:
+          type: array
+          items:
+            type: string
+          nullable: true
+        commands:
+          type: array
+          items:
+            type: string
+          nullable: true
+        directories:
+          type: array
+          items:
+            type: string
+          nullable: true
+        services:
+          type: array
+          items:
+            type: string
+          nullable: true
+    recommended_next:
+      type: array
+      items:
+        type: object
+      nullable: true
+    presentation:
+      type: object
+      additional_properties: false
+      required:
+        - mode
+        - color_profile
+        - theme
+      properties:
+        mode:
+          type: string
+          enum:
+            - tui_menu
+            - text_menu
+            - plain_prompt
+        color_profile:
+          type: string
+          enum:
+            - auto
+            - mono
+            - ansi16
+            - ansi256
+            - rgb24
+        theme:
+          type: string
+          enum:
+            - auto
+            - dark
+            - light
+        accent_token:
+          type: string
+          enum:
+            - danger
+            - warning
+            - success
+            - info
+            - focus
+            - muted
+          nullable: true
+        show_details_by_default:
+          type: boolean
+          default: false
+        allow_alternate_screen:
+          type: boolean
+          default: true
+        keymap:
+          type: object
+          additional_properties: true
+          nullable: true
+    originating_request_id:
+      type: string
+    origin:
+      type: object
+      additional_properties: false
+      nullable: true
+      properties:
+        source:
+          type: string
+          enum:
+            - runtime
+            - hook_client
+            - mcp
+            - adapter
+            - host_wrapper
+        event_name:
+          type: string
+          nullable: true
+        node_id:
+          type: string
+          nullable: true
+        phase_id:
+          type: string
+          nullable: true
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+response_envelope:
+  type: object
+  additional_properties: false
+  required:
+    - schema
+    - interaction_id
+    - status
+    - answer_form
+    - submitted_at
+    - presenter
+  properties:
+    schema:
+      type: integer
+      const: 1
+    interaction_id:
+      type: string
+      pattern: ^ix-[0-9]{8}-[0-9]{3,}$
+    status:
+      type: string
+      enum:
+        - answered
+        - cancelled
+        - timeout
+        - failed
+    answer_form:
+      type: string
+      enum:
+        - boolean
+        - single_select
+        - multi_select
+        - text
+        - number
+        - path
+        - secret
+    bool_value:
+      type: boolean
+      nullable: true
+    selected_option_ids:
+      type: array
+      items:
+        type: string
+      nullable: true
+    text_value:
+      type: string
+      nullable: true
+    number_value:
+      type: number
+      nullable: true
+    path_value:
+      type: string
+      nullable: true
+    secret_ref:
+      type: string
+      nullable: true
+    comment:
+      type: string
+      nullable: true
+    response_analysis:
+      type: object
+      additional_properties: false
+      nullable: true
+      properties:
+        comment_conflicts_with_answer:
+          type: boolean
+          default: false
+        needs_clarification:
+          type: boolean
+          default: false
+        clarification_reason:
+          type: string
+          nullable: true
+    submitted_at:
+      type: string
+      format: date-time
+    presenter:
+      type: object
+      additional_properties: false
+      required:
+        - name
+        - mode
+      properties:
+        name:
+          type: string
+          const: sy-interact
+        version:
+          type: string
+          nullable: true
+        mode:
+          type: string
+          enum:
+            - tui_menu
+            - text_menu
+            - plain_prompt
+        color_depth:
+          type: string
+          enum:
+            - mono
+            - ansi16
+            - ansi256
+            - rgb24
+          nullable: true
+        terminal_kind:
+          type: string
+          nullable: true
+validation_rules:
+  - Interaction requests MUST be created by runtime or a runtime-authorized bridge, not by free-form prompt text.
+  - Presentation metadata MUST NOT change business semantics.
+  - Structured answers MUST take precedence over free-form comment.
+  - If comment conflicts with structured answer, response_analysis.needs_clarification MUST be true.
+  - Secret input MUST NOT be persisted in clear text inside the normal comment field.
+  - Option identifiers MUST remain stable and machine-readable.
+  - High-risk interactions SHOULD declare risk_level and scope.
+  - Interaction identifiers MUST remain unique within a run.
+  - Response status MUST describe presenter outcome, not policy outcome.
+  - A valid denial by the user MUST still be represented as a successful response object.
