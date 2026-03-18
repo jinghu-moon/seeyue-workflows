@@ -4,6 +4,7 @@
 // The binary entry point remains in main.rs.
 
 pub mod app_state;
+pub mod interaction;
 pub mod encoding;
 pub mod error;
 pub mod git;
