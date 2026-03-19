@@ -4,11 +4,10 @@
 // Run: cargo test --test symbol_references
 
 use seeyue_mcp::tools::find_referencing_symbols::{
-    find_enclosing_symbol, ReferenceEntry, run_find_referencing_symbols,
+    find_enclosing_symbol, run_find_referencing_symbols,
     FindReferencingSymbolsParams,
 };
 use seeyue_mcp::tools::get_symbols_overview::OverviewSymbol;
-use seeyue_mcp::lsp::LspSymbolKind;
 
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;

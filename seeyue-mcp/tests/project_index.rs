@@ -3,7 +3,7 @@
 // Run: cargo test --test project_index
 
 use std::fs;
-use seeyue_mcp::tools::project_index::{ProjectIndex, IndexEntry};
+use seeyue_mcp::tools::project_index::ProjectIndex;
 
 // A-N6 test 1: build generates valid JSON file
 #[test]
