@@ -336,3 +336,85 @@ pub fn parse_regex_fallback(source: &str, lang: &str) -> Vec<Symbol> {
 
     symbols
 }
+
+// ─── TsSymbol: nested tree representation ────────────────────────────────────
+
+/// Nested symbol tree node for symbol-first navigation.
+/// Children represent symbols lexically contained within the parent
+/// (e.g. methods inside an impl block).
+#[derive(Debug, Clone)]
+pub struct TsSymbol {
+    pub name:       String,
+    pub kind:       String,
+    pub start_line: usize, // 1-indexed
+    pub end_line:   usize, // 1-indexed
+    pub children:   Vec<TsSymbol>,
+}
+
+impl TsSymbol {
+    /// Generate a `name_path` string, e.g. "MyStruct/new" or "top_level_fn".
+    /// For overloads, callers append `[idx]` before calling this method.
+    pub fn to_name_path(&self, parent: Option<&str>) -> String {
+        match parent {
+            Some(p) => format!("{}/{}", p, self.name),
+            None    => self.name.clone(),
+        }
+    }
+}
+
+/// Extract symbols from `source` written in `language` and return a nested
+/// `TsSymbol` tree.  Builds on the existing flat `extract_symbols()` by
+/// assembling parent→children relationships using the `parent` field.
+///
+/// Supported languages: rust, python, typescript, tsx, go.
+/// Unsupported languages: returns an empty vec (no panic).
+pub fn extract_ts_symbols(source: &str, language: &str) -> Vec<TsSymbol> {
+    if source.is_empty() {
+        return vec![];
+    }
+
+    let flat = extract_symbols(language, source, 2);
+    build_tree(flat)
+}
+
+/// Convert a flat `Symbol` list (with optional `parent` field) into a nested
+/// `TsSymbol` tree.  Symbols without a parent become roots; symbols with a
+/// parent are attached as children.
+fn build_tree(flat: Vec<Symbol>) -> Vec<TsSymbol> {
+    // Collect parent names to know which symbols are containers.
+    // Pass 1: build all TsSymbol nodes (ignoring parent links for now).
+    // We use an index-based approach: store (parent_name, TsSymbol) pairs,
+    // then attach children to parents.
+
+    // Separate roots from children.
+    let mut roots: Vec<TsSymbol> = Vec::new();
+    let mut children_map: std::collections::HashMap<String, Vec<TsSymbol>> =
+        std::collections::HashMap::new();
+
+    for sym in flat {
+        let ts = TsSymbol {
+            name:       sym.name.clone(),
+            kind:       sym.kind.clone(),
+            start_line: sym.line,
+            end_line:   sym.end_line,
+            children:   vec![],
+        };
+        match &sym.parent {
+            Some(p) if !p.is_empty() => {
+                children_map.entry(p.clone()).or_default().push(ts);
+            }
+            _ => {
+                roots.push(ts);
+            }
+        }
+    }
+
+    // Attach children to matching root nodes.
+    for root in &mut roots {
+        if let Some(kids) = children_map.remove(&root.name) {
+            root.children = kids;
+        }
+    }
+
+    roots
+}

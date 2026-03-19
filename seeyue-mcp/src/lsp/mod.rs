@@ -8,6 +8,92 @@ use crate::error::ToolError;
 
 mod protocol;
 
+// ─── Symbol types ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum LspSymbolKind {
+    File,
+    Module,
+    Namespace,
+    Package,
+    Class,
+    Method,
+    Property,
+    Field,
+    Constructor,
+    Enum,
+    Interface,
+    Function,
+    Variable,
+    Constant,
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    Key,
+    Null,
+    EnumMember,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+    Other,
+}
+
+impl LspSymbolKind {
+    fn from_lsp_kind(k: u64) -> Self {
+        match k {
+            1  => LspSymbolKind::File,
+            2  => LspSymbolKind::Module,
+            3  => LspSymbolKind::Namespace,
+            4  => LspSymbolKind::Package,
+            5  => LspSymbolKind::Class,
+            6  => LspSymbolKind::Method,
+            7  => LspSymbolKind::Property,
+            8  => LspSymbolKind::Field,
+            9  => LspSymbolKind::Constructor,
+            10 => LspSymbolKind::Enum,
+            11 => LspSymbolKind::Interface,
+            12 => LspSymbolKind::Function,
+            13 => LspSymbolKind::Variable,
+            14 => LspSymbolKind::Constant,
+            15 => LspSymbolKind::String,
+            16 => LspSymbolKind::Number,
+            17 => LspSymbolKind::Boolean,
+            18 => LspSymbolKind::Array,
+            19 => LspSymbolKind::Object,
+            20 => LspSymbolKind::Key,
+            21 => LspSymbolKind::Null,
+            22 => LspSymbolKind::EnumMember,
+            23 => LspSymbolKind::Struct,
+            24 => LspSymbolKind::Event,
+            25 => LspSymbolKind::Operator,
+            26 => LspSymbolKind::TypeParameter,
+            _  => LspSymbolKind::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LspSymbol {
+    pub name:       String,
+    pub kind:       LspSymbolKind,
+    pub start_line: usize, // 1-indexed
+    pub end_line:   usize, // 1-indexed
+    pub children:   Vec<LspSymbol>,
+}
+
+impl LspSymbol {
+    /// Generate a name_path string, e.g. "MyStruct/new" or "top_level_fn".
+    pub fn name_path(&self, parent: Option<&str>) -> String {
+        match parent {
+            Some(p) => format!("{}/{}", p, self.name),
+            None    => self.name.clone(),
+        }
+    }
+}
+
 pub struct LspLocation {
     pub path:   PathBuf,
     pub line:   usize,
@@ -267,6 +353,25 @@ impl LspSession {
         let result = self.send_request("textDocument/references", params)?;
         Ok(parse_locations(&result))
     }
+
+    pub fn request_document_symbols(
+        &mut self,
+        path: &Path,
+        language_id: &str,
+        text: &str,
+    ) -> Result<Vec<LspSymbol>, ToolError> {
+        self.ensure_initialized()?;
+
+        let uri = path_to_uri(path);
+        self.open_document(&uri, language_id, text)?;
+
+        let params = json!({
+            "textDocument": { "uri": uri },
+        });
+
+        let result = self.send_request("textDocument/documentSymbol", params)?;
+        Ok(parse_document_symbols(&result))
+    }
 }
 
 // ─── LSP server discovery ───────────────────────────────────────────────────
@@ -298,16 +403,43 @@ fn discover_server(language: &str) -> Result<(String, Vec<String>), ToolError> {
             } else {
                 Err(ToolError::LspNotAvailable {
                     language: language.to_string(),
-                    hint: "Install pyright-langserver or pylsp.".into(),
+                    hint: "Install pyright-langserver (`pip install pyright`) or pylsp (`pip install python-lsp-server`). Set AGENT_EDITOR_LSP_CMD to override.".into(),
                 })
             }
         }
         "go" => pick_cmd(language, "gopls", vec![]),
+        "c" | "cpp" => pick_cmd(language, "clangd", vec![]),
+        "kotlin" => pick_cmd(language, "kotlin-language-server", vec![]),
+        "css" | "scss" | "less" => {
+            pick_cmd(language, "vscode-css-language-server", vec!["--stdio".into()])
+        }
+        "vue" => pick_cmd(language, "vue-language-server", vec!["--stdio".into()]),
+        "shell" | "bash" | "sh" => {
+            pick_cmd(language, "bash-language-server", vec!["start".into()])
+        }
+        "markdown" | "md" => pick_cmd(language, "marksman", vec![]),
+        "json" => {
+            pick_cmd(language, "vscode-json-language-server", vec!["--stdio".into()])
+        }
+        "toml" => pick_cmd(language, "taplo", vec!["lsp".into(), "stdio".into()]),
+        "yaml" | "yml" => {
+            pick_cmd(language, "yaml-language-server", vec!["--stdio".into()])
+        }
+        "bat" => Err(ToolError::LspNotAvailable {
+            language: language.to_string(),
+            hint: "No LSP server is available for Windows batch (.bat) files. Set AGENT_EDITOR_LSP_CMD to use a custom server.".into(),
+        }),
         _ => Err(ToolError::LspNotAvailable {
             language: language.to_string(),
-            hint: "No LSP server mapping for this language.".into(),
+            hint: format!("No LSP server mapping for language '{language}'. Install the appropriate server and set AGENT_EDITOR_LSP_CMD=<cmd> to override."),
         }),
     }
+}
+
+/// Public wrapper for testing discover_server without PATH checks bypassed.
+/// Exposed only for integration tests.
+pub fn discover_server_for_test(language: &str) -> Result<(String, Vec<String>), ToolError> {
+    discover_server(language)
 }
 
 fn pick_cmd(language: &str, cmd: &str, args: Vec<String>) -> Result<(String, Vec<String>), ToolError> {
@@ -405,4 +537,64 @@ fn parse_range(uri: &str, range: &Value) -> Option<LspLocation> {
     let column = start.get("character")?.as_u64()? as usize + 1;
     let path = uri_to_path(uri)?;
     Some(LspLocation { path, line, column })
+}
+
+// ─── DocumentSymbol parsing ──────────────────────────────────────────────────
+
+/// Parse the result of textDocument/documentSymbol.
+/// Handles both DocumentSymbol[] (nested, has "children") and
+/// SymbolInformation[] (flat, has "location").
+pub fn parse_document_symbols(value: &Value) -> Vec<LspSymbol> {
+    match value {
+        Value::Array(arr) if !arr.is_empty() => {
+            if arr[0].get("children").is_some()
+                || (arr[0].get("range").is_some() && arr[0].get("location").is_none())
+            {
+                arr.iter().filter_map(parse_document_symbol_node).collect()
+            } else {
+                arr.iter().filter_map(parse_symbol_information).collect()
+            }
+        }
+        _ => vec![],
+    }
+}
+
+fn parse_document_symbol_node(value: &Value) -> Option<LspSymbol> {
+    let name       = value.get("name")?.as_str()?.to_string();
+    let kind       = value.get("kind").and_then(|k| k.as_u64()).unwrap_or(0);
+    let range      = value.get("range")?;
+    let start      = range.get("start")?;
+    let end        = range.get("end")?;
+    let start_line = start.get("line")?.as_u64()? as usize + 1;
+    let end_line   = end.get("line")?.as_u64()? as usize + 1;
+    let children   = value
+        .get("children")
+        .and_then(|c| c.as_array())
+        .map(|arr| arr.iter().filter_map(parse_document_symbol_node).collect())
+        .unwrap_or_default();
+    Some(LspSymbol {
+        name,
+        kind: LspSymbolKind::from_lsp_kind(kind),
+        start_line,
+        end_line,
+        children,
+    })
+}
+
+fn parse_symbol_information(value: &Value) -> Option<LspSymbol> {
+    let name       = value.get("name")?.as_str()?.to_string();
+    let kind       = value.get("kind").and_then(|k| k.as_u64()).unwrap_or(0);
+    let location   = value.get("location")?;
+    let range      = location.get("range")?;
+    let start      = range.get("start")?;
+    let end        = range.get("end")?;
+    let start_line = start.get("line")?.as_u64()? as usize + 1;
+    let end_line   = end.get("line")?.as_u64()? as usize + 1;
+    Some(LspSymbol {
+        name,
+        kind: LspSymbolKind::from_lsp_kind(kind),
+        start_line,
+        end_line,
+        children: vec![],
+    })
 }

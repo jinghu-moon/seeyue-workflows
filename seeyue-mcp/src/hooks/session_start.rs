@@ -143,3 +143,15 @@ fn workflow_context(session: &SessionState) -> Option<String> {
 
     Some(lines.join("\n"))
 }
+
+/// Trigger an incremental index update in a background thread (non-blocking).
+/// Called from the SessionStart hook; failures are silently logged to stderr.
+pub fn trigger_index_update(workspace: &std::path::Path) {
+    let workspace = workspace.to_path_buf();
+    std::thread::spawn(move || {
+        match crate::tools::project_index::ProjectIndex::update(&workspace) {
+            Ok(_)  => {},
+            Err(e) => eprintln!("[seeyue-mcp] index update warning: {:?}", e),
+        }
+    });
+}

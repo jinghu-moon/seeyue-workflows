@@ -1,6 +1,7 @@
 // src/server/mod.rs — SeeyueMcpServer: struct, new(), ServerHandler, prompt_router
 
 pub mod util;
+pub mod schema;
 pub mod tools_core;
 pub mod tools_nav;
 pub mod tools_git;
