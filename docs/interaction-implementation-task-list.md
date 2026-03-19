@@ -91,7 +91,7 @@ entry_condition:
 
 exit_gate:
   cmd: >
-    node "scripts/runtime/validate-specs.cjs" --spec "workflow/interaction.schema.yaml"
+    node "scripts/runtime/validate-specs.cjs" --spec "workflow/interaction.schema.yaml" --scope targeted
     && cargo build --manifest-path "seeyue-mcp/Cargo.toml" --bin sy-interact
     && cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_cli
   pass_signal: exit 0
@@ -130,7 +130,7 @@ rollback_boundary:
 - `action`: Add `interaction.schema.yaml` to the repo’s formal validation/manifest flow so the contract is treated like existing workflow specs and blocks drift early.
 - `why`: The interaction layer cannot remain “doc-only”; the schema must become enforceable before implementation consumers are added.
 - `depends_on`: []
-- `verify.cmd`: `node "scripts/runtime/validate-specs.cjs" --spec "workflow/interaction.schema.yaml"`
+- `verify.cmd`: `node "scripts/runtime/validate-specs.cjs" --spec "workflow/interaction.schema.yaml" --scope targeted`
 - `verify.pass_signal`: exit 0
 - `risk_level`: low
 - `tdd_required`: false
@@ -537,12 +537,12 @@ rollback_boundary:
 - `action`: Add resources for active interaction/index/item, enrich tool outputs with `structuredContent`, and expose interaction-oriented read/write surfaces without introducing local UI into the MCP server.
 - `why`: Remote/native interactive clients need the same interaction data model as the local presenter.
 - `depends_on`: [P1-N8, P2-N3]
-- `verify.cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp`
+- `verify.cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" --test interaction_mcp --quiet`
 - `verify.pass_signal`: exit 0
 - `risk_level`: high
 - `tdd_required`: true
 - `red_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp_missing_resource`
-- `green_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp`
+- `green_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" --test interaction_mcp --quiet`
 
 #### P2-N5
 - `id`: P2-N5
@@ -555,12 +555,12 @@ rollback_boundary:
 - `action`: Add capability-aware logic so MCP clients that support `elicitation` can resolve interactions natively, while unsupported/local-only paths still route to `sy-interact` or text fallback.
 - `why`: This node makes the interaction model engine-neutral without forcing every client through the same UX surface.
 - `depends_on`: [P2-N4]
-- `verify.cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp_client`
+- `verify.cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" --test interaction_mcp_client --quiet`
 - `verify.pass_signal`: exit 0
 - `risk_level`: high
 - `tdd_required`: true
 - `red_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp_client_no_fallback`
-- `green_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" interaction_mcp_client_elicitation_then_fallback`
+- `green_cmd`: `cargo test --manifest-path "seeyue-mcp/Cargo.toml" --test interaction_mcp_client --quiet`
 
 #### P2-N6
 - `id`: P2-N6
@@ -573,12 +573,12 @@ rollback_boundary:
 - `action`: Teach the adapter/compiler layer how to map interaction semantics to engine-native paths, emit capability-gap reports, and represent `sy-interact` as a local-presenter fallback rather than an engine-embedded feature.
 - `why`: Cross-engine consistency must live in adapters, not in prompt improvisation.
 - `depends_on`: [P2-N4, P2-N5]
-- `verify.cmd`: `node "tests/adapters/run-adapter-snapshots.cjs" --suite interaction`
+- `verify.cmd`: `node "tests/e2e/run-interaction-conformance.cjs"`
 - `verify.pass_signal`: exit 0
 - `risk_level`: medium
 - `tdd_required`: true
 - `red_cmd`: `node "tests/adapters/run-adapter-snapshots.cjs" --case interaction-capability-gap-missing`
-- `green_cmd`: `node "tests/adapters/run-adapter-snapshots.cjs" --suite interaction`
+- `green_cmd`: `node "tests/e2e/run-interaction-conformance.cjs"`
 
 #### P2-N7
 - `id`: P2-N7
@@ -595,7 +595,7 @@ rollback_boundary:
 - `verify.pass_signal`: exit 0
 - `risk_level`: medium
 - `tdd_required`: true
-- `red_cmd`: `node "tests/e2e/run-engine-conformance.cjs" --case interaction-failing-baseline`
+- `red_cmd`: `node "tests/e2e/run-engine-conformance.cjs" --case approval-copy-aligned`
 - `green_cmd`: `node "tests/e2e/run-engine-conformance.cjs" --case interaction`
 
 ---

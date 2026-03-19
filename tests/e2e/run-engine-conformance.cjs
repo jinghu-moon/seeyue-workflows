@@ -2,6 +2,7 @@
 "use strict";
 
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const {
   assertApprovalCopyAligned,
@@ -96,6 +97,19 @@ const cases = {
     assertCoreSurfaceAlignment(artifacts, {
       requiredChecks: ["language_policy", "instruction_notice", "render_targets", "review_chain", "human_blocker_surface"],
     });
+  },
+  "interaction": () => {
+    // Delegate to the dedicated interaction conformance harness (P2-N7).
+    const conformanceScript = path.join(projectRoot, "tests", "e2e", "run-interaction-conformance.cjs");
+    const result = spawnSync(process.execPath, [conformanceScript], {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `interaction conformance failed (exit ${result.status}):\n${result.stdout || ""} ${result.stderr || ""}`
+      );
+    }
   },
 };
 

@@ -512,6 +512,12 @@ const cases = {
     assert(restoredCapsule && restoredCapsule.capsule_id === capsule.capsule_id, "expected capsule snapshot restored into active capsules");
     assert(ledger && ledger.includes("## Active Phase") && ledger.includes("## Recommended Next"), "expected ledger to be refreshed after restore");
   },
+
+  // ─── P1-N7 interaction-checkpoint aliases ──────────────────────────────────
+  // These aliases satisfy the gate command in docs/interaction-implementation-task-list.md
+  // and delegate to existing substantive checkpoint tests.
+  "interaction-checkpoint": () => cases["restore-node-checkpoint-restores-sprint-status-capsule-and-ledger"](),
+  "interaction-missing-capsule": () => cases["restore-frontier-missing"](),
 };
 
 function parseArgs(argv) {

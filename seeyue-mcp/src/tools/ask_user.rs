@@ -162,7 +162,7 @@ pub fn run_ask_user(
         actor:   "tool".into(),
         payload: Some(serde_json::json!({
             "question_id": question_id,
-            "question":    params.question,
+            "question":    params.question.clone(),
         })),
         phase:    None,
         node_id:  None,
@@ -171,12 +171,88 @@ pub fn run_ask_user(
         trace_id: None,
     });
 
+    // P2-N3: project into canonical interaction store (best-effort, non-blocking)
+    let _ = project_ask_as_interaction(
+        &question_id,
+        &params.question,
+        params.options.as_deref(),
+        params.default.as_deref(),
+        workflow_dir,
+    );
+
     Ok(AskUserResult {
         kind:        "pending".into(),
         question_id,
         question:    params.question,
         notified:    toast.notified,
     })
+}
+
+// ─── P2-N3: Interaction Projection ───────────────────────────────────────────
+//
+// Projects a legacy ask_user request into the canonical interaction store
+// (.ai/workflow/interactions/requests/). Additive-only — questions.jsonl unchanged.
+
+pub fn project_ask_as_interaction(
+    question_id: &str,
+    question: &str,
+    options: Option<&[String]>,
+    default: Option<&str>,
+    workflow_dir: &Path,
+) -> Result<(), ToolError> {
+    let requests_dir = workflow_dir.join("interactions").join("requests");
+    fs::create_dir_all(&requests_dir)
+        .map_err(|e| ToolError::IoError { message: format!("create interactions/requests dir: {e}") })?;
+
+    let ts = Utc::now().to_rfc3339();
+    // interaction_id must match ^ix-[0-9]{8}-[0-9]{3,}$
+    let date8 = &ts[..10].replace('-', "");
+    // Use last 6 digits of question_id (timestamp_ms suffix) as sequence
+    let seq = question_id.trim_start_matches(|c: char| !c.is_ascii_digit())
+        .chars().rev().take(6).collect::<String>()
+        .chars().rev().collect::<String>();
+    let seq = if seq.len() >= 3 { seq } else { format!("{:03}", 0) };
+    let interaction_id = format!("ix-{}-{}", date8, seq);
+
+    let has_options = options.map(|o| !o.is_empty()).unwrap_or(false);
+    let selection_mode = if has_options { "single_select" } else { "text" };
+
+    let ix_options: Vec<serde_json::Value> = options
+        .unwrap_or(&[])
+        .iter()
+        .map(|o| serde_json::json!({ "id": o, "label": o, "recommended": false }))
+        .collect();
+
+    // Map `default` string to default_option_ids array (schema field)
+    let default_option_ids: Option<Vec<&str>> = default.map(|d| vec![d]);
+
+    let obj = serde_json::json!({
+        "schema": 1,
+        "interaction_id": interaction_id,
+        "kind": "question_request",
+        "status": "pending",
+        "title": question,
+        "message": question,
+        "selection_mode": selection_mode,
+        "options": ix_options,
+        "default_option_ids": default_option_ids,
+        "comment_mode": "disabled",
+        "presentation": {
+            "mode": "text_menu",
+            "color_profile": "auto",
+            "theme": "auto"
+        },
+        "originating_request_id": question_id,
+        "created_at": ts,
+    });
+
+    let file_path = requests_dir.join(format!("{}.json", question_id));
+    let content = serde_json::to_string_pretty(&obj)
+        .map_err(|e| ToolError::IoError { message: format!("serialize ask interaction: {e}") })?;
+    fs::write(&file_path, format!("{content}\n"))
+        .map_err(|e| ToolError::IoError { message: format!("write ask interaction file: {e}") })?;
+
+    Ok(())
 }
 
 // ─── sy_ask_user_status ──────────────────────────────────────────────────────

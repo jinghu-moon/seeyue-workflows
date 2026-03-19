@@ -171,7 +171,7 @@ pub fn run_input_request(
         payload: Some(serde_json::json!({
             "request_id": request_id,
             "prompt":     params.prompt,
-            "kind":       kind_str,
+            "kind":       kind_str.clone(),
         })),
         phase:    None,
         node_id:  None,
@@ -180,12 +180,92 @@ pub fn run_input_request(
         trace_id: None,
     });
 
+    // P2-N3: project into canonical interaction store (best-effort, non-blocking)
+    let _ = project_input_as_interaction(
+        &request_id,
+        &params.prompt,
+        &kind_str,
+        params.language.as_deref(),
+        params.example.as_deref(),
+        workflow_dir,
+    );
+
     Ok(InputRequestResult {
         kind:       "pending".into(),
         request_id,
         prompt:     params.prompt,
         notified:   toast.notified,
     })
+}
+
+// ─── P2-N3: Interaction Projection ───────────────────────────────────────────
+//
+// Projects a legacy input_request into the canonical interaction store
+// (.ai/workflow/interactions/requests/). Additive-only — input_requests.jsonl unchanged.
+
+pub fn project_input_as_interaction(
+    request_id: &str,
+    prompt: &str,
+    kind: &str,
+    language: Option<&str>,
+    example: Option<&str>,
+    workflow_dir: &Path,
+) -> Result<(), ToolError> {
+    let requests_dir = workflow_dir.join("interactions").join("requests");
+    fs::create_dir_all(&requests_dir)
+        .map_err(|e| ToolError::IoError { message: format!("create interactions/requests dir: {e}") })?;
+
+    let ts = Utc::now().to_rfc3339();
+    // interaction_id must match ^ix-[0-9]{8}-[0-9]{3,}$
+    let date8 = &ts[..10].replace('-', "");
+    let seq = request_id.trim_start_matches(|c: char| !c.is_ascii_digit())
+        .chars().rev().take(6).collect::<String>()
+        .chars().rev().collect::<String>();
+    let seq = if seq.len() >= 3 { seq } else { format!("{:03}", 0) };
+    let interaction_id = format!("ix-{}-{}", date8, seq);
+
+    // Map input kind to schema-legal selection_mode
+    let selection_mode = match kind {
+        "file_path" => "path",
+        "secret"    => "secret",
+        _           => "text",
+    };
+
+    // Store extra input metadata in detail field (schema allows nullable string)
+    let detail = match (language, example) {
+        (Some(lang), Some(ex)) => Some(format!("language: {}; example: {}", lang, ex)),
+        (Some(lang), None)     => Some(format!("language: {}", lang)),
+        (None, Some(ex))       => Some(format!("example: {}", ex)),
+        (None, None)           => None,
+    };
+
+    let obj = serde_json::json!({
+        "schema": 1,
+        "interaction_id": interaction_id,
+        "kind": "input_request",
+        "status": "pending",
+        "title": prompt,
+        "message": prompt,
+        "detail": detail,
+        "selection_mode": selection_mode,
+        "options": [],
+        "comment_mode": "disabled",
+        "presentation": {
+            "mode": "text_menu",
+            "color_profile": "auto",
+            "theme": "auto"
+        },
+        "originating_request_id": request_id,
+        "created_at": ts,
+    });
+
+    let file_path = requests_dir.join(format!("{}.json", request_id));
+    let content = serde_json::to_string_pretty(&obj)
+        .map_err(|e| ToolError::IoError { message: format!("serialize input interaction: {e}") })?;
+    fs::write(&file_path, format!("{content}\n"))
+        .map_err(|e| ToolError::IoError { message: format!("write input interaction file: {e}") })?;
+
+    Ok(())
 }
 
 // ─── sy_input_status ─────────────────────────────────────────────────────────

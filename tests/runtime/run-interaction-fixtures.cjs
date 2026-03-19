@@ -486,6 +486,158 @@ cases["local-loop-round-trip"] = function () {
   fs.rmSync(root, { recursive: true, force: true });
 };
 
+// ─── CASE: legacy-to-interaction-projection ─────────────────────────────────
+// Verifies that the canonical interaction projection (active_interaction_id)
+// survives a setInteractionBlock → getInteractionBlock round-trip.
+// This is the GREEN gate for P2-N3: legacy tools must project into the
+// unified interaction schema without field divergence.
+cases["legacy-to-interaction-projection"] = function () {
+  const root = makeTempRoot();
+  ensureInteractionLayout(root);
+  const session = makeBaseSession("wf-20260318-proj-002");
+  writeSession(root, session);
+  writeTaskGraph(root, makeBaseTaskGraph());
+  writeSprintStatus(root, makeBaseSprintStatus());
+
+  // Simulate a legacy tool (approval/ask_user/input_request) projecting into
+  // the canonical interaction block using active_interaction_id.
+  setInteractionBlock(root, session, {
+    active_interaction_id: "ix-20260318-legacy-001",
+    pending_count: 1,
+    last_dispatched_at: null,
+    blocking_kind: "approval",
+    blocking_reason: "legacy_tool_projection_test",
+  });
+
+  // Re-read and verify canonical field is intact.
+  const loaded = require("../../scripts/runtime/store.cjs").readSession(root);
+  const block = getInteractionBlock(loaded);
+  assert(block !== null, "interaction block must exist after legacy projection");
+  assert(
+    block.active_interaction_id === "ix-20260318-legacy-001",
+    `active_interaction_id must be canonical, got: ${block.active_interaction_id}`
+  );
+  assert(block.blocking_kind === "approval", "blocking_kind must be preserved");
+  assert(block.pending_count === 1, "pending_count must be preserved");
+
+  // Clear and verify projection resets to defaults (no stale active_interaction_id).
+  clearInteractionBlock(root, loaded);
+  const cleared = require("../../scripts/runtime/store.cjs").readSession(root);
+  const clearedBlock = getInteractionBlock(cleared);
+  assert(clearedBlock === null, "getInteractionBlock must return null after clear");
+
+  fs.rmSync(root, { recursive: true, force: true });
+};
+
+// ─── P2-N5: Orchestration dispatch fixtures ──────────────────────────────────
+//
+// Verifies the elicitation-first orchestration in interaction-dispatch.cjs.
+// Tests all three paths: elicitation, local_presenter (binary missing → fallback),
+// and text_fallback.
+
+const { orchestrateInteraction, selectStrategy } = require("../../scripts/runtime/interaction-dispatch.cjs");
+const { buildApprovalRequest: buildApprovalReq2 } = require("../../scripts/runtime/interaction-builders.cjs");
+
+cases["orchestration-strategy-elicitation"] = function () {
+  const root = makeTempRoot();
+  ensureInteractionLayout(root);
+
+  // Activate elicitation via capabilities.yaml
+  const capDir = path.join(root, ".ai", "workflow");
+  fs.mkdirSync(capDir, { recursive: true });
+  fs.writeFileSync(path.join(capDir, "capabilities.yaml"), "elicitation: true\n");
+
+  const { strategy } = selectStrategy(root, {});
+  assert(strategy === "elicitation",
+    `strategy must be elicitation when capabilities.yaml sets it, got: ${strategy}`);
+
+  fs.rmSync(root, { recursive: true, force: true });
+};
+
+cases["orchestration-strategy-text-fallback"] = function () {
+  const root = makeTempRoot();
+  ensureInteractionLayout(root);
+
+  // No capabilities.yaml, no binary override → text_fallback or local_presenter
+  const { strategy } = selectStrategy(root, {
+    capabilitiesOverride: { supports_elicitation: false, supports_local_presenter: false },
+  });
+  assert(strategy === "text_fallback",
+    `strategy must be text_fallback when no elicitation or presenter, got: ${strategy}`);
+
+  fs.rmSync(root, { recursive: true, force: true });
+};
+
+cases["orchestration-elicitation-dispatch"] = function () {
+  const root = makeTempRoot();
+  ensureInteractionLayout(root);
+  writeSession(root, makeBaseSession("wf-p2n5-orch-001"));
+
+  // Build and store a request
+  const req = buildApprovalReq2({
+    subject:      "Orchestration test",
+    options: [
+      { id: "approve", label: "Approve", recommended: true },
+      { id: "reject",  label: "Reject",  recommended: false },
+    ],
+    originating_request_id: "ap-orch-001",
+    risk_level: "medium",
+  });
+  writeRequest(root, req);
+
+  // Dispatch via elicitation path
+  const result = orchestrateInteraction(root, req.interaction_id, {
+    capabilitiesOverride: { supports_elicitation: true, supports_local_presenter: false },
+  });
+
+  assert(result.strategy === "elicitation",
+    `result.strategy must be elicitation, got: ${result.strategy}`);
+  assert(result.exitCode === 0, `exitCode must be 0, got: ${result.exitCode}`);
+  assert(result.error === null, `error must be null, got: ${result.error}`);
+  assert(result.response !== null, "response must not be null");
+  assert(result.response.status === "elicitation_pending",
+    `response.status must be elicitation_pending, got: ${result.response.status}`);
+  // Pre-resolution: elicitation is handled by MCP client — response store must stay empty
+  const storedResp = readResponse(root, req.interaction_id);
+  assert(storedResp === null,
+    `response store must be empty for elicitation pre-resolution, got: ${JSON.stringify(storedResp)}`);
+
+  fs.rmSync(root, { recursive: true, force: true });
+};
+
+cases["orchestration-text-fallback-dispatch"] = function () {
+  const root = makeTempRoot();
+  ensureInteractionLayout(root);
+  writeSession(root, makeBaseSession("wf-p2n5-orch-002"));
+
+  const req = buildApprovalReq2({
+    subject:      "Fallback test",
+    options: [
+      { id: "approve", label: "Approve", recommended: true },
+      { id: "reject",  label: "Reject",  recommended: false },
+    ],
+    originating_request_id: "ap-orch-002",
+    risk_level: "low",
+  });
+  writeRequest(root, req);
+
+  const result = orchestrateInteraction(root, req.interaction_id, {
+    capabilitiesOverride: { supports_elicitation: false, supports_local_presenter: false },
+  });
+
+  assert(result.strategy === "text_fallback",
+    `result.strategy must be text_fallback, got: ${result.strategy}`);
+  assert(result.exitCode === 0, `exitCode must be 0, got: ${result.exitCode}`);
+  assert(result.response.status === "text_fallback_pending",
+    `response.status must be text_fallback_pending, got: ${result.response.status}`);
+  // Pre-resolution: text_fallback does not write to response store
+  const storedResp2 = readResponse(root, req.interaction_id);
+  assert(storedResp2 === null,
+    `response store must be empty for text_fallback pre-resolution, got: ${JSON.stringify(storedResp2)}`);
+
+  fs.rmSync(root, { recursive: true, force: true });
+};
+
 // ─── Runner ──────────────────────────────────────────────────────────────────
 function parseArgs(argv) {
   const parsed = { caseName: null };

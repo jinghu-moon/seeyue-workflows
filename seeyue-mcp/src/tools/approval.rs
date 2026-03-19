@@ -238,9 +238,9 @@ pub fn run_approval_request(
         event:   "approval_requested".into(),
         actor:   "tool".into(),
         payload: Some(serde_json::json!({
-            "approval_id":  approval_id,
-            "subject":      params.subject,
-            "category":     params.category,
+            "approval_id":  approval_id.clone(),
+            "subject":      params.subject.clone(),
+            "category":     params.category.clone(),
             "timeout_secs": params.timeout_secs,
             "expires_at":   expires_at,
         })),
@@ -250,6 +250,15 @@ pub fn run_approval_request(
         ts:       Utc::now().to_rfc3339(),
         trace_id: None,
     });
+
+    // P2-N3: project into canonical interaction store (best-effort, non-blocking)
+    let _ = project_approval_as_interaction(
+        &approval_id,
+        &record.subject,
+        params.detail.as_deref(),
+        params.category.as_deref(),
+        workflow_dir,
+    );
 
     Ok(ApprovalRequestResult {
         kind:         "pending".into(),

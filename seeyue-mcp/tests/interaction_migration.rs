@@ -2,8 +2,11 @@
 //
 // Verifies that project_approval_as_interaction writes a valid
 // interaction file under .ai/workflow/interactions/requests/.
+// Also verifies ask_user and input_request projection functions.
 
 use seeyue_mcp::tools::approval::project_approval_as_interaction;
+use seeyue_mcp::tools::ask_user::project_ask_as_interaction;
+use seeyue_mcp::tools::input_request::project_input_as_interaction;
 use std::fs;
 use tempfile::TempDir;
 
@@ -128,4 +131,123 @@ fn test_approval_projection_idempotent_overwrite() {
         obj["message"].as_str().unwrap_or(""),
         "updated detail"
     );
+}
+
+// ─── ask_user projection ─────────────────────────────────────────────────────
+
+#[test]
+fn test_ask_user_projection_creates_interaction_file() {
+    let tmp = TempDir::new().expect("create tempdir");
+    let workflow_dir = tmp.path().join(".ai").join("workflow");
+    fs::create_dir_all(&workflow_dir).expect("create workflow dir");
+
+    let options = vec!["yes".to_string(), "no".to_string()];
+    project_ask_as_interaction(
+        "qst-test-001",
+        "Do you want to continue?",
+        Some(&options),
+        Some("yes"),
+        &workflow_dir,
+    )
+    .expect("ask projection should succeed");
+
+    // Assert file created under interactions/requests/
+    let file_path = workflow_dir
+        .join("interactions")
+        .join("requests")
+        .join("qst-test-001.json");
+    assert!(file_path.exists(), "ask interaction file must exist");
+
+    let content = fs::read_to_string(&file_path).expect("read ask interaction file");
+    let obj: serde_json::Value = serde_json::from_str(&content).expect("parse JSON");
+
+    assert_eq!(obj["schema"], 1);
+    assert_eq!(obj["kind"].as_str().unwrap_or(""), "question_request",
+        "kind must be question_request (canonical schema value)");
+    assert_eq!(obj["status"].as_str().unwrap_or(""), "pending");
+    assert_eq!(obj["originating_request_id"].as_str().unwrap_or(""), "qst-test-001");
+    assert_eq!(obj["selection_mode"].as_str().unwrap_or(""), "single_select",
+        "selection_mode must be single_select when options are provided");
+    // interaction_id must match ^ix-[0-9]{8}-[0-9]{3,}$
+    let ix_id = obj["interaction_id"].as_str().unwrap_or("");
+    assert!(ix_id.starts_with("ix-"), "interaction_id must start with ix-");
+    let parts: Vec<&str> = ix_id.split('-').collect();
+    assert!(parts.len() >= 3, "interaction_id must have 3 parts");
+    assert_eq!(parts[1].len(), 8, "date part must be 8 digits");
+    assert!(parts[1].chars().all(|c| c.is_ascii_digit()), "date part must be digits");
+    // Options array must contain the two entries
+    let opts = obj["options"].as_array().expect("options must be array");
+    assert_eq!(opts.len(), 2, "must have 2 options");
+    // default_option_ids must map the default value
+    let def_ids = obj["default_option_ids"].as_array().expect("default_option_ids must be array");
+    assert_eq!(def_ids[0].as_str().unwrap_or(""), "yes");
+}
+
+#[test]
+fn test_ask_user_projection_free_text_when_no_options() {
+    let tmp = TempDir::new().expect("create tempdir");
+    let workflow_dir = tmp.path().join(".ai").join("workflow");
+    fs::create_dir_all(&workflow_dir).expect("create workflow dir");
+
+    project_ask_as_interaction(
+        "qst-free-001",
+        "What is your name?",
+        None,
+        None,
+        &workflow_dir,
+    )
+    .expect("ask projection should succeed");
+
+    let file_path = workflow_dir
+        .join("interactions")
+        .join("requests")
+        .join("qst-free-001.json");
+    let content = fs::read_to_string(&file_path).expect("read file");
+    let obj: serde_json::Value = serde_json::from_str(&content).expect("parse JSON");
+
+    assert_eq!(obj["selection_mode"].as_str().unwrap_or(""), "text",
+        "selection_mode must be text when no options");
+}
+
+// ─── input_request projection ─────────────────────────────────────────────────
+
+#[test]
+fn test_input_request_projection_creates_interaction_file() {
+    let tmp = TempDir::new().expect("create tempdir");
+    let workflow_dir = tmp.path().join(".ai").join("workflow");
+    fs::create_dir_all(&workflow_dir).expect("create workflow dir");
+
+    project_input_as_interaction(
+        "inp-test-001",
+        "Enter the file path:",
+        "file_path",
+        None,
+        Some("/src/main.rs"),
+        &workflow_dir,
+    )
+    .expect("input projection should succeed");
+
+    // Assert file created under interactions/requests/
+    let file_path = workflow_dir
+        .join("interactions")
+        .join("requests")
+        .join("inp-test-001.json");
+    assert!(file_path.exists(), "input interaction file must exist");
+
+    let content = fs::read_to_string(&file_path).expect("read input interaction file");
+    let obj: serde_json::Value = serde_json::from_str(&content).expect("parse JSON");
+
+    assert_eq!(obj["schema"], 1);
+    assert_eq!(obj["kind"].as_str().unwrap_or(""), "input_request");
+    assert_eq!(obj["status"].as_str().unwrap_or(""), "pending");
+    assert_eq!(obj["originating_request_id"].as_str().unwrap_or(""), "inp-test-001");
+    // file_path kind maps to selection_mode: path
+    assert_eq!(obj["selection_mode"].as_str().unwrap_or(""), "path",
+        "file_path kind must map to selection_mode=path");
+    // example stored in detail field
+    let detail = obj["detail"].as_str().unwrap_or("");
+    assert!(detail.contains("/src/main.rs"), "example must appear in detail field");
+    // interaction_id must match ^ix-[0-9]{8}-[0-9]{3,}$
+    let ix_id = obj["interaction_id"].as_str().unwrap_or("");
+    assert!(ix_id.starts_with("ix-"), "interaction_id must start with ix-");
 }
