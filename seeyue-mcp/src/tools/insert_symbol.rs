@@ -106,7 +106,7 @@ async fn insert_at_symbol(
     };
 
     // Atomic write
-    let tmp = path.with_extension("rs.tmp");
+    let tmp = { let mut p = path.clone().into_os_string(); p.push(".tmp"); std::path::PathBuf::from(p) };
     std::fs::write(&tmp, &new_content).map_err(|e| ToolError::IoError {
         message: format!("Failed to write tmp: {e}"),
     })?;
