@@ -106,8 +106,8 @@ pub async fn run_find_referencing_symbols(
 
         // Read enclosing file and get symbol tree
         let enc_content = safe_read(&loc.path).ok().map(|d| d.content);
-        let enc_lang    = detect_language(&loc.path);
-        let symbols     = if let Some(ref c) = enc_content {
+        let _enc_lang   = detect_language(&loc.path);
+        let symbols     = if let Some(ref _c) = enc_content {
             let overview = run_get_symbols_overview(
                 GetSymbolsOverviewParams {
                     relative_path: rel.clone(),

@@ -10,7 +10,6 @@ use crate::app_state::AppState;
 use crate::encoding::safe_read;
 use crate::error::ToolError;
 use crate::tools::get_symbols_overview::{run_get_symbols_overview, GetSymbolsOverviewParams, OverviewSymbol};
-use crate::treesitter::languages::detect_language;
 
 // ─── Params ──────────────────────────────────────────────────────────────────
 

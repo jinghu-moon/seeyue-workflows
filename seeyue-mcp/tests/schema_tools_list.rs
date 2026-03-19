@@ -2,7 +2,7 @@
 // TDD tests for M-N2: tools/list generated from registry().
 // Run: cargo test --test schema_tools_list
 
-use seeyue_mcp::tools::schema::generate_tools_list;
+use seeyue_mcp::server::schema::generate_tools_list;
 use seeyue_mcp::tools::metadata::registry;
 
 // M-N2 test 1: generate_tools_list includes all registry tool names

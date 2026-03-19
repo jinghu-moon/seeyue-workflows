@@ -3,6 +3,12 @@
 // Library facade: re-exports modules for integration tests and benchmarks.
 // The binary entry point remains in main.rs.
 
+// MCP Params/Result structs are constructed via serde JSON deserialization at runtime;
+// Rust dead_code analysis cannot detect this dynamic construction path.
+#![allow(dead_code)]
+
+pub use app_state::AppState;
+
 pub mod app_state;
 pub mod interaction;
 pub mod encoding;
@@ -10,10 +16,13 @@ pub mod error;
 pub mod git;
 pub mod hooks;
 pub mod lsp;
+pub mod params;
 pub mod platform;
 pub mod policy;
 pub mod prompts;
 pub mod render;
+pub mod resources;
+pub mod server;
 pub mod storage;
 pub mod treesitter;
 pub mod workflow;
@@ -47,6 +56,7 @@ pub mod tools {
     pub mod git_diff_file;
     pub mod git_log;
     pub mod git_status;
+    pub mod hooks;
     pub mod input_request;
     pub mod insert_symbol;
     pub mod interaction_mcp;
@@ -74,7 +84,6 @@ pub mod tools {
     pub mod run_command;
     pub mod run_script;
     pub mod run_test;
-    pub mod schema;
     pub mod search_session;
     pub mod search_workspace;
     pub mod session_summary;

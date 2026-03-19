@@ -54,7 +54,6 @@ pub mod resolve_path;
 pub mod run_command;
 pub mod run_script;
 pub mod run_test;
-pub mod schema;
 pub mod search_session;
 pub mod search_workspace;
 pub mod session_summary;

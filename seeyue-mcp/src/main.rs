@@ -7,6 +7,9 @@
 // ToolError is intentionally large (~192 bytes) for rich error context.
 // Suppress clippy::result_large_err crate-wide until a Box refactor is warranted.
 #![allow(clippy::result_large_err)]
+// MCP Params/Result structs are constructed via serde JSON deserialization at runtime;
+// static analysis cannot detect this dynamic construction path.
+#![allow(dead_code)]
 
 mod app_state;
 mod encoding;

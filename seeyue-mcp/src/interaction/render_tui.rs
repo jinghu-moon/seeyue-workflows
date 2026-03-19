@@ -16,7 +16,7 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame, Terminal,
@@ -27,7 +27,7 @@ use std::time::Duration;
 use crate::interaction::{
     renderer::TerminalResponse,
     schema::{
-        CommentMode, InteractionOption, InteractionRequest, ResponseStatus, SelectionMode,
+        CommentMode, InteractionRequest, ResponseStatus, SelectionMode,
     },
     state::{FocusPanel, TuiState},
     theme::Theme,
