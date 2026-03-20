@@ -122,3 +122,33 @@ function greet() { return 'hi' }
     // Verify the call succeeds (no panic) and result is a Vec
     let _ : Vec<_> = syms.into_iter().collect();
 }
+
+// JS: detect_language maps .js -> "javascript", ts_language returns Some
+#[test]
+fn test_js_language_detected() {
+    use seeyue_mcp::treesitter::languages::{detect_language, ts_language};
+    use std::path::Path;
+    let lang = detect_language(Path::new("index.js"));
+    assert_eq!(lang, "javascript");
+    assert!(ts_language(&lang).is_some());
+}
+
+// JS: extract_ts_symbols extracts top-level functions
+#[test]
+fn test_js_top_level_functions() {
+    let src = "function hello() { return 1; }\nfunction world() { return 2; }\n";
+    let syms = extract_ts_symbols(src, "javascript");
+    let names: Vec<&str> = syms.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"hello"), "expected hello, got: {:?}", names);
+    assert!(names.contains(&"world"), "expected world, got: {:?}", names);
+}
+
+// JSX: detect_language maps .jsx -> "jsx", routed to JavaScript grammar
+#[test]
+fn test_jsx_language_detected() {
+    use seeyue_mcp::treesitter::languages::{detect_language, ts_language};
+    use std::path::Path;
+    let lang = detect_language(Path::new("App.jsx"));
+    assert_eq!(lang, "jsx");
+    assert!(ts_language(&lang).is_some(), "jsx should route to JavaScript grammar");
+}

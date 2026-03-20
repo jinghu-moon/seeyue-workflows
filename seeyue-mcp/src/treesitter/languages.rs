@@ -9,6 +9,7 @@ pub enum TsLanguage {
     Tsx,
     Go,
     Vue,
+    JavaScript,
 }
 
 pub fn detect_language(path: &Path) -> String {
@@ -42,6 +43,8 @@ pub fn ts_language(lang: &str) -> Option<TsLanguage> {
         "tsx"        => Some(TsLanguage::Tsx),
         "go"         => Some(TsLanguage::Go),
         "vue"        => Some(TsLanguage::Vue),
+        "javascript"
+        | "jsx"      => Some(TsLanguage::JavaScript),
         _            => None,
     }
 }
@@ -54,5 +57,6 @@ pub fn grammar_for(lang: TsLanguage) -> Language {
         TsLanguage::Tsx        => tree_sitter_typescript::LANGUAGE_TSX.into(),
         TsLanguage::Go         => tree_sitter_go::LANGUAGE.into(),
         TsLanguage::Vue        => tree_sitter_vue_updated::language(),
+        TsLanguage::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
     }
 }
