@@ -1,9 +1,12 @@
 // src/tools/batch_read.rs
 //
 // Read multiple files in a single request, reducing round-trips for agents.
+// Files are read in parallel using tokio::task::JoinSet.
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::path::PathBuf;
+use std::time::Instant;
 
 use crate::encoding::safe_read;
 use crate::error::ToolError;
@@ -28,16 +31,18 @@ pub struct FileReadEntry {
 #[derive(Debug, Serialize)]
 pub struct BatchReadResult {
     #[serde(rename = "type")]
-    pub kind:    String, // "success"
-    pub total:   usize,
-    pub files:   Vec<FileReadEntry>,
+    pub kind:       String, // "success"
+    pub total:      usize,
+    pub files:      Vec<FileReadEntry>,
+    #[serde(default)]
+    pub elapsed_ms: u64,
 }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 const MAX_PATHS: usize = 20;
 
-pub fn run_batch_read(
+pub async fn run_batch_read(
     params: BatchReadParams,
     workspace: &Path,
 ) -> Result<BatchReadResult, ToolError> {
@@ -54,34 +59,68 @@ pub fn run_batch_read(
         });
     }
 
-    let files: Vec<FileReadEntry> = params.paths.iter().map(|p| {
-        match resolve_path(workspace, p) {
-            Err(e) => FileReadEntry {
-                path:    p.clone(),
+    let t0 = Instant::now();
+    let workspace = workspace.to_path_buf();
+
+    // Resolve paths upfront (sync, cheap).
+    let resolved: Vec<(String, Option<PathBuf>)> = params
+        .paths
+        .iter()
+        .map(|p| {
+            let abs = resolve_path(&workspace, p).ok();
+            (p.clone(), abs)
+        })
+        .collect();
+
+    // Spawn one async task per file; each task performs blocking IO via spawn_blocking.
+    let mut set: tokio::task::JoinSet<FileReadEntry> = tokio::task::JoinSet::new();
+    for (orig, abs_opt) in resolved {
+        match abs_opt {
+            None => {
+                set.spawn(async move {
+                    FileReadEntry {
+                        path:    orig,
+                        content: String::new(),
+                        size:    0,
+                        error:   Some("path resolve error".into()),
+                    }
+                });
+            }
+            Some(abs) => {
+                set.spawn(async move {
+                    match tokio::task::spawn_blocking(move || safe_read(&abs)).await {
+                        Ok(Ok(data)) => {
+                            let size = data.content.len();
+                            FileReadEntry { path: orig, content: data.content, size, error: None }
+                        }
+                        Ok(Err(e)) => FileReadEntry {
+                            path: orig, content: String::new(), size: 0,
+                            error: Some(format!("{e:?}")),
+                        },
+                        Err(e) => FileReadEntry {
+                            path: orig, content: String::new(), size: 0,
+                            error: Some(format!("spawn error: {e}")),
+                        },
+                    }
+                });
+            }
+        }
+    }
+
+    let mut files: Vec<FileReadEntry> = Vec::with_capacity(params.paths.len());
+    while let Some(res) = set.join_next().await {
+        match res {
+            Ok(entry) => files.push(entry),
+            Err(e) => files.push(FileReadEntry {
+                path:    String::new(),
                 content: String::new(),
                 size:    0,
-                error:   Some(format!("{e:?}")),
-            },
-            Ok(abs) => match safe_read(&abs) {
-                Err(e) => FileReadEntry {
-                    path:    p.clone(),
-                    content: String::new(),
-                    size:    0,
-                    error:   Some(format!("{e:?}")),
-                },
-                Ok(data) => {
-                    let size = data.content.len();
-                    FileReadEntry {
-                        path:    p.clone(),
-                        content: data.content,
-                        size,
-                        error:   None,
-                    }
-                }
-            },
+                error:   Some(format!("task panic: {e}")),
+            }),
         }
-    }).collect();
+    }
 
     let total = files.len();
-    Ok(BatchReadResult { kind: "success".into(), total, files })
+    let elapsed_ms = t0.elapsed().as_millis() as u64;
+    Ok(BatchReadResult { kind: "success".into(), total, files, elapsed_ms })
 }

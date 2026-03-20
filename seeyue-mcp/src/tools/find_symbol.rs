@@ -46,8 +46,10 @@ pub struct SymbolMatch {
 #[derive(Debug, Serialize)]
 pub struct FindSymbolResult {
     #[serde(rename = "type")]
-    pub kind:    String, // "success"
-    pub matches: Vec<SymbolMatch>,
+    pub kind:       String, // "success"
+    pub matches:    Vec<SymbolMatch>,
+    #[serde(default)]
+    pub elapsed_ms: u64,
 }
 
 // ─── Main logic ───────────────────────────────────────────────────────────────
@@ -56,6 +58,7 @@ pub async fn run_find_symbol(
     params: FindSymbolParams,
     state: &AppState,
 ) -> Result<FindSymbolResult, ToolError> {
+    let t0 = std::time::Instant::now();
     let substring = params.substring_matching.unwrap_or(false);
     let include_body = params.include_body.unwrap_or(false);
     let depth = params.depth.unwrap_or(1);
@@ -102,7 +105,7 @@ pub async fn run_find_symbol(
         );
     }
 
-    Ok(FindSymbolResult { kind: "success".into(), matches })
+    Ok(FindSymbolResult { kind: "success".into(), matches, elapsed_ms: t0.elapsed().as_millis() as u64 })
 }
 
 // ─── Recursive match collector ────────────────────────────────────────────────

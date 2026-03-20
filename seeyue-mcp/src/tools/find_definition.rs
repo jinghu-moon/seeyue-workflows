@@ -35,6 +35,8 @@ pub struct FindDefinitionResult {
     pub kind:        String, // "success"
     pub symbol:      String,
     pub definitions: Vec<DefinitionLocation>,
+    #[serde(default)]
+    pub elapsed_ms:  u64,
 }
 
 // ─── 工具主逻辑 ───────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ pub async fn run_find_definition(
     params: FindDefinitionParams,
     state: &AppState,
 ) -> Result<FindDefinitionResult, ToolError> {
+    let t0 = std::time::Instant::now();
     let path = resolve_path(&state.workspace, &params.path)?;
     if !path.exists() {
         return Err(ToolError::FileNotFound {
@@ -83,6 +86,7 @@ pub async fn run_find_definition(
         kind: "success".into(),
         symbol,
         definitions,
+        elapsed_ms: t0.elapsed().as_millis() as u64,
     })
 }
 

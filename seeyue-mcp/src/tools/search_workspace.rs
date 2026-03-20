@@ -35,6 +35,8 @@ pub struct SearchWorkspaceResult {
     pub total_matches: usize,
     pub truncated:     bool,
     pub matches:       Vec<SearchMatch>,
+    #[serde(default)]
+    pub elapsed_ms:    u64,
 }
 
 // ─── 工具主逻辑 ───────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ pub fn run_search_workspace(
     params: SearchWorkspaceParams,
     workspace: &Path,
 ) -> Result<SearchWorkspaceResult, ToolError> {
+    let t0 = std::time::Instant::now();
     if params.pattern.trim().is_empty() {
         return Err(ToolError::MissingParameter {
             missing: "pattern".into(),
@@ -151,5 +154,6 @@ pub fn run_search_workspace(
         total_matches,
         truncated: total_matches > matches.len(),
         matches,
+        elapsed_ms: t0.elapsed().as_millis() as u64,
     })
 }

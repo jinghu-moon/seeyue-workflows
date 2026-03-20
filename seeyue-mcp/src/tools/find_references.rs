@@ -36,6 +36,8 @@ pub struct FindReferencesResult {
     pub symbol:     String,
     pub total:      usize,
     pub references: Vec<ReferenceLocation>,
+    #[serde(default)]
+    pub elapsed_ms: u64,
 }
 
 // ─── 工具主逻辑 ───────────────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ pub async fn run_find_references(
     params: FindReferencesParams,
     state: &AppState,
 ) -> Result<FindReferencesResult, ToolError> {
+    let t0 = std::time::Instant::now();
     let path = resolve_path(&state.workspace, &params.path)?;
     if !path.exists() {
         return Err(ToolError::FileNotFound {
@@ -86,6 +89,7 @@ pub async fn run_find_references(
         symbol,
         total,
         references,
+        elapsed_ms: t0.elapsed().as_millis() as u64,
     })
 }
 

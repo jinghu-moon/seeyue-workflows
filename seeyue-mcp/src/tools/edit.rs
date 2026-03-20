@@ -364,14 +364,68 @@ fn match_string(
     // Level B: Unicode 混淆检测
     let unicode_hints = find_unicode_confusion(old_string, content);
 
-    // Level C: STRING_NOT_FOUND（含所有诊断信息）
+    // Level C: STRING_NOT_FOUND（含所有诊断信息 + 最近 3 行）
+    let first_line = old_string.lines().next().unwrap_or(old_string);
+    let similar = find_similar_lines(first_line, content, 3);
+    let similar_hint = if similar.is_empty() {
+        String::new()
+    } else {
+        let lines = similar.join("\n  ");
+        format!("\nNearest lines in file:\n  {lines}")
+    };
+
     Err(ToolError::StringNotFound {
         file_path:          "[file]".into(), // 调用方填充
         old_string_preview: old_string.chars().take(80).collect(),
         suggestions:        unicode_hints,
-        hint: "Read the file again and copy old_string verbatim from the output. \
-               Pay attention to tab characters (shown as \\t in Read output).".into(),
+        hint: format!(
+            "Read the file again and copy old_string verbatim from the output. \
+             Pay attention to tab characters (shown as \\t in Read output).{similar_hint}"
+        ),
     })
+}
+
+/// 按首行相似度在文件中查找最接近的 n 行。
+/// 相似度 = 公共前缀字节数 * 2 + 公共字符数（不区分大小写）。
+fn find_similar_lines(first_line: &str, content: &str, n: usize) -> Vec<String> {
+    let needle_lower = first_line.trim().to_lowercase();
+    let needle_bytes = first_line.trim().as_bytes();
+
+    let mut scored: Vec<(usize, usize, &str)> = content
+        .lines()
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            // 公共前缀字节数
+            let prefix = needle_bytes
+                .iter()
+                .zip(trimmed.as_bytes())
+                .take_while(|(a, b)| a == b)
+                .count();
+            // 公共字符占比（不区分大小写）
+            let line_lower = trimmed.to_lowercase();
+            let common_chars = needle_lower
+                .chars()
+                .filter(|c| line_lower.contains(*c))
+                .count();
+            let score = prefix * 2 + common_chars;
+            if score == 0 {
+                None
+            } else {
+                Some((score, idx + 1, line))
+            }
+        })
+        .collect();
+
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored
+        .into_iter()
+        .take(n)
+        .map(|(_, lineno, text)| format!("L{lineno}: {}", text.trim_end()))
+        .collect()
 }
 
 fn match_string_for_multi(

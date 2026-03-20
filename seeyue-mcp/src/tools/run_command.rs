@@ -40,6 +40,8 @@ pub struct RunCommandResult {
     pub duration_ms: u64,
     pub command:     String,
     pub working_dir: String,
+    #[serde(default)]
+    pub elapsed_ms:  u64,
 }
 
 // ─── Implementation ──────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ pub async fn run_run_command(
                 duration_ms,
                 command:     params.command,
                 working_dir: work_dir.display().to_string(),
+                elapsed_ms:  duration_ms,
             })
         }
         Ok(Err(e)) => Err(ToolError::IoError { message: format!("Failed to spawn command: {}", e) }),
@@ -127,6 +130,7 @@ pub async fn run_run_command(
                 duration_ms,
                 command:     params.command,
                 working_dir: work_dir.display().to_string(),
+                elapsed_ms:  duration_ms,
             })
         }
     }

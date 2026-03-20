@@ -45,14 +45,16 @@ pub struct RunTestParams {
 
 #[derive(Debug, Serialize)]
 pub struct RunTestResult {
-    pub passed:       bool,
-    pub exit_code:    Option<i32>,
-    pub runner:       String,
-    pub stdout:       String,
-    pub stderr:       String,
+    pub passed:         bool,
+    pub exit_code:      Option<i32>,
+    pub runner:         String,
+    pub stdout:         String,
+    pub stderr:         String,
     pub filtered_lines: u32,
-    pub truncated:    bool,
-    pub duration_ms:  u64,
+    pub truncated:      bool,
+    pub duration_ms:    u64,
+    #[serde(default)]
+    pub elapsed_ms:     u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +111,7 @@ pub async fn run_run_test(
             filtered_lines: 0,
             truncated:      false,
             duration_ms,
+            elapsed_ms:     duration_ms,
         }),
         Ok(Err(e)) => Err(ToolError::IoError {
             message: format!("Failed to spawn test runner '{}': {}", program, e),
@@ -131,6 +134,7 @@ pub async fn run_run_test(
                 filtered_lines,
                 truncated,
                 duration_ms,
+                elapsed_ms: duration_ms,
             })
         }
     }
