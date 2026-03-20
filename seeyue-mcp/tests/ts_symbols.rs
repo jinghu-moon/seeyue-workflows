@@ -94,3 +94,31 @@ fn test_crlf_line_numbers() {
         assert!(s.start_line > f.start_line, "second should start after first");
     }
 }
+
+// Vue: detect_language maps .vue -> "vue", ts_language returns Some(Vue)
+#[test]
+fn test_vue_language_detected() {
+    use seeyue_mcp::treesitter::languages::{detect_language, ts_language};
+    use std::path::Path;
+    let lang = detect_language(Path::new("App.vue"));
+    assert_eq!(lang, "vue");
+    assert!(ts_language(&lang).is_some(), "ts_language should return Some for vue");
+}
+
+// Vue: extract_ts_symbols on a simple .vue SFC returns non-empty or empty gracefully
+#[test]
+fn test_vue_sfc_symbols_no_panic() {
+    let src = r#"<template>
+  <div>{{ msg }}</div>
+</template>
+<script setup>
+import { ref } from 'vue'
+const msg = ref('Hello')
+function greet() { return 'hi' }
+</script>
+"#;
+    // Must not panic; result may be empty if Vue grammar doesn't expose functions at top-level
+    let syms = extract_ts_symbols(src, "vue");
+    // Verify the call succeeds (no panic) and result is a Vec
+    let _ : Vec<_> = syms.into_iter().collect();
+}

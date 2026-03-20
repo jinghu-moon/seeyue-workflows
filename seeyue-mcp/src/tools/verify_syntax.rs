@@ -143,7 +143,7 @@ fn collect_errors(node: tree_sitter::Node, src: &[u8], out: &mut Vec<SyntaxIssue
         });
     }
 
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(child) = node.child(i) {
             collect_errors(child, src, out);
         }

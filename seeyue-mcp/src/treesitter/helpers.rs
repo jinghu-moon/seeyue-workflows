@@ -28,7 +28,7 @@ pub(super) fn collect_by_kind(root: Node, kinds: &[&str]) -> Vec<NodeInfo> {
                 end_line:   node.end_position().row + 1,
             });
         }
-        for i in 0..node.child_count() {
+        for i in 0..node.child_count() as u32 as u32 {
             if let Some(child) = node.child(i) {
                 stack.push(child);
             }
@@ -41,7 +41,7 @@ pub(super) fn collect_by_kind(root: Node, kinds: &[&str]) -> Vec<NodeInfo> {
 // ─── Node text extraction ────────────────────────────────────────────────────
 
 pub(super) fn find_child_text(node: Node, kind: &str, src: &[u8]) -> Option<String> {
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(child) = node.child(i) {
             if child.kind() == kind {
                 return child.utf8_text(src).ok().map(|s| s.to_string());
@@ -52,7 +52,7 @@ pub(super) fn find_child_text(node: Node, kind: &str, src: &[u8]) -> Option<Stri
 }
 
 pub(super) fn find_name(node: Node, src: &[u8], kinds: &[&str]) -> Option<String> {
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(child) = node.child(i) {
             if kinds.contains(&child.kind()) {
                 return child.utf8_text(src).ok().map(|s| s.to_string());
@@ -79,7 +79,7 @@ pub(super) fn find_parent_name(
 }
 
 pub(super) fn unwrap_decorated(node: Node) -> Option<Node> {
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(child) = node.child(i) {
             if child.kind() == "function_definition" || child.kind() == "class_definition" {
                 return Some(child);
@@ -92,7 +92,7 @@ pub(super) fn unwrap_decorated(node: Node) -> Option<Node> {
 // ─── Signature extraction ────────────────────────────────────────────────────
 
 pub(super) fn sig_up_to_block(node: Node, block_kind: &str, src: &[u8]) -> Option<String> {
-    for i in 0..node.child_count() {
+    for i in 0..node.child_count() as u32 {
         if let Some(child) = node.child(i) {
             if child.kind() == block_kind {
                 let raw = &src[node.start_byte()..child.start_byte()];
