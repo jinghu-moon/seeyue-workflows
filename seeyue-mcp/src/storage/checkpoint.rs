@@ -165,6 +165,28 @@ impl CheckpointStore {
         .filter_map(|r| r.ok())
         .collect()
     }
+
+    /// 清理超过 `days` 天未修改的旧 session DB 文件（跨会话持久化维护）。
+    pub fn cleanup_old_sessions(db_dir: &Path, days: u64) {
+        let cutoff_secs = days * 86_400;
+        let Ok(entries) = std::fs::read_dir(db_dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("db") {
+                continue;
+            }
+            if let Ok(meta) = std::fs::metadata(&path) {
+                let age = meta.modified()
+                    .ok()
+                    .and_then(|t| t.elapsed().ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                if age > cutoff_secs {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

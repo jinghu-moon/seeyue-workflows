@@ -1,8 +1,8 @@
 // src/server/tools_git.rs — P2 Git + P3 Execution/Analysis + P4 Extended Tools
 
-use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
+use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*, service::RequestContext, RoleServer};
 use crate::params::*;
-use crate::server::util::{to_text, to_mcp_err};
+use crate::server::util::{to_text, to_mcp_err, tool_error_to_result, notify_log, notify_progress};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = git_router)]
@@ -13,8 +13,7 @@ impl SeeyueMcpServer {
         Parameters(_): Parameters<GitStatusParams>,
     ) -> Result<CallToolResult, ErrorData> {
         crate::tools::git_status::run_git_status(&self.state.workspace)
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(to_mcp_err)
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Show the diff of a specific file between a git ref and working tree.")]
@@ -28,8 +27,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Structured git commit history. Returns hash/author/date/subject per commit.")]
@@ -41,8 +39,7 @@ impl SeeyueMcpServer {
             crate::tools::git_log::GitLogParams { limit: p.limit, path: p.path, since: p.since },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Per-line authorship via git blame --porcelain.")]
@@ -56,41 +53,87 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Execute a shell command in the workspace. Requires sy_pretool_bash verdict.")]
     async fn run_command(
         &self,
         Parameters(p): Parameters<RunCommandParams>,
+        ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
-        crate::tools::run_command::run_run_command(
+        // progress: started
+        if let Some(token) = ctx.meta.get_progress_token() {
+            notify_progress(&ctx, token, 0.0, None, Some("running command…".into()));
+        }
+        let result = crate::tools::run_command::run_run_command(
             crate::tools::run_command::RunCommandParams {
                 command: p.command, timeout_ms: p.timeout_ms,
                 working_dir: p.working_dir, env: p.env,
             },
             &self.state.workspace,
         )
-        .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .await;
+        match result {
+            Err(e) => {
+                notify_log(&ctx, LoggingLevel::Error, "run_command",
+                    serde_json::Value::String(e.to_json()));
+                tool_error_to_result(e)
+            }
+            Ok(r) => {
+                // push stdout/stderr as MCP logging notifications
+                if !r.stdout.is_empty() {
+                    notify_log(&ctx, LoggingLevel::Info, "run_command/stdout",
+                        serde_json::Value::String(r.stdout.clone()));
+                }
+                if !r.stderr.is_empty() {
+                    let level = if r.exit_code == Some(0) { LoggingLevel::Notice } else { LoggingLevel::Warning };
+                    notify_log(&ctx, level, "run_command/stderr",
+                        serde_json::Value::String(r.stderr.clone()));
+                }
+                if let Some(token) = ctx.meta.get_progress_token() {
+                    notify_progress(&ctx, token, 1.0, Some(1.0), Some("done".into()));
+                }
+                Ok(to_text(serde_json::to_string_pretty(&r).unwrap()))
+            }
+        }
     }
 
     #[tool(description = "Run the project test suite. Auto-detects cargo/jest/vitest/pytest.")]
     async fn run_test(
         &self,
         Parameters(p): Parameters<RunTestParams>,
+        ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
-        crate::tools::run_test::run_run_test(
+        if let Some(token) = ctx.meta.get_progress_token() {
+            notify_progress(&ctx, token, 0.0, None, Some("running tests…".into()));
+        }
+        let result = crate::tools::run_test::run_run_test(
             crate::tools::run_test::RunTestParams {
                 filter: p.filter, language: p.language, timeout_ms: p.timeout_ms,
             },
             &self.state.workspace,
         )
-        .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .await;
+        match result {
+            Err(e) => {
+                notify_log(&ctx, LoggingLevel::Error, "run_test",
+                    serde_json::Value::String(e.to_json()));
+                tool_error_to_result(e)
+            }
+            Ok(r) => {
+                let level = if r.passed { LoggingLevel::Info } else { LoggingLevel::Warning };
+                notify_log(&ctx, level, "run_test",
+                    serde_json::json!({
+                        "passed": r.passed,
+                        "runner": r.runner,
+                    }));
+                if let Some(token) = ctx.meta.get_progress_token() {
+                    notify_progress(&ctx, token, 1.0, Some(1.0), Some("done".into()));
+                }
+                Ok(to_text(serde_json::to_string_pretty(&r).unwrap()))
+            }
+        }
     }
 
     #[tool(description = "Run a linter on a file. Auto-detects clippy/eslint/ruff.")]
@@ -105,8 +148,7 @@ impl SeeyueMcpServer {
             &self.state.workspace,
         )
         .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Return a structured summary of the current workflow session.")]
@@ -118,8 +160,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
             &self.state.checkpoint,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Return a structured diff of workspace changes relative to latest checkpoint.")]
@@ -134,8 +175,7 @@ impl SeeyueMcpServer {
             &self.state.workspace,
             &self.state.checkpoint,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Return a file-level dependency graph. Uses static import analysis.")]
@@ -149,8 +189,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Preview a symbol rename across the project without writing changes.")]
@@ -164,8 +203,7 @@ impl SeeyueMcpServer {
             },
             &self.state,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Apply edits across multiple files atomically. Validate-then-write in 3 phases.")]
@@ -186,8 +224,7 @@ impl SeeyueMcpServer {
             },
             &cache, &self.state.checkpoint, &self.state.backup, &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Scaffold batch file/directory creation. Parent dirs auto-created.")]
@@ -205,8 +242,7 @@ impl SeeyueMcpServer {
             },
             &self.state.checkpoint, &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Query package registries (crates.io/npm/PyPI) for latest version and metadata.")]
@@ -242,8 +278,7 @@ impl SeeyueMcpServer {
             crate::tools::type_check::TypeCheckParams { path: p.path, language: p.language },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Read multiple files in a single request (max 20).")]
@@ -255,8 +290,8 @@ impl SeeyueMcpServer {
             crate::tools::batch_read::BatchReadParams { paths: p.paths },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .await
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Format a file in-place using rustfmt/black/prettier/gofmt.")]
@@ -268,8 +303,7 @@ impl SeeyueMcpServer {
             crate::tools::format_file::FormatFileParams { path: p.path, check_only: p.check_only },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Rename/move a file atomically within the workspace.")]
@@ -282,8 +316,7 @@ impl SeeyueMcpServer {
             &self.state.checkpoint,
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Copy the workspace into .snapshots/ for point-in-time recovery.")]
@@ -297,8 +330,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Static call-hierarchy analysis: find callers or callees of a symbol.")]
@@ -312,8 +344,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Compact journal.jsonl — archive old entries, retain recent N lines.")]
@@ -327,8 +358,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workflow_dir,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Search journal.jsonl for entries matching query.")]
@@ -344,8 +374,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workflow_dir,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 }
 

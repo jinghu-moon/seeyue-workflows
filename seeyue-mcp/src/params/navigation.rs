@@ -82,3 +82,47 @@ pub struct FindReferencesParams {
     #[schemars(description = "1-based column number")]
     pub column: usize,
 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FindSymbolParams {
+    #[schemars(description = "Symbol name or name_path pattern (e.g. \"validate\" or \"UserSession/validate\")")]
+    pub name_path_pattern: String,
+    #[schemars(description = "Restrict to this file (relative path). Omit to search all source files.")]
+    pub relative_path: Option<String>,
+    #[schemars(description = "If true, match by substring; if false, exact name match (default: false)")]
+    pub substring_matching: Option<bool>,
+    #[schemars(description = "If true, include symbol source lines in result (default: false)")]
+    pub include_body: Option<bool>,
+    #[schemars(description = "Depth of child symbols to include (default: 1)")]
+    pub depth: Option<u8>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReplaceSymbolBodyParams {
+    #[schemars(description = "Symbol name_path to replace (e.g. \"Greeter/greet\" or \"MyStruct\").")]
+    pub name_path: String,
+    #[schemars(description = "File containing the symbol (relative to workspace root).")]
+    pub relative_path: String,
+    #[schemars(description = "Complete new body including the signature line. PREFER over edit for whole-symbol replacement.")]
+    pub new_body: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct InsertAfterSymbolParams {
+    #[schemars(description = "Symbol name_path after which to insert (e.g. \"MyStruct/last_method\").")]
+    pub name_path: String,
+    #[schemars(description = "File containing the symbol (relative to workspace root).")]
+    pub relative_path: String,
+    #[schemars(description = "Content to insert after the symbol's closing line.")]
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct InsertBeforeSymbolParams {
+    #[schemars(description = "Symbol name_path before which to insert (e.g. \"/first_fn\").")]
+    pub name_path: String,
+    #[schemars(description = "File containing the symbol (relative to workspace root).")]
+    pub relative_path: String,
+    #[schemars(description = "Content to insert before the symbol's opening line.")]
+    pub content: String,
+}

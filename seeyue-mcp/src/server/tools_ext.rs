@@ -2,7 +2,7 @@
 
 use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
 use crate::params::*;
-use crate::server::util::{to_text, to_mcp_err};
+use crate::server::util::{to_text, tool_error_to_result};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = ext_router)]
@@ -21,8 +21,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Get LSP hover info (type signature, docs) for symbol at given position.")]
@@ -39,8 +38,7 @@ impl SeeyueMcpServer {
             &self.state,
         )
         .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Record a tool error to journal, optionally notify, return recovery suggestions.")]
@@ -60,8 +58,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workflow_dir,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Open a file in VS Code or Cursor at a given line/column. editor: auto|vscode|cursor.")]
@@ -78,8 +75,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "List running processes (Windows tasklist). Filter by name substring or port.")]
@@ -94,8 +90,7 @@ impl SeeyueMcpServer {
                 limit:       p.limit,
             },
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Run a script file. Supports .ps1 .sh .py .js .ts. Configurable timeout.")]
@@ -114,8 +109,7 @@ impl SeeyueMcpServer {
             &self.state,
         )
         .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Check loop budget consumption. Warns (Toast + journal) when warn_at fraction exceeded.")]
@@ -130,8 +124,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workflow_dir,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 }
 

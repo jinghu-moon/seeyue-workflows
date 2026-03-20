@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # MCP SDK（v1.2.0，与 refer/rust-sdk-main 对齐）
-rmcp = { version = "1.2.0", path = "../refer/rust-sdk-main/crates/rmcp", features = ["server", "transport-io", "macros"] }
+rmcp = { version = "1.2.0", path = "../refer/rust-sdk-main/crates/rmcp", features = ["server", "transport-io", "macros", "elicitation"] }
 
 # 编码检测（Firefox 同款）
 chardetng   = "0.1"

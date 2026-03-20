@@ -2,7 +2,7 @@
 
 use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
 use crate::params::*;
-use crate::server::util::{to_text, to_mcp_err};
+use crate::server::util::{to_text, tool_error_to_result};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = mem_router)]
@@ -21,8 +21,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Search persisted memory entries from .ai/memory/. Matches query against key/tags/content. Returns full content when exactly one entry matches.")]
@@ -38,8 +37,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Delete a named memory entry from .ai/memory/. Removes content file and index.json entry. Returns not_found if key does not exist.")]
@@ -51,8 +49,7 @@ impl SeeyueMcpServer {
             crate::tools::memory_delete::MemoryDeleteParams { key: p.key },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "List all persisted memory entries from .ai/memory/. Supports optional tag filter and limit. Sorted by updated timestamp descending.")]
@@ -67,8 +64,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "List all checkpoint snapshots in the current session. Returns file path, tool name, and captured_at timestamp. Use with rewind to undo.")]
@@ -80,8 +76,7 @@ impl SeeyueMcpServer {
             crate::tools::checkpoint_list::CheckpointListParams {},
             &self.state.checkpoint,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Aggregate TDD evidence from journal.jsonl. Returns per-node TDD progression: red_verified, green_verified, refactor_done. Optional node_id filter.")]
@@ -93,8 +88,7 @@ impl SeeyueMcpServer {
             crate::tools::tdd_evidence::TddEvidenceParams { node_id: p.node_id },
             &self.state.workflow_dir,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "[Hook] End session and persist a session summary to .ai/memory/sessions/. Extracts nodes visited and files written from journal. Returns memory_key.")]

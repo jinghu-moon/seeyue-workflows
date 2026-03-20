@@ -2,7 +2,7 @@
 
 use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
 use crate::params::*;
-use crate::server::util::{to_text, to_mcp_err};
+use crate::server::util::{to_text, tool_error_to_result};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = nav_router)]
@@ -19,8 +19,7 @@ impl SeeyueMcpServer {
             crate::tools::resolve_path::ResolvePathParams { path: p.path },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -36,7 +35,8 @@ impl SeeyueMcpServer {
 
     #[tool(description = "\
         Return a compact symbol outline of a source file using tree-sitter. \
-        Designed to be ~200 tokens and used with read_range for focused reads.")]
+        Call FIRST before reading file body — ~200 tokens vs full file. \
+        Use with read_range for focused reads of specific symbols.")]
     async fn file_outline(
         &self,
         Parameters(p): Parameters<FileOutlineParams>,
@@ -48,8 +48,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -67,8 +66,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -88,12 +86,12 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
         Search the workspace for a pattern. \
+        PREFER over Grep/Glob for workspace searches — gitignore-aware and supports regex + literal. \
         Respects .gitignore by default and supports regex or literal matching.")]
     async fn search_workspace(
         &self,
@@ -109,8 +107,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -129,8 +126,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -147,8 +143,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -167,8 +162,7 @@ impl SeeyueMcpServer {
             },
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -187,8 +181,7 @@ impl SeeyueMcpServer {
             &self.state,
         )
         .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -207,8 +200,92 @@ impl SeeyueMcpServer {
             &self.state,
         )
         .await
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+    }
+
+    #[tool(description = "\
+        Find symbols by name or name_path pattern across the workspace. \
+        PREFER over Grep for any symbol/function/class/struct search — \
+        semantic, index-accelerated (up to 7× faster on large codebases). \
+        Supports exact match or substring. Optionally include source body. \
+        Use relative_path to restrict to a single file.")]
+    async fn find_symbol(
+        &self,
+        Parameters(p): Parameters<FindSymbolParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        crate::tools::find_symbol::run_find_symbol(
+            crate::tools::find_symbol::FindSymbolParams {
+                name_path_pattern:  p.name_path_pattern,
+                relative_path:      p.relative_path,
+                substring_matching: p.substring_matching,
+                include_body:       p.include_body,
+                depth:              p.depth,
+            },
+            &self.state,
+        )
+        .await
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+    }
+
+    #[tool(description = "\
+        Replace the complete body of a symbol (function, method, struct, etc.) in-place. \
+        PREFER over edit when replacing an entire symbol definition — \
+        finds the symbol by name_path, replaces start_line..end_line atomically. \
+        Requires relative_path to avoid ambiguity across files.")]
+    async fn replace_symbol_body(
+        &self,
+        Parameters(p): Parameters<ReplaceSymbolBodyParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        crate::tools::replace_symbol_body::run_replace_symbol_body(
+            crate::tools::replace_symbol_body::ReplaceSymbolBodyParams {
+                name_path:     p.name_path,
+                relative_path: p.relative_path,
+                new_body:      p.new_body,
+            },
+            &self.state,
+        )
+        .await
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+    }
+
+    #[tool(description = "\
+        Insert content immediately after a symbol's closing line. \
+        Use to add a new function/method/field after an existing symbol. \
+        Requires relative_path. Uses atomic write.")]
+    async fn insert_after_symbol(
+        &self,
+        Parameters(p): Parameters<InsertAfterSymbolParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        crate::tools::insert_symbol::run_insert_after_symbol(
+            crate::tools::insert_symbol::InsertSymbolParams {
+                name_path:     p.name_path,
+                relative_path: p.relative_path,
+                content:       p.content,
+            },
+            &self.state,
+        )
+        .await
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+    }
+
+    #[tool(description = "\
+        Insert content immediately before a symbol's opening line. \
+        Use to add imports, attributes, or new symbols before an existing one. \
+        Requires relative_path. Uses atomic write.")]
+    async fn insert_before_symbol(
+        &self,
+        Parameters(p): Parameters<InsertBeforeSymbolParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        crate::tools::insert_symbol::run_insert_before_symbol(
+            crate::tools::insert_symbol::InsertSymbolParams {
+                name_path:     p.name_path,
+                relative_path: p.relative_path,
+                content:       p.content,
+            },
+            &self.state,
+        )
+        .await
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 }
 

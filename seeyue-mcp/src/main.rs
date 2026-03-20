@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
         .map(PathBuf::from)
         .unwrap_or_else(|_| std::env::current_dir().unwrap());
 
-    let session_id = format!("sess_{}", chrono::Utc::now().timestamp_millis());
+    let session_id = load_session_id(&workspace);
 
     // Checkpoint DB 存放于 %LOCALAPPDATA%\seeyue-mcp\checkpoints\
     let db_dir = dirs::data_local_dir()
@@ -96,9 +96,60 @@ async fn main() -> Result<()> {
 
     let server = server::SeeyueMcpServer::new(state);
 
+    // M1: 后台异步构建/刷新符号索引（冷启动加速）
+    {
+        let ws = workspace.clone();
+        tokio::spawn(async move {
+            let index_path = ws.join(".seeyue").join("index.json");
+            let needs_build = match std::fs::metadata(&index_path) {
+                Ok(meta) => {
+                    let age = meta.modified()
+                        .ok()
+                        .and_then(|t| t.elapsed().ok())
+                        .map(|d| d.as_secs())
+                        .unwrap_or(u64::MAX);
+                    age > 300 // 超过 5 分钟则重建
+                }
+                Err(_) => true,
+            };
+            if needs_build {
+                let _ = tokio::task::spawn_blocking(move || {
+                    tools::project_index::ProjectIndex::build(&ws)
+                }).await;
+            }
+        });
+    }
+
+    // M2: 后台清理过期 checkpoint DB（7 天前）
+    {
+        let db = db_dir.clone();
+        tokio::spawn(async move {
+            let _ = tokio::task::spawn_blocking(move || {
+                storage::checkpoint::CheckpointStore::cleanup_old_sessions(&db, 7);
+            }).await;
+        });
+    }
+
     // MCP over stdio：Claude Code / Gemini CLI / Cursor 均使用此传输层
     let service = server.serve(stdio()).await?;
     service.waiting().await?;
 
     Ok(())
+}
+
+/// 从 workflow/session.yaml 读取 run_id 作为持久化 session_id。
+/// 若文件不存在或无法解析，回退到时间戳 ID。
+fn load_session_id(workspace: &std::path::Path) -> String {
+    let path = workspace.join(".ai").join("workflow").join("session.yaml");
+    if let Ok(text) = std::fs::read_to_string(&path) {
+        for line in text.lines() {
+            if let Some(rest) = line.strip_prefix("run_id:") {
+                let id = rest.trim().trim_matches('\'').trim_matches('"');
+                if !id.is_empty() {
+                    return id.to_string();
+                }
+            }
+        }
+    }
+    format!("sess_{}", chrono::Utc::now().timestamp_millis())
 }

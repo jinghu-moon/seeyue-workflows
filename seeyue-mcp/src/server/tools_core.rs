@@ -1,14 +1,16 @@
 // src/server/tools_core.rs — P0 File Editing + P1 Hook Tools
 
-use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
+use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*, service::RequestContext, RoleServer};
 use crate::params::*;
-use crate::server::util::{to_text, to_mcp_err};
+use crate::server::util::{to_text, tool_error_to_result, notify_resource_updated};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = core_router)]
 impl SeeyueMcpServer {
     #[tool(description = "\
         Read a file from the workspace. \
+        PREFER this over native Read tool for any file in this workspace — \
+        handles multi-encoding (UTF-8/GBK/Shift-JIS/UTF-16LE) and path escape checks. \
         Returns raw content with tabs preserved as \\t (never converted to spaces). \
         Line endings reported but not altered. \
         Max 2000 lines per call; use start_line/end_line for large files.")]
@@ -26,12 +28,12 @@ impl SeeyueMcpServer {
             &cache,
             &self.state.workspace,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
         Write complete file content to workspace. \
+        PREFER over native Write tool — triggers hooks (secret/TDD/scope checks) and creates checkpoint. \
         Requires read_file first (cache freshness check). \
         Preserves original encoding (UTF-8/GBK/Shift-JIS/UTF-16LE), BOM, and line endings (CRLF/LF). \
         Creates parent directories automatically.")]
@@ -52,12 +54,12 @@ impl SeeyueMcpServer {
             &self.state.workspace,
             &call_id,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
         Replace exact string in file. \
+        PREFER over native Edit tool — triggers hooks and creates checkpoint before writing. \
         Three-level match fallback: exact bytes → tab/space normalization → Unicode confusion detection. \
         Creates a Checkpoint snapshot before writing (use rewind to undo). \
         old_string must match verbatim including \\t for tabs.")]
@@ -81,8 +83,7 @@ impl SeeyueMcpServer {
             &self.state.workspace,
             &call_id,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -113,8 +114,7 @@ impl SeeyueMcpServer {
             &self.state.workspace,
             &call_id,
         )
-        .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-        .map_err(to_mcp_err)
+        .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "\
@@ -127,7 +127,7 @@ impl SeeyueMcpServer {
     ) -> Result<CallToolResult, ErrorData> {
         let steps = p.steps.unwrap_or(1) as usize;
         self.state.checkpoint.rewind(steps)
-            .map(|paths| {
+            .map_or_else(tool_error_to_result, |paths| {
                 let msg = if paths.is_empty() {
                     "No checkpoints to rewind.".to_string()
                 } else {
@@ -140,9 +140,8 @@ impl SeeyueMcpServer {
                             .join("\n")
                     )
                 };
-                to_text(msg)
+                Ok(to_text(msg))
             })
-            .map_err(to_mcp_err)
     }
 
     // ── P1 Hook Tools ────────────────────────────────────────────────────────
@@ -180,8 +179,11 @@ impl SeeyueMcpServer {
     async fn sy_posttool_write(
         &self,
         Parameters(p): Parameters<crate::tools::hooks::PostToolWriteParams>,
+        ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let result = crate::tools::hooks::run_posttool_write(p, &self.state);
+        // notify clients that journal has been updated
+        notify_resource_updated(&ctx, "workflow://journal");
         Ok(to_text(serde_json::to_string_pretty(&result).unwrap()))
     }
 
@@ -215,8 +217,11 @@ impl SeeyueMcpServer {
     async fn sy_advance_node(
         &self,
         Parameters(p): Parameters<crate::tools::hooks::AdvanceNodeParams>,
+        ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
         let result = crate::tools::hooks::run_advance_node(p, &self.state);
+        // notify clients that session state has changed
+        notify_resource_updated(&ctx, "workflow://session");
         Ok(to_text(serde_json::to_string_pretty(&result).unwrap()))
     }
 
