@@ -108,3 +108,46 @@ async fn test_index_result_consistent_with_direct() {
     assert_eq!(direct.matches.len(), with_idx.matches.len(),
         "index and direct paths should return same number of matches");
 }
+
+// A-N4b test 4: index narrows candidate files
+// Create 20 files; only 1 contains target_func.
+// With index: result should come from exactly 1 file.
+// Without index: same result but searches all 20 files.
+// Verifies that index-accelerated path returns correct file attribution.
+#[tokio::test]
+async fn test_index_narrows_candidate_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let ws = dir.path().to_path_buf();
+    let src = ws.join("src");
+    fs::create_dir_all(&src).unwrap();
+
+    // Write 19 files without the target, 1 file with it
+    for i in 0..19usize {
+        fs::write(src.join(format!("mod{}.rs", i)),
+            format!("pub fn noise_fn_{}() {{}}\n", i)).unwrap();
+    }
+    fs::write(src.join("target.rs"), "pub fn unique_target_xyz() {}\n").unwrap();
+
+    // Build index
+    ProjectIndex::build(&ws).unwrap();
+
+    let state = make_state(dir.path());
+    let result = run_find_symbol(
+        FindSymbolParams {
+            name_path_pattern: "unique_target_xyz".into(),
+            relative_path: None,
+            substring_matching: Some(false),
+            include_body: Some(false),
+            depth: Some(1),
+        },
+        &state,
+    ).await.unwrap();
+
+    assert_eq!(result.matches.len(), 1, "should find exactly 1 match");
+    assert_eq!(result.matches[0].name, "unique_target_xyz");
+    // Result must come from target.rs, not any other file
+    assert!(
+        result.matches[0].file.contains("target"),
+        "match should be from target.rs, got: {}", result.matches[0].file
+    );
+}
