@@ -217,7 +217,7 @@ fn collect_mtimes(root: &Path, dir: &Path, out: &mut HashMap<String, u64>) {
 fn is_source_file(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|e| e.to_str()).unwrap_or(""),
-        "rs" | "py" | "ts" | "tsx" | "js" | "go" | "java" | "c" | "cpp" | "cs"
+        "rs" | "py" | "ts" | "tsx" | "js" | "jsx" | "vue" | "go" | "java" | "c" | "cpp" | "cs"
     )
 }
 

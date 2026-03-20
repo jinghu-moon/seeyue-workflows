@@ -10,6 +10,7 @@ use crate::app_state::AppState;
 use crate::encoding::safe_read;
 use crate::error::ToolError;
 use crate::tools::get_symbols_overview::{run_get_symbols_overview, GetSymbolsOverviewParams, OverviewSymbol};
+use crate::tools::project_index::ProjectIndex;
 
 // ─── Params ──────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ pub async fn run_find_symbol(
 
     let files: Vec<String> = match &params.relative_path {
         Some(p) => vec![p.clone()],
-        None    => collect_source_files(&state.workspace),
+        None    => candidate_files_for_pattern(&state.workspace, pattern, substring),
     };
 
     let mut matches: Vec<SymbolMatch> = Vec::new();
@@ -203,7 +204,7 @@ fn collect_source_files_rec(root: &Path, dir: &Path, out: &mut Vec<String>) {
             collect_source_files_rec(root, &path, out);
         } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             match ext {
-                "rs" | "py" | "ts" | "tsx" | "js" | "go" | "java" | "c" | "cpp" | "cs" => {
+                "rs" | "py" | "ts" | "tsx" | "js" | "jsx" | "vue" | "go" | "java" | "c" | "cpp" | "cs" => {
                     if let Ok(rel) = path.strip_prefix(root) {
                         out.push(rel.to_string_lossy().replace('\\', "/"));
                     }
@@ -212,4 +213,38 @@ fn collect_source_files_rec(root: &Path, dir: &Path, out: &mut Vec<String>) {
             }
         }
     }
+}
+
+// ─── Index-accelerated file candidate selection ───────────────────────────────
+
+/// Return candidate files to search for `pattern`.
+/// Strategy:
+///   1. Try to load .seeyue/index.json (ProjectIndex).
+///   2. If index exists and has hits for the pattern → return only those files.
+///   3. If index missing or no hits → fall back to full workspace scan.
+fn candidate_files_for_pattern(workspace: &std::path::Path, pattern: &str, substring: bool) -> Vec<String> {
+    if let Ok(index) = ProjectIndex::load(workspace) {
+        let hits: Vec<String> = index
+            .files
+            .iter()
+            .filter(|(_, entry)| {
+                entry.symbols.iter().any(|sym| {
+                    if substring {
+                        sym.name_path.contains(pattern)
+                    } else {
+                        // Match last segment (name) or full name_path
+                        let last = sym.name_path.rsplit('/').next().unwrap_or(&sym.name_path);
+                        last == pattern || sym.name_path == pattern
+                    }
+                })
+            })
+            .map(|(file, _)| file.clone())
+            .collect();
+
+        if !hits.is_empty() {
+            return hits;
+        }
+    }
+    // Fallback: full scan
+    collect_source_files(workspace)
 }

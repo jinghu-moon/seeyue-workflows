@@ -18,6 +18,9 @@ use crate::workflow::state::SessionState;
 pub fn handle(input: &HookInput, _workflow_dir: &Path, session: &SessionState) -> ! {
     let cwd = input.resolve_cwd();
 
+    // Trigger incremental symbol index update in background (non-blocking, silent failure)
+    trigger_index_update(Path::new(&cwd));
+
     let mut extras: Vec<String> = Vec::new();
 
     // 1. Git context
