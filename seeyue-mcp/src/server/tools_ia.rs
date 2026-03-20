@@ -1,8 +1,8 @@
 // src/server/tools_ia.rs — P3 Interactive Tools
 
-use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*};
+use rmcp::{tool, tool_router, handler::server::wrapper::Parameters, model::*, service::RequestContext, RoleServer};
 use crate::params::*;
-use crate::server::util::to_text;
+use crate::server::util::{to_text, tool_error_to_result};
 use super::SeeyueMcpServer;
 
 #[tool_router(router = ia_router)]
@@ -27,27 +27,110 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
-    #[tool(description = "Create a pending approval request and send a Windows Toast notification. Returns approval_id to track the request.")]
+    #[tool(description = "Create an approval request. Uses MCP elicitation (inline popup) when supported; falls back to Toast + approvals.jsonl. Returns approval result with decision.")]
     async fn sy_approval_request(
         &self,
         Parameters(p): Parameters<ApprovalRequestParams>,
+        ctx: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
-        let result = crate::tools::approval::run_approval_request(
-            crate::tools::approval::ApprovalRequestParams {
-                subject:      p.subject,
-                detail:       p.detail,
-                category:     p.category,
-                timeout_secs: p.timeout_secs,
-            },
-            &self.state.workflow_dir,
-        );
-        result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+        let subject      = p.subject.clone();
+        let detail       = p.detail.clone();
+        let category     = p.category.clone();
+        let timeout_secs = p.timeout_secs;
+        let workflow_dir = self.state.workflow_dir.clone();
+
+        // Build elicitation message
+        let message = match detail.as_deref() {
+            Some(d) => format!("**{}**\n\n{}\n\nApprove this action?", subject, d),
+            None    => format!("**{}**\n\nApprove this action?", subject),
+        };
+
+        // Try MCP elicitation first (requires client support)
+        let schema = ElicitationSchema::builder()
+            .required_bool("approved")
+            .build_unchecked();
+
+        let params = CreateElicitationRequestParams::FormElicitationParams {
+            meta:             None,
+            message,
+            requested_schema: schema,
+        };
+
+        let timeout = timeout_secs
+            .map(|s| std::time::Duration::from_secs(s));
+
+        let approval_id = format!("apr_{}", chrono::Utc::now().timestamp_millis());
+
+        match ctx.peer.create_elicitation_with_timeout(params, timeout).await {
+            Ok(elicit_result) => {
+                let decision = match elicit_result.action {
+                    ElicitationAction::Accept => {
+                        // Check the "approved" bool field
+                        let approved = elicit_result.content
+                            .as_ref()
+                            .and_then(|v| v.get("approved"))
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(true);
+                        if approved { "approved" } else { "rejected" }
+                    }
+                    ElicitationAction::Decline  => "rejected",
+                    ElicitationAction::Cancel   => "cancelled",
+                };
+                let result = crate::tools::approval::write_elicitation_resolved(
+                    &approval_id,
+                    &subject,
+                    detail.as_deref(),
+                    category.as_deref(),
+                    decision,
+                    &workflow_dir,
+                );
+                result.map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+            }
+            Err(_) => {
+                // Client does not support elicitation → try local presenter (sy-interact)
+                let workspace    = self.state.workspace.clone();
+                let workflow_dir2 = workflow_dir.clone();
+                match crate::tools::approval::run_approval_via_presenter(
+                    &approval_id,
+                    &subject,
+                    detail.as_deref(),
+                    category.as_deref(),
+                    timeout_secs,
+                    &workspace,
+                    &workflow_dir2,
+                ) {
+                    Ok(decision) => {
+                        // Already written to approvals.jsonl by run_approval_via_presenter
+                        let r = crate::tools::approval::ApprovalRequestResult {
+                            kind:         decision.clone(),
+                            approval_id:  approval_id.clone(),
+                            subject:      subject.clone(),
+                            status:       decision.clone(),
+                            notified:     true,
+                            timeout_secs,
+                            expires_at:   None,
+                        };
+                        Ok(to_text(serde_json::to_string_pretty(&r).unwrap()))
+                    }
+                    Err(_) => {
+                        // Presenter unavailable → fallback to Toast + jsonl
+                        let result = crate::tools::approval::run_approval_request(
+                            crate::tools::approval::ApprovalRequestParams {
+                                subject,
+                                detail,
+                                category,
+                                timeout_secs,
+                            },
+                            &workflow_dir,
+                        );
+                        result.map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
+                    }
+                }
+            }
+        }
     }
 
     #[tool(description = "Resolve a pending approval as approved or rejected. approval_id from sy_approval_request. decision: approved | rejected.")]
@@ -64,8 +147,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Query approval status. If approval_id is omitted, returns all pending approvals.")]
@@ -81,8 +163,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Update a node's status or notes in task-graph.yaml. status values: completed | in_progress | skipped | pending.")]
@@ -104,8 +185,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Generate a human-readable progress report for the current workflow phase. Aggregates completed/total nodes, files written, key events.")]
@@ -121,8 +201,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Post a question to the user via Windows Toast + questions.jsonl. Returns question_id; poll sy_ask_user_status to retrieve the answer.")]
@@ -139,8 +218,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Poll for user answers to questions posted by sy_ask_user. Omit question_id to return all pending questions.")]
@@ -155,8 +233,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Request structured input from the user (text/code/file_path/json) via Toast + input_requests.jsonl. Returns request_id.")]
@@ -174,8 +251,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Poll for submitted input responses from sy_input_request. Omit request_id to return all pending requests.")]
@@ -190,8 +266,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     // ─── P2-N4: Interaction MCP Tools ────────────────────────────────────────
@@ -208,8 +283,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Read a specific interaction request by ID from .ai/workflow/interactions/requests/.")]
@@ -224,8 +298,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Probe interaction capability: checks for MCP elicitation support and sy-interact binary. Returns preferred_mode (elicitation|local_presenter|text_fallback).")]
@@ -240,8 +313,7 @@ impl SeeyueMcpServer {
             self.state.workspace.as_ref(),
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 
     #[tool(description = "Write a response file for an interaction (MCP-driven resolution). Writes to .ai/workflow/interactions/responses/.")]
@@ -258,8 +330,7 @@ impl SeeyueMcpServer {
             &self.state.workflow_dir,
         );
         result
-            .map(|r| to_text(serde_json::to_string_pretty(&r).unwrap()))
-            .map_err(|e| ErrorData::invalid_params(e.to_json(), None))
+            .map_or_else(tool_error_to_result, |r| Ok(to_text(serde_json::to_string_pretty(&r).unwrap())))
     }
 }
 

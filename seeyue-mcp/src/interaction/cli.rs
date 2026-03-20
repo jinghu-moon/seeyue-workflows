@@ -86,7 +86,7 @@ pub enum Commands {
         timeout_seconds: u32,
 
         /// Disable alternate screen (use inline rendering)
-        #[arg(long = "no-alternate-screen")]
+        #[arg(long = "inline")]
         no_alternate_screen: bool,
     },
 
@@ -174,18 +174,36 @@ pub fn cmd_render(
     };
 
     // 4. Resolve effective mode.
-    //    "tui" is NOT implemented in P0 — always reject with EXIT_TERMINAL_UNSUPPORTED.
-    //    This keeps the host wrapper contract stable: --mode tui never silently degrades.
-    if mode == "tui" {
-        eprintln!("[sy-interact] tui mode is not implemented in P0; use 'text' or 'plain'");
+    //    tui + inline → render_tui_inline
+    //    tui (full)   → render_tui (alternate screen)
+    //    text/plain   → text_menu / plain_prompt
+    let use_inline_tui = mode == "tui" && opts.no_alternate_screen;
+    let use_full_tui   = mode == "tui" && !opts.no_alternate_screen;
+
+    if use_full_tui && !effective_caps.supports_raw_mode {
+        eprintln!("[sy-interact] tui mode requires raw mode terminal");
         return EXIT_TERMINAL_UNSUPPORTED;
     }
 
-    let effective_mode = resolve_mode(mode, &effective_caps);
+    let effective_mode = if use_inline_tui || use_full_tui {
+        "tui".to_string()
+    } else {
+        resolve_mode(mode, &effective_caps)
+    };
 
     // 6. Render — with optional timeout via thread + channel
     let options = request.options.clone();
-    let terminal_resp = if opts.timeout_seconds > 0 {
+    let terminal_resp = if use_inline_tui {
+        // Inline TUI: ratatui Viewport::Inline, no alternate screen
+        let req_clone = request.clone();
+        let theme = opts.theme.clone();
+        crate::interaction::render_tui::render_tui_inline(&req_clone, &theme)
+    } else if use_full_tui {
+        // Full-screen TUI: alternate screen
+        let req_clone = request.clone();
+        let theme = opts.theme.clone();
+        crate::interaction::render_tui::render_tui(&req_clone, &theme)
+    } else if opts.timeout_seconds > 0 {
         let (tx, rx) = mpsc::channel();
         let req_clone = request.clone();
         let opts_clone = options.clone();

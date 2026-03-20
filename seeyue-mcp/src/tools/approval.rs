@@ -479,3 +479,192 @@ pub fn project_approval_as_interaction(
         projected: true,
     })
 }
+
+// ─── sy-interact local presenter ────────────────────────────────────────────
+
+/// Try to resolve an approval via the `sy-interact` local TUI presenter.
+/// Writes a temporary request file, spawns sy-interact, reads the response.
+/// Returns the decision string or an error if presenter unavailable/failed.
+pub fn run_approval_via_presenter(
+    approval_id: &str,
+    subject:     &str,
+    detail:      Option<&str>,
+    category:    Option<&str>,
+    timeout_secs: Option<u64>,
+    workspace:   &Path,
+    workflow_dir: &Path,
+) -> Result<String, String> {
+    // Find sy-interact binary
+    let binary = find_presenter_binary(workspace)
+        .ok_or_else(|| "sy-interact binary not found".to_string())?;
+
+    // Write request file to interactions/requests/
+    let requests_dir = workflow_dir.join("interactions").join("requests");
+    fs::create_dir_all(&requests_dir)
+        .map_err(|e| format!("create requests dir: {e}"))?;
+
+    let ts = chrono::Utc::now().to_rfc3339();
+    let interaction_id = format!("ix-{}_{}",
+        chrono::Utc::now().format("%Y%m%d"),
+        &approval_id[approval_id.len().saturating_sub(6)..]);
+
+    let message = match detail {
+        Some(d) => format!("{subject}\n\n{d}"),
+        None    => subject.to_owned(),
+    };
+    let risk = category.unwrap_or("medium");
+    let request_obj = serde_json::json!({
+        "schema": 1,
+        "interaction_id": interaction_id,
+        "kind": "approval_request",
+        "status": "pending",
+        "title": subject,
+        "message": message,
+        "selection_mode": "boolean",
+        "options": [
+            {"id": "approve", "label": "Approve", "recommended": true},
+            {"id": "reject",  "label": "Reject",  "recommended": false}
+        ],
+        "comment_mode": "disabled",
+        "presentation": {
+            "mode": "text_menu",
+            "color_profile": "auto",
+            "theme": "auto"
+        },
+        "originating_request_id": approval_id,
+        "risk_level": risk,
+        "created_at": ts,
+    });
+
+    let req_path = requests_dir.join(format!("{interaction_id}.json"));
+    let req_content = serde_json::to_string_pretty(&request_obj)
+        .map_err(|e| format!("serialize request: {e}"))?;
+    fs::write(&req_path, req_content)
+        .map_err(|e| format!("write request file: {e}"))?;
+
+    // Write response file path (sy-interact will create it)
+    let responses_dir = workflow_dir.join("interactions").join("responses");
+    fs::create_dir_all(&responses_dir)
+        .map_err(|e| format!("create responses dir: {e}"))?;
+    let resp_path = responses_dir.join(format!("{interaction_id}.json"));
+
+    // Build command
+    let timeout_arg = timeout_secs.unwrap_or(120).to_string();
+    let mut cmd = std::process::Command::new(&binary);
+    cmd.arg("render")
+        .arg("--request-file").arg(&req_path)
+        .arg("--response-file").arg(&resp_path)
+        .arg("--timeout-seconds").arg(&timeout_arg)
+        .arg("--mode").arg("tui")
+        .arg("--inline");
+
+    // Inherit stdin/stdout/stderr so TUI can render
+    cmd.stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit());
+
+    let status = cmd.status()
+        .map_err(|e| format!("spawn sy-interact: {e}"))?;
+
+    // Exit code 2 = user cancelled, 4 = timeout
+    if !status.success() {
+        let code = status.code().unwrap_or(-1);
+        return match code {
+            2 => Ok("cancelled".to_string()),
+            4 => Ok("cancelled".to_string()), // timeout
+            _ => Err(format!("sy-interact exited with code {code}")),
+        };
+    }
+
+    // Read response
+    let resp_content = fs::read_to_string(&resp_path)
+        .map_err(|e| format!("read response file: {e}"))?;
+    let resp_val: serde_json::Value = serde_json::from_str(&resp_content)
+        .map_err(|e| format!("parse response: {e}"))?;
+
+    let selected = resp_val
+        .get("selected_option_ids")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|v| v.as_str())
+        .unwrap_or("reject");
+
+    let decision = if selected == "approve" { "approved" } else { "rejected" };
+
+    // Write resolved record
+    write_elicitation_resolved(approval_id, subject, detail, category, decision, workflow_dir)
+        .map_err(|e| format!("write resolved: {e:?}"))?;
+
+    Ok(decision.to_string())
+}
+
+/// Search for the sy-interact binary in standard locations.
+fn find_presenter_binary(workspace: &Path) -> Option<String> {
+    let candidates = [
+        workspace.join("target").join("debug").join("sy-interact.exe"),
+        workspace.join("target").join("release").join("sy-interact.exe"),
+        workspace.join("target").join("debug").join("sy-interact"),
+        workspace.join("target").join("release").join("sy-interact"),
+    ];
+    for c in &candidates {
+        if c.exists() { return Some(c.to_string_lossy().into_owned()); }
+    }
+    which::which("sy-interact").ok().map(|p| p.to_string_lossy().into_owned())
+}
+
+// ─── Elicitation-resolved record writer ──────────────────────────────────────
+
+/// Called from the MCP handler after elicitation completes.
+/// Writes a resolved ApprovalRecord (approved/rejected/cancelled) to approvals.jsonl
+/// and records a journal event.  Returns the resolved ApprovalRequestResult.
+pub fn write_elicitation_resolved(
+    approval_id: &str,
+    subject:     &str,
+    detail:      Option<&str>,
+    category:    Option<&str>,
+    decision:    &str, // "approved" | "rejected" | "cancelled"
+    workflow_dir: &Path,
+) -> Result<ApprovalRequestResult, ToolError> {
+    let ts          = Utc::now().to_rfc3339();
+    let resolved_at = ts.clone();
+
+    let record = ApprovalRecord {
+        approval_id:  approval_id.to_owned(),
+        ts:           ts.clone(),
+        subject:      subject.to_owned(),
+        detail:       detail.map(|s| s.to_owned()),
+        category:     category.map(|s| s.to_owned()),
+        status:       decision.to_owned(),
+        decision:     Some(decision.to_owned()),
+        note:         Some("resolved via MCP elicitation".into()),
+        resolved_at:  Some(resolved_at),
+        timeout_secs: None,
+        expires_at:   None,
+    };
+    append_record(workflow_dir, &record)?;
+
+    let _ = journal::append_event(workflow_dir, JournalEvent {
+        event:   "approval_resolved".into(),
+        actor:   "elicitation".into(),
+        payload: Some(serde_json::json!({
+            "approval_id": approval_id,
+            "decision":    decision,
+            "subject":     subject,
+        })),
+        phase:    None,
+        node_id:  None,
+        run_id:   None,
+        ts:       Utc::now().to_rfc3339(),
+        trace_id: None,
+    });
+
+    Ok(ApprovalRequestResult {
+        kind:         decision.to_owned(),
+        approval_id:  approval_id.to_owned(),
+        subject:      subject.to_owned(),
+        status:       decision.to_owned(),
+        notified:     true,
+        timeout_secs: None,
+        expires_at:   None,
+    })
+}
